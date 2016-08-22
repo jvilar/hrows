@@ -1,0 +1,7 @@
+Setup.hs
+dist
+
+*~
+*.hi
+*.swp
+
