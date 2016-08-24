@@ -316,7 +316,7 @@
               <placeholder/>
             </child>
             <child>
-              <object class="GtkButton" id="exitButton">
+              <object class="GtkButton" id="quitButton">
                 <property name="label" translatable="yes">Salir</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>

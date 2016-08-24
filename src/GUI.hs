@@ -25,6 +25,7 @@ makeGUI inputChan = do
 
   prepareMainWindow builder
   prepareMovementButtons builder inputChan
+  prepareQuitButton builder
 
   prepareControl builder
 
@@ -51,7 +52,12 @@ prepareMovementButtons builder inputChan =
         , ("rightButton", MoveNext)
         ] $ \(name, input) -> do
     btn <- builderGetObject builder castToButton name
-    btn `on`buttonActivated $ (writeChan inputChan (InputMove input) >> print input)
+    btn `on` buttonActivated $ (writeChan inputChan (InputMove input) >> print input)
+
+prepareQuitButton :: Builder -> IO ()
+prepareQuitButton builder = do
+  btn <- builderGetObject builder castToButton "quitButton"
+  void (btn `on` buttonActivated $ mainQuit)
 
 updateGUI :: GUIControl -> DisplayInfo -> IO ()
 updateGUI control dinfo = do
