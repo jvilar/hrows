@@ -5,8 +5,10 @@ module Model (
              -- *Constants
              , model0
              -- *Functions
+             , names
              , row
              , size
+             , toString
 ) where
 
 -- |A field can store an Int, a Double or a String or it may be empty.
@@ -30,6 +32,13 @@ instance ToField String where
 instance ToField f => ToField (Maybe f) where
     toField Nothing = Empty
     toField (Just v) = toField v
+
+-- |The string associated to a `Field`.
+toString :: Field -> String
+toString (AInt n) = show n
+toString (ADouble d) = show d
+toString (AString s) = s
+toString Empty = "---"
 
 -- |A row is a list of fields.
 type Row = [Field]
@@ -57,3 +66,7 @@ row n = (!!n) . _rows
 -- |Number of rows of the `Model`.
 size :: Model -> Int
 size = _size
+
+-- |Returns the names of the rows.
+names :: Model -> Maybe [String]
+names = _names

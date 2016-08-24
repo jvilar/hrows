@@ -1,46 +1,29 @@
 {-# LANGUAGE Arrows #-}
 
 module Presenter (
-                 -- *Types
-                 Input(..)
-                 , MoveCommand
                  -- *Functions
-                 , presenter
+                 presenter
+                 -- *Constants
+                 , display0
+                 -- *Reexported
+                 , module Input
 ) where
 
-import Control.Auto(Auto', accum_, id, (.))
+import Control.Auto(Auto', accum_, id)
 import Prelude hiding((.), id)
 
-import Model
+import AppState
+import DisplayInfo
+import Input
 
--- |The input that the presenter can receive.
-data Input = InputMove MoveCommand
 
--- |Commands related to movement.
-data MoveCommand = MoveNext
-                 | MovePrevious
+-- |Initial display of the application.
+display0 :: DisplayInfo
+display0 = buildDisplay state0
 
--- |The information to display
-data DisplayInfo = DisplayInfo { rows :: [String]
-                               , position :: Int
-                               }
-
-data State = State { model :: Model
-                   , pos :: Int
-                   }
-
-state0 :: State
-state0 = State { model = model0
-               , pos = 0
-               }
-
+-- |The presenter admits inputs and produces information
+-- for updating the display.
 presenter :: Auto' Input DisplayInfo
 presenter = proc inp -> do
-              state <- accum_ update state0 -< inp
+              state <- accum_ (flip update) state0 -< inp
               id -< buildDisplay state
-
-update :: State -> Input -> State
-update = undefined
-
-buildDisplay :: State -> DisplayInfo
-buildDisplay = undefined
