@@ -5,8 +5,6 @@ module Model (
              , Row
              -- *Classes
              , ToField(..)
-             -- *Constants
-             , model0
              -- *Functions
              -- **Construction
              , empty
@@ -61,16 +59,6 @@ data Model = Model { _rows :: IntMap Row
                    , _names :: Maybe [String]
                    , _size :: Int
                    }
-
--- |The initial `Model` for tests.
-model0 :: Model
-model0 = Model { _rows = IM.fromList $ zip [0..] [toField <$> ["one", "two", "three"]
-                         ,toField <$> ["uno", "dos", "tres"]
-                         ,toField <$> ["eins", "zwei", "drei"]
-                         ]
-               , _names = Just ["Col1", "Col2", "Col3"]
-               , _size = 3
-               }
 
 -- |An empty `Model`.
 empty :: Model

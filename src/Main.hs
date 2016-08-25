@@ -16,18 +16,23 @@ import System.IO (hPutStrLn, IOMode(ReadMode), openFile, stderr)
 import System.Console.JMVOptions
 
 import AppState
+import DisplayInfo
 import GUI
 import ListatabFile
+import Model
 import Presenter
 
 data Options = Options { _help :: Bool
                        , _inputFileName :: Maybe FilePath
+                       , _separator :: Char
                        }
 
 makeLenses ''Options
 
+defaultOptions :: Options
 defaultOptions = Options  { _help = False
                           , _inputFileName = Nothing
+                          , _separator = '\t'
                           }
 
 def field = "Default: " ++ show (defaultOptions ^. field) ++ "."
@@ -35,6 +40,7 @@ def field = "Default: " ++ show (defaultOptions ^. field) ++ "."
 options :: [OptDescr (Options -> Options)]
 options = processOptions $ do
               'h' ~: s "help" ==> NoArg (set help True) ~: s "This help."
+              's' ~: s "separator" ==> ReqArg (set separator . head) "SEP" ~: s "Separator for listatab files. " ++ def separator
           where s :: String -> String
                 s = id
 
@@ -64,19 +70,23 @@ myError m = do
 main :: IO ()
 main = do
   opts <- getOptions
-  let name = fromJust $ opts ^. inputFileName
-  f <- openFile name ReadMode
-  model0 <- fromListatab name f '\t'
+  model0 <- initialModel opts
   let state0 = mkState model0
-      display0 = buildDisplay state0
 
   inputChan <- newChan
   control <- makeGUI inputChan
-  updateGUI control display0
+  updateGUI control $ buildDisplay state0
   forkIO $ void $ runOnChan (\info -> do
                                  postGUIAsync (updateGUI control info)
+                                 print $ position info
                                  return True
                             )
                   inputChan
                   (presenter state0)
   mainGUI
+
+initialModel :: Options -> IO Model
+initialModel opts = do
+  let name = fromJust $ opts ^. inputFileName
+  f <- openFile name ReadMode
+  fromListatab name f (opts ^. separator)
