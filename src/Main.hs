@@ -17,7 +17,6 @@ main = do
   updateGUI control display0
   forkIO $ void $ runOnChan (\info -> do
                                  postGUIAsync (updateGUI control info)
-                                 print $ position info
                                  return True
                             )
                   inputChan

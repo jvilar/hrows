@@ -26,6 +26,7 @@ makeGUI inputChan = do
   prepareMainWindow builder
   prepareMovementButtons builder inputChan
   prepareQuitButton builder
+  prepareFileMenu builder
 
   prepareControl builder
 
@@ -58,6 +59,11 @@ prepareQuitButton :: Builder -> IO ()
 prepareQuitButton builder = do
   btn <- builderGetObject builder castToButton "quitButton"
   void (btn `on` buttonActivated $ mainQuit)
+
+prepareFileMenu :: Builder -> IO ()
+prepareFileMenu builder = do
+  itm <- builderGetObject builder castToMenuItem "quitMenuItem"
+  void (itm `on` menuItemActivated $ mainQuit)
 
 updateGUI :: GUIControl -> DisplayInfo -> IO ()
 updateGUI control dinfo = do

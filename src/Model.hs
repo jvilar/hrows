@@ -11,6 +11,9 @@ module Model (
              , toString
 ) where
 
+import Data.IntMap.Strict(IntMap)
+import qualified Data.IntMap.Strict as IM
+
 -- |A field can store an Int, a Double or a String or it may be empty.
 data Field = AInt Int
            | ADouble Double
@@ -44,14 +47,14 @@ toString Empty = "---"
 type Row = [Field]
 
 -- |Holds the rows.
-data Model = Model { _rows :: [Row]
+data Model = Model { _rows :: IntMap Row
                    , _names :: Maybe [String]
                    , _size :: Int
                    }
 
 -- |The initial model for tests.
 model0 :: Model
-model0 = Model { _rows = [toField <$> ["one", "two", "three"]
+model0 = Model { _rows = IM.fromList $ zip [0..] [toField <$> ["one", "two", "three"]
                          ,toField <$> ["uno", "dos", "tres"]
                          ,toField <$> ["eins", "zwei", "drei"]
                          ]
@@ -61,7 +64,7 @@ model0 = Model { _rows = [toField <$> ["one", "two", "three"]
 
 -- |Returns one row of the `Model`.
 row :: Int -> Model -> Row
-row n = (!!n) . _rows
+row n = (IM.! n) . _rows
 
 -- |Number of rows of the `Model`.
 size :: Model -> Int
