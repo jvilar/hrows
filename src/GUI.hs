@@ -8,6 +8,7 @@ import Control.Concurrent.Chan(Chan, writeChan)
 import Control.Monad(forM_, void)
 import Control.Monad.IO.Class(liftIO)
 import Graphics.UI.Gtk
+import Graphics.UI.Gtk.General.Enums(Align(..))
 
 import DisplayInfo
 import Input
@@ -84,6 +85,7 @@ updateRows control dinfo = do
   mapM_ widgetDestroy children
   forM_ (enumerate $ zip (fieldNames dinfo) (fields dinfo)) $ \(row, (name, field)) -> do
                              lbl <- labelNew (Just name)
+                             widgetSetHAlign lbl AlignStart
                              gridAttach grid lbl 0 row 1 1
                              entry <- entryNew
                              set entry [ entryText := field

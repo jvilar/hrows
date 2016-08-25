@@ -3,8 +3,8 @@ module AppState (
                  AppState(..)
                 -- *Classes
                 , StateUpdater(..)
-                -- *Constants
-                , state0
+                -- *Constructor
+                , mkState
                 -- *Functions
                 , buildDisplay
 ) where
@@ -18,10 +18,10 @@ data AppState = AppState { model :: Model
                          , pos :: Int
                          }
 
-state0 :: AppState
-state0 = AppState { model = model0
-                  , pos = 0
-                  }
+mkState :: Model -> AppState
+mkState m = AppState { model = m
+                     , pos = 0
+                     }
 
 class StateUpdater t where
     update :: t -> AppState -> AppState

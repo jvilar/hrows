@@ -2,9 +2,18 @@
 module Model (
               -- *Types
               Model
+             , Row
+             -- *Classes
+             , ToField(..)
              -- *Constants
              , model0
              -- *Functions
+             -- **Construction
+             , empty
+             , addRow
+             , setNames
+             , fromRows
+             -- **Querying
              , names
              , row
              , size
@@ -13,6 +22,7 @@ module Model (
 
 import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
+import Data.List(foldl')
 
 -- |A field can store an Int, a Double or a String or it may be empty.
 data Field = AInt Int
@@ -52,7 +62,7 @@ data Model = Model { _rows :: IntMap Row
                    , _size :: Int
                    }
 
--- |The initial model for tests.
+-- |The initial `Model` for tests.
 model0 :: Model
 model0 = Model { _rows = IM.fromList $ zip [0..] [toField <$> ["one", "two", "three"]
                          ,toField <$> ["uno", "dos", "tres"]
@@ -61,6 +71,27 @@ model0 = Model { _rows = IM.fromList $ zip [0..] [toField <$> ["one", "two", "th
                , _names = Just ["Col1", "Col2", "Col3"]
                , _size = 3
                }
+
+-- |An empty `Model`.
+empty :: Model
+empty = Model { _rows = IM.empty
+              , _names = Nothing
+              , _size = 0
+              }
+
+-- |Adds a `Row` to a `Model`.
+addRow :: Model -> Row -> Model
+addRow m r = m { _rows = IM.insert (_size m) r (_rows m)
+               , _size = _size m + 1
+               }
+
+-- |Creates a model from a list of `Row`s.
+fromRows :: [Row] -> Model
+fromRows = foldl' addRow empty
+
+-- |Sets the names of the field.
+setNames :: [String] -> Model -> Model
+setNames l m = m { _names = Just l }
 
 -- |Returns one row of the `Model`.
 row :: Int -> Model -> Row
