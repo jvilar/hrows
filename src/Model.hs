@@ -3,6 +3,9 @@ module Model (
               -- *Types
               Model
              , Row
+             , Field
+             , RowPos
+             , ColPos
              -- *Classes
              , ToField(..)
              -- *Functions
@@ -16,6 +19,8 @@ module Model (
              , row
              , size
              , toString
+             -- **Updating
+             , changeField
 ) where
 
 import Data.IntMap.Strict(IntMap)
@@ -54,6 +59,12 @@ toString Empty = "---"
 -- |A row is a list of fields.
 type Row = [Field]
 
+-- |The position of a `Row`.
+type RowPos = Int
+
+-- |The position of a `Column`.
+type ColPos = Int
+
 -- |Holds the rows.
 data Model = Model { _rows :: IntMap Row
                    , _names :: Maybe [String]
@@ -82,7 +93,7 @@ setNames :: [String] -> Model -> Model
 setNames l m = m { _names = Just l }
 
 -- |Returns one row of the `Model`.
-row :: Int -> Model -> Row
+row :: RowPos -> Model -> Row
 row n = (IM.! n) . _rows
 
 -- |Number of rows of the `Model`.
@@ -92,3 +103,11 @@ size = _size
 -- |Returns the names of the rows.
 names :: Model -> Maybe [String]
 names = _names
+
+-- |Changes one field.
+changeField :: RowPos -> ColPos -> Field -> Model -> Model
+changeField r c field m = m { _rows = IM.adjust (adjustCol c field) r (_rows m) }
+
+adjustCol :: ColPos -> Field -> Row -> Row
+adjustCol 0 x (_:xs) = x:xs
+adjustCol n x (y:ys) = y : adjustCol (n-1) x ys

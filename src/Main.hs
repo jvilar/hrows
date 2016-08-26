@@ -8,7 +8,7 @@ import Control.Concurrent.Chan(newChan)
 import Control.Lens (makeLenses, (^.), set)
 import Control.Monad(unless, void, when)
 import Data.Maybe(fromJust)
-import Graphics.UI.Gtk (mainGUI, postGUIAsync)
+import Graphics.UI.Gtk (mainGUI, postGUISync)
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
 import System.IO (hPutStrLn, IOMode(ReadMode), openFile, stderr)
@@ -76,14 +76,16 @@ main = do
   inputChan <- newChan
   control <- makeGUI inputChan
   updateGUI control $ buildDisplay state0
-  forkIO $ void $ runOnChan (\info -> do
-                                 postGUIAsync (updateGUI control info)
-                                 print $ position info
-                                 return True
-                            )
-                  inputChan
-                  (presenter state0)
+  forkIO $ void $ runOnChan (updateScreen control)
+                            inputChan
+                            (presenter state0)
   mainGUI
+
+updateScreen :: GUIControl -> DisplayInfo -> IO Bool
+updateScreen control info = do
+  postGUISync (updateGUI control info)
+  print $ position info
+  return True
 
 initialModel :: Options -> IO Model
 initialModel opts = do
