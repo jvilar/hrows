@@ -17,6 +17,7 @@ cabal-version:       >=1.10
 
 executable hrows
   main-is:             Main.hs
+  ghc-options:         -threaded
   -- other-modules:       
   -- other-extensions:    
   build-depends:       auto, base, containers, jmvOptions, lens, gtk3, megaparsec, mtl, transformers
