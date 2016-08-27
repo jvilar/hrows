@@ -334,9 +334,6 @@
               </packing>
             </child>
             <child>
-              <placeholder/>
-            </child>
-            <child>
               <object class="GtkButton" id="quitButton">
                 <property name="label" translatable="yes">Salir</property>
                 <property name="visible">True</property>
@@ -346,6 +343,7 @@
               <packing>
                 <property name="expand">False</property>
                 <property name="fill">True</property>
+                <property name="pack_type">end</property>
                 <property name="position">4</property>
               </packing>
             </child>
