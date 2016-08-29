@@ -3,19 +3,21 @@ module ListatabFile (
    fromListatab
 ) where
 
-import System.IO (Handle, hGetContents)
+import System.IO (hGetContents, openFile, IOMode(ReadMode))
 import Text.Megaparsec
 
+import ListatabInfo
 import Model
 
 -- |Creates a `Model` from a listatab file.
-fromListatab :: FilePath -> Handle -> Char -> IO Model
-fromListatab name handle separator = do
+fromListatab :: ListatabInfo -> IO Model
+fromListatab info = do
+  handle <- openFile (ltFileName info) ReadMode
   f <- hGetContents handle
-  case parse (analyze separator) name f of
-    Right lst -> return lst
+  case parse (analyze (ltInputSeparator info)) (ltFileName info) f of
+    Right m -> return $ setSourceInfo info m
     Left e -> do
-      putStrLn $ "Error reading file: " ++ name
+      putStrLn $ "Error reading file: " ++ (ltFileName info)
       putStr $ parseErrorPretty e
       fail ""
 

@@ -2,29 +2,28 @@
 
 module Main where
 
-import Control.Auto.Run(runOnChan)
+import Control.Auto.Run(runOnChanM)
 import Control.Concurrent(forkIO)
-import Control.Concurrent.Chan(newChan)
-import Control.Lens (makeLenses, (^.), set)
+import Control.Concurrent.Chan(newChan, writeChan)
+import Control.Lens (makeLenses, (^.), set, Getting)
 import Control.Monad(unless, void, when)
-import Data.Maybe(fromJust)
 import Graphics.UI.Gtk (mainGUI, postGUISync)
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
-import System.IO (hPutStrLn, IOMode(ReadMode), openFile, stderr)
+import System.IO (hPutStrLn, stderr)
 
 import System.Console.JMVOptions
 
 import AppState
 import DisplayInfo
 import GUI
-import ListatabFile
 import Model
 import Presenter
 
 data Options = Options { _help :: Bool
                        , _inputFileName :: Maybe FilePath
-                       , _separator :: Char
+                       , _inputSeparator :: Char
+                       , _outputSeparator :: Char
                        }
 
 makeLenses ''Options
@@ -32,15 +31,18 @@ makeLenses ''Options
 defaultOptions :: Options
 defaultOptions = Options  { _help = False
                           , _inputFileName = Nothing
-                          , _separator = '\t'
+                          , _inputSeparator = '\t'
+                          , _outputSeparator = '\t'
                           }
 
+def :: Show a => Getting a Options a -> String
 def field = "Default: " ++ show (defaultOptions ^. field) ++ "."
 
 options :: [OptDescr (Options -> Options)]
 options = processOptions $ do
               'h' ~: s "help" ==> NoArg (set help True) ~: s "This help."
-              's' ~: s "separator" ==> ReqArg (set separator . head) "SEP" ~: s "Separator for listatab files. " ++ def separator
+              's' ~: s "separator" ==> ReqArg ((\c -> set inputSeparator c . set outputSeparator c) . head) "SEP" ~: s "Separator for input of listatab files. " ++ def inputSeparator
+              'S' ~: s "oSeparator" ==> ReqArg (set outputSeparator . head) "SEP" ~: s "Separator for output listatab files. Default: use the one passed to separator."
           where s :: String -> String
                 s = id
 
@@ -70,15 +72,20 @@ myError m = do
 main :: IO ()
 main = do
   opts <- getOptions
-  model0 <- initialModel opts
-  let state0 = mkState model0
+  let Just fileName = opts ^. inputFileName
+      info = ListatabInfo fileName
+                          (opts ^. inputSeparator)
+                          (opts ^. outputSeparator)
+      model0 = empty
+      state0 = mkState model0
 
   inputChan <- newChan
   control <- makeGUI inputChan
-  updateGUI control $ buildDisplay state0
-  forkIO $ void $ runOnChan (updateScreen control)
+  forkIO $ void $ runOnChanM id
+                            (updateScreen control)
                             inputChan
                             (presenter state0)
+  writeChan inputChan $ InputFile (LoadFile $ toSourceInfo info)
   mainGUI
 
 updateScreen :: GUIControl -> DisplayInfo -> IO Bool
@@ -87,8 +94,3 @@ updateScreen control info = do
   print $ position info
   return True
 
-initialModel :: Options -> IO Model
-initialModel opts = do
-  let name = fromJust $ opts ^. inputFileName
-  f <- openFile name ReadMode
-  fromListatab name f (opts ^. separator)

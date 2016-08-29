@@ -18,7 +18,7 @@ instance StateUpdater MoveCommand where
     update MoveBegin = checkedMovement (const 0)
     update MoveEnd = \s -> checkedMovement (const $ size (model s) - 1) s
 
-checkedMovement :: (Int -> Int) -> AppState -> AppState
-checkedMovement f s | 0 <= newPos && newPos < size (model s) = s { pos = newPos }
-                    | otherwise = s
+checkedMovement :: (Int -> Int) -> AppState -> IO AppState
+checkedMovement f s | 0 <= newPos && newPos < size (model s) = return s { pos = newPos }
+                    | otherwise = return s
     where newPos = f $ pos s

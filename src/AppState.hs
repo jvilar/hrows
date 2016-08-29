@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances, UndecidableInstances  #-}
+
 module AppState (
                  -- *Types
                  AppState(..)
@@ -16,15 +18,17 @@ import Model
 
 data AppState = AppState { model :: Model
                          , pos :: Int
+                         , errorMessage :: Maybe String
                          }
 
 mkState :: Model -> AppState
 mkState m = AppState { model = m
                      , pos = 0
+                     , errorMessage = Nothing
                      }
 
 class StateUpdater t where
-    update :: t -> AppState -> AppState
+    update :: t -> AppState -> IO AppState
 
 buildDisplay :: AppState -> DisplayInfo
 buildDisplay s = DisplayInfo { position = p

@@ -6,8 +6,8 @@ module Update (
 import AppState
 import Model
 
-data UpdateCommand = UpdateField Int Field
+data UpdateCommand = UpdateField Int Field deriving Show
 
 instance StateUpdater UpdateCommand where
-    update (UpdateField c v) s = s { model = newModel }
+    update (UpdateField c v) s = return s { model = newModel }
         where newModel = changeField (pos s) c v (model s)

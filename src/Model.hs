@@ -18,20 +18,25 @@ module Model (
              , names
              , row
              , size
+             , sourceInfo
              , toString
              -- **Updating
              , changeField
+             , setSourceInfo
 ) where
 
 import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
 import Data.List(foldl')
 
+import SourceInfo
+
 -- |A field can store an Int, a Double or a String or it may be empty.
 data Field = AInt Int
            | ADouble Double
            | AString String
            | Empty
+             deriving Show
 
 class ToField t where
     toField :: t -> Field
@@ -69,13 +74,16 @@ type ColPos = Int
 data Model = Model { _rows :: IntMap Row
                    , _names :: Maybe [String]
                    , _size :: Int
+                   , _sourceInfo :: SourceInfo
                    }
+
 
 -- |An empty `Model`.
 empty :: Model
 empty = Model { _rows = IM.empty
               , _names = Nothing
               , _size = 0
+              , _sourceInfo = toSourceInfo ()
               }
 
 -- |Adds a `Row` to a `Model`.
@@ -91,6 +99,14 @@ fromRows = foldl' addRow empty
 -- |Sets the names of the field.
 setNames :: [String] -> Model -> Model
 setNames l m = m { _names = Just l }
+
+-- |Set the associated information.
+setSourceInfo :: SourceInfoClass si => si -> Model -> Model
+setSourceInfo si m = m { _sourceInfo = toSourceInfo si }
+
+-- |Get the associated information
+sourceInfo :: Model -> SourceInfo
+sourceInfo = _sourceInfo
 
 -- |Returns one row of the `Model`.
 row :: RowPos -> Model -> Row

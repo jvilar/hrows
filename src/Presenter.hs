@@ -7,7 +7,7 @@ module Presenter (
                  , module Input
 ) where
 
-import Control.Auto(Auto', accum_, id)
+import Control.Auto(Auto, accumM_, id)
 import Prelude hiding((.), id)
 
 import AppState
@@ -16,7 +16,7 @@ import Input
 
 -- |The presenter admits inputs and produces information
 -- for updating the display.
-presenter :: AppState -> Auto' Input DisplayInfo
+presenter :: AppState -> Auto IO Input DisplayInfo
 presenter state0 = proc inp -> do
-              state <- accum_ (flip update) state0 -< inp
+              state <- accumM_ (flip update) state0 -< inp
               id -< buildDisplay state
