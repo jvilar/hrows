@@ -13,6 +13,8 @@ import Data.IORef(IORef, newIORef, readIORef, writeIORef)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
 
+import Paths_hrows(getDataFileName)
+
 import DisplayInfo
 import Input
 import Model
@@ -28,7 +30,8 @@ makeGUI iChan = do
   initGUI
 
   builder <- builderNew
-  builderAddFromFile builder "hrows.glade"
+  gladefn <- getDataFileName "hrows.glade"
+  builderAddFromFile builder gladefn
 
   prepareMainWindow builder
   prepareMovementButtons builder iChan

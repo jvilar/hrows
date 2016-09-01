@@ -14,6 +14,8 @@ maintainer:          jvilar@uji.es
 build-type:          Simple
 extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
+data-files:          hrows.glade
+data-dir:            src
 
 executable hrows
   main-is:             Main.hs
