@@ -14,17 +14,18 @@ module AppState (
 import Data.Maybe(fromMaybe)
 
 import DisplayInfo
+import Message
 import Model
 
 data AppState = AppState { model :: Model
                          , pos :: Int
-                         , errorMessage :: Maybe String
+                         , pendingMessage :: Maybe Message
                          }
 
 mkState :: Model -> AppState
 mkState m = AppState { model = m
                      , pos = 0
-                     , errorMessage = Nothing
+                     , pendingMessage = Nothing
                      }
 
 class StateUpdater t where
@@ -35,6 +36,7 @@ buildDisplay s = DisplayInfo { position = p
                              , fields = map toString r
                              , fieldNames = fnames
                              , modelSize = size m
+                             , message = pendingMessage s
                              }
                    where p = pos s
                          m = model s

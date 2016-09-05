@@ -3,7 +3,7 @@ module GUI (
             GUIControl
             -- *Functions
             , makeGUI
-           , updateGUI
+            , updateGUI
 ) where
 
 import Control.Concurrent.Chan(Chan, writeChan)
@@ -17,9 +17,11 @@ import Paths_hrows(getDataFileName)
 
 import DisplayInfo
 import Input
+import Message
 import Model
 
-data GUIControl = GUIControl { positionLabel :: Label
+data GUIControl = GUIControl { mainWindow :: Window
+                             , positionLabel :: Label
                              , rowsGrid :: Grid
                              , currentRows :: IORef Int
                              , inputChan :: Chan Input
@@ -33,24 +35,33 @@ makeGUI iChan = do
   gladefn <- getDataFileName "hrows.glade"
   builderAddFromFile builder gladefn
 
-  prepareMainWindow builder
+  control <- prepareControl builder iChan
+
+  prepareMainWindow control
   prepareMovementButtons builder iChan
   prepareQuitButton builder
-  prepareFileMenu builder
+  prepareFileMenu builder control
 
-  prepareControl builder iChan
+  return control
+
 
 prepareControl :: Builder -> Chan Input -> IO GUIControl
 prepareControl builder iChan = do
   lbl <- builderGetObject builder castToLabel "positionLabel"
   grid <- builderGetObject builder castToGrid "rowsGrid"
-  rows <- newIORef 0
-  return $ GUIControl lbl grid rows iChan
-
-
-prepareMainWindow :: Builder -> IO ()
-prepareMainWindow builder = do
   window <- builderGetObject builder castToWindow "mainWindow"
+  rows <- newIORef 0
+  return $ GUIControl { mainWindow = window
+                      , positionLabel = lbl
+                      , rowsGrid = grid
+                      , currentRows = rows
+                      , inputChan = iChan
+                      }
+
+
+prepareMainWindow :: GUIControl -> IO ()
+prepareMainWindow control = do
+  let window = mainWindow control
   void (window `on` deleteEvent $ do
         liftIO mainQuit
         return False)
@@ -71,15 +82,21 @@ prepareQuitButton builder = do
   btn <- builderGetObject builder castToButton "quitButton"
   void (btn `on` buttonActivated $ mainQuit)
 
-prepareFileMenu :: Builder -> IO ()
-prepareFileMenu builder = do
+prepareFileMenu :: Builder -> GUIControl -> IO ()
+prepareFileMenu builder control = do
+  itm <- builderGetObject builder castToMenuItem "openMenuItem"
+  void (itm `on` menuItemActivated $ writeChan (inputChan control) (InputDialog LoadFileDialog))
   itm <- builderGetObject builder castToMenuItem "quitMenuItem"
   void (itm `on` menuItemActivated $ mainQuit)
 
 updateGUI :: GUIControl -> DisplayInfo -> IO ()
-updateGUI control dinfo = do
-  updatePosition control dinfo
-  updateRows control dinfo
+updateGUI control dinfo = maybe
+  ( do
+      updatePosition control dinfo
+      updateRows control dinfo
+  )
+  (\m -> displayMessage m control)
+  (message dinfo)
 
 updatePosition :: GUIControl -> DisplayInfo -> IO ()
 updatePosition control dinfo = labelSetText (positionLabel control) positionText
@@ -132,3 +149,20 @@ deleteRows grid rows = forM_ rows $ \r ->
                          forM_ [0, 1] $ \c -> do
                              Just w <- gridGetChildAt grid c r
                              widgetDestroy w
+
+displayMessage :: Message -> GUIControl -> IO ()
+displayMessage (ErrorMessage m) control = noResponseMessage m MessageError control
+displayMessage (WarningMessage m) control = noResponseMessage m MessageWarning control
+displayMessage (InformationMessage m) control = noResponseMessage m MessageWarning control
+displayMessage (QuestionMessage m) control = undefined
+
+noResponseMessage :: String -> MessageType -> GUIControl -> IO ()
+noResponseMessage m mtype control = do
+    dlg <- messageDialogNew (Just $ mainWindow control)
+                            []
+                            mtype
+                            ButtonsOk
+                            m
+    dialogRun dlg
+    writeChan (inputChan control) (InputDialog DialogShown)
+    widgetDestroy dlg
