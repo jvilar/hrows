@@ -10,6 +10,7 @@ module Model (
              , ToField(..)
              -- *Functions
              -- **Construction
+             , emptyRow
              , empty
              , addRow
              , setNames
@@ -64,6 +65,10 @@ toString Empty = "---"
 -- |A row is a list of fields.
 type Row = [Field]
 
+-- |An empty 'Row'
+emptyRow :: Row
+emptyRow = []
+
 -- |The position of a `Row`.
 type RowPos = Int
 
@@ -110,7 +115,8 @@ sourceInfo = _sourceInfo
 
 -- |Returns one row of the `Model`.
 row :: RowPos -> Model -> Row
-row n = (IM.! n) . _rows
+row n m | IM.null (_rows m) = emptyRow
+        | otherwise = (IM.! n) $ _rows m
 
 -- |Number of rows of the `Model`.
 size :: Model -> Int

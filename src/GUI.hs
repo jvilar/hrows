@@ -100,7 +100,12 @@ updateGUI control dinfo = maybe
 
 updatePosition :: GUIControl -> DisplayInfo -> IO ()
 updatePosition control dinfo = labelSetText (positionLabel control) positionText
-    where positionText = show (position dinfo + 1) ++ "/" ++ show (modelSize dinfo)
+    where positionText = let
+              pos = if size == 0
+                    then 0
+                    else position dinfo + 1
+              size = modelSize dinfo
+              in show pos ++ "/" ++ show size
 
 enumerate :: [a] -> [(Int, a)]
 enumerate = zip [0..]
