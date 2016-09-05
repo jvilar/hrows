@@ -9,6 +9,7 @@ module GUI (
 import Control.Concurrent.Chan(Chan, writeChan)
 import Control.Monad(forM_, void)
 import Control.Monad.IO.Class(liftIO)
+import Control.Monad.Reader(ask, ReaderT, runReaderT)
 import Data.IORef(IORef, newIORef, readIORef, writeIORef)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
@@ -35,22 +36,43 @@ makeGUI iChan = do
   gladefn <- getDataFileName "hrows.glade"
   builderAddFromFile builder gladefn
 
-  control <- prepareControl builder iChan
+  runReaderT (do
+                control <- prepareControl iChan
 
-  prepareMainWindow control
-  prepareMovementButtons builder iChan
-  prepareQuitButton builder
-  prepareFileMenu builder control
+                liftIO $ prepareMainWindow control
+                prepareMovementButtons iChan
+                prepareQuitButton
+                prepareFileMenu control
+                return control
+             ) builder
 
-  return control
 
+type BuildMonad = ReaderT Builder IO
 
-prepareControl :: Builder -> Chan Input -> IO GUIControl
-prepareControl builder iChan = do
-  lbl <- builderGetObject builder castToLabel "positionLabel"
-  grid <- builderGetObject builder castToGrid "rowsGrid"
-  window <- builderGetObject builder castToWindow "mainWindow"
-  rows <- newIORef 0
+getObject :: GObjectClass obj => (GObject -> obj) -> String -> BuildMonad obj
+getObject cast s = do
+    builder <- ask
+    liftIO $ builderGetObject builder cast s
+
+ioVoid :: IO a -> BuildMonad ()
+ioVoid = liftIO . void
+
+buttonAction :: String -> IO () -> BuildMonad ()
+buttonAction name action = do
+    btn <- getObject castToButton name
+    ioVoid (btn `on` buttonActivated $ action)
+
+menuItemAction :: String -> IO () -> BuildMonad ()
+menuItemAction name action = do
+    itm <- getObject castToMenuItem name
+    ioVoid (itm `on` menuItemActivated $ action)
+
+prepareControl :: Chan Input -> BuildMonad GUIControl
+prepareControl iChan = do
+  lbl <- getObject castToLabel "positionLabel"
+  grid <- getObject castToGrid "rowsGrid"
+  window <- getObject castToWindow "mainWindow"
+  rows <- liftIO $ newIORef 0
   return $ GUIControl { mainWindow = window
                       , positionLabel = lbl
                       , rowsGrid = grid
@@ -67,27 +89,22 @@ prepareMainWindow control = do
         return False)
   widgetShowAll window
 
-prepareMovementButtons :: Builder -> Chan Input -> IO()
-prepareMovementButtons builder iChan =
+prepareMovementButtons :: Chan Input -> BuildMonad ()
+prepareMovementButtons iChan =
   forM_ [ ("beginButton", MoveBegin)
         , ("endButton", MoveEnd)
         , ("leftButton", MovePrevious)
         , ("rightButton", MoveNext)
         ] $ \(name, input) -> do
-    btn <- builderGetObject builder castToButton name
-    btn `on` buttonActivated $ writeChan iChan (InputMove input)
+    buttonAction name $ writeChan iChan (InputMove input)
 
-prepareQuitButton :: Builder -> IO ()
-prepareQuitButton builder = do
-  btn <- builderGetObject builder castToButton "quitButton"
-  void (btn `on` buttonActivated $ mainQuit)
+prepareQuitButton :: BuildMonad ()
+prepareQuitButton = buttonAction "quitButton" mainQuit
 
-prepareFileMenu :: Builder -> GUIControl -> IO ()
-prepareFileMenu builder control = do
-  itm <- builderGetObject builder castToMenuItem "openMenuItem"
-  void (itm `on` menuItemActivated $ writeChan (inputChan control) (InputDialog LoadFileDialog))
-  itm <- builderGetObject builder castToMenuItem "quitMenuItem"
-  void (itm `on` menuItemActivated $ mainQuit)
+prepareFileMenu :: GUIControl -> BuildMonad ()
+prepareFileMenu control = do
+  menuItemAction "openMenuItem" $ writeChan (inputChan control) (InputDialog LoadFileDialog)
+  menuItemAction "quitMenuItem" $ mainQuit
 
 updateGUI :: GUIControl -> DisplayInfo -> IO ()
 updateGUI control dinfo = case iteration dinfo of
