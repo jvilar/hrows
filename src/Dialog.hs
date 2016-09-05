@@ -10,5 +10,5 @@ data DialogCommand = LoadFileDialog
                      deriving Show
 
 instance StateUpdater DialogCommand where
-    update LoadFileDialog s = undefined
-    update DialogShown s = return s { pendingMessage = Nothing }
+    update LoadFileDialog s = return s { pendingIteration = AskReadFile }
+    update DialogShown s = return s { pendingIteration = NoIteration }

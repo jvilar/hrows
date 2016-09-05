@@ -9,23 +9,25 @@ module AppState (
                 , mkState
                 -- *Functions
                 , buildDisplay
+                -- *Reexported modules
+                , module Iteration
 ) where
 
 import Data.Maybe(fromMaybe)
 
 import DisplayInfo
-import Message
+import Iteration
 import Model
 
 data AppState = AppState { model :: Model
                          , pos :: Int
-                         , pendingMessage :: Maybe Message
+                         , pendingIteration :: Iteration
                          }
 
 mkState :: Model -> AppState
 mkState m = AppState { model = m
                      , pos = 0
-                     , pendingMessage = Nothing
+                     , pendingIteration = NoIteration
                      }
 
 class StateUpdater t where
@@ -36,7 +38,7 @@ buildDisplay s = DisplayInfo { position = p
                              , fields = map toString r
                              , fieldNames = fnames
                              , modelSize = size m
-                             , message = pendingMessage s
+                             , iteration = pendingIteration s
                              }
                    where p = pos s
                          m = model s

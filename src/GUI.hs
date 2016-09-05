@@ -17,7 +17,7 @@ import Paths_hrows(getDataFileName)
 
 import DisplayInfo
 import Input
-import Message
+import Iteration
 import Model
 
 data GUIControl = GUIControl { mainWindow :: Window
@@ -90,13 +90,13 @@ prepareFileMenu builder control = do
   void (itm `on` menuItemActivated $ mainQuit)
 
 updateGUI :: GUIControl -> DisplayInfo -> IO ()
-updateGUI control dinfo = maybe
-  ( do
-      updatePosition control dinfo
-      updateRows control dinfo
-  )
-  (\m -> displayMessage m control)
-  (message dinfo)
+updateGUI control dinfo = case iteration dinfo of
+    NoIteration -> do
+        updatePosition control dinfo
+        updateRows control dinfo
+    AskReadFile -> askReadFile control
+    AskWriteFile -> undefined
+    DisplayMessage m -> displayMessage m control
 
 updatePosition :: GUIControl -> DisplayInfo -> IO ()
 updatePosition control dinfo = labelSetText (positionLabel control) positionText
@@ -170,4 +170,21 @@ noResponseMessage m mtype control = do
                             m
     dialogRun dlg
     writeChan (inputChan control) (InputDialog DialogShown)
+    widgetDestroy dlg
+
+askReadFile :: GUIControl -> IO ()
+askReadFile control = do
+    dlg <- fileChooserDialogNew (Just "Abrir fichero")
+                                (Just $ mainWindow control)
+                                FileChooserActionOpen
+                                [("OK", ResponseOk), ("Cancelar", ResponseCancel)]
+    r <- dialogRun dlg
+    case r of
+        ResponseOk -> do
+            file <- fileChooserGetFilename dlg
+            maybe (writeChan (inputChan control) (InputDialog DialogShown))
+                  (\name -> writeChan (inputChan control) (InputFile $ LoadFileFromName name))
+                  file
+        ResponseCancel -> writeChan (inputChan control) (InputDialog DialogShown)
+        ResponseNone -> writeChan (inputChan control) (InputDialog DialogShown)
     widgetDestroy dlg

@@ -1,5 +1,6 @@
 module SourceInfo ( SourceInfo(..)
                   , SourceInfoClass(..)
+                  , changeFileName
                   , module ListatabInfo
                   ) where
 
@@ -13,6 +14,10 @@ data SourceInfo = EmptySource
 
 class SourceInfoClass t where
     toSourceInfo :: t -> SourceInfo
+
+changeFileName :: FilePath -> SourceInfo -> SourceInfo
+changeFileName n EmptySource = EmptySource
+changeFileName n (ListatabSource lt) = ListatabSource lt { ltFileName = n }
 
 instance SourceInfoClass () where
     toSourceInfo () = EmptySource

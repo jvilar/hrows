@@ -91,6 +91,5 @@ main = do
 updateScreen :: GUIControl -> DisplayInfo -> IO Bool
 updateScreen control info = do
   postGUISync (updateGUI control info)
-  print $ position info
   return True
 
