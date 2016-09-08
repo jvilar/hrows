@@ -104,6 +104,8 @@ prepareQuitButton = buttonAction "quitButton" mainQuit
 prepareFileMenu :: GUIControl -> BuildMonad ()
 prepareFileMenu control = do
   menuItemAction "openMenuItem" $ writeChan (inputChan control) (InputDialog LoadFileDialog)
+  menuItemAction "saveMenuItem" $ writeChan (inputChan control) (InputFile WriteFile)
+  menuItemAction "saveAsMenuItem" $ writeChan (inputChan control) (InputDialog SaveAsFileDialog)
   menuItemAction "quitMenuItem" $ mainQuit
 
 updateGUI :: GUIControl -> DisplayInfo -> IO ()
@@ -112,7 +114,7 @@ updateGUI control dinfo = case iteration dinfo of
         updatePosition control dinfo
         updateRows control dinfo
     AskReadFile -> askReadFile control
-    AskWriteFile -> undefined
+    AskWriteFile -> askWriteFile control
     DisplayMessage m -> displayMessage m control
 
 updatePosition :: GUIControl -> DisplayInfo -> IO ()
@@ -201,6 +203,23 @@ askReadFile control = do
             file <- fileChooserGetFilename dlg
             maybe (writeChan (inputChan control) (InputDialog DialogShown))
                   (\name -> writeChan (inputChan control) (InputFile $ LoadFileFromName name))
+                  file
+        ResponseCancel -> writeChan (inputChan control) (InputDialog DialogShown)
+        ResponseNone -> writeChan (inputChan control) (InputDialog DialogShown)
+    widgetDestroy dlg
+
+askWriteFile :: GUIControl -> IO ()
+askWriteFile control = do
+    dlg <- fileChooserDialogNew (Just "Escribir fichero")
+                                (Just $ mainWindow control)
+                                FileChooserActionSave
+                                [("OK", ResponseOk), ("Cancelar", ResponseCancel)]
+    r <- dialogRun dlg
+    case r of
+        ResponseOk -> do
+            file <- fileChooserGetFilename dlg
+            maybe (writeChan (inputChan control) (InputDialog DialogShown))
+                  (\name -> writeChan (inputChan control) (InputFile $ WriteFileFromName name))
                   file
         ResponseCancel -> writeChan (inputChan control) (InputDialog DialogShown)
         ResponseNone -> writeChan (inputChan control) (InputDialog DialogShown)

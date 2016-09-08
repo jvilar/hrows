@@ -24,4 +24,3 @@ instance SourceInfoClass () where
 
 instance SourceInfoClass ListatabInfo where
     toSourceInfo = ListatabSource
-

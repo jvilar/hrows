@@ -1,10 +1,13 @@
 module ListatabFile (
    -- *Functions
-   fromListatab
+   fromListatab,
+   toListatab
 ) where
 
 import Control.Exception (displayException, IOException, try, throwIO)
-import System.IO (hGetContents, openFile, IOMode(ReadMode))
+import Control.Monad (mapM_)
+import Data.List(intercalate)
+import System.IO (Handle, hGetContents, hPutStrLn, openFile, IOMode(ReadMode, WriteMode))
 import Text.Megaparsec hiding (try)
 
 import HRowsException
@@ -39,3 +42,21 @@ analyze separator = do
   return $ case h of
              Nothing -> model
              Just h' -> setNames h' model
+
+-- |Writes a model to a listatab file.
+toListatab :: ListatabInfo -> Model -> IO ()
+toListatab info model = do
+    mh <- try (openFile (ltFileName info) WriteMode)
+    case mh of
+        Right h -> do
+                     case names model of
+                        Nothing -> return ()
+                        Just ns -> case ltHeaderType info of
+                                   NoHeader -> return ()
+                                   FirstLine -> hPutStrLn h $ intercalate [ltOutputSeparator info] ns
+                                   Comment -> hPutStrLn h $ "#<" ++ intercalate "><" ns ++ ">"
+                     mapM_ (writeRow (ltOutputSeparator info) h) $ rows model
+        Left e -> throwIO $ HRowsException $ "Exception: " ++ displayException (e :: IOException)
+
+writeRow :: Char -> Handle -> Row -> IO ()
+writeRow sep h = hPutStrLn h . intercalate [sep] . map toString

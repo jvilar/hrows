@@ -18,6 +18,7 @@ module Model (
              -- **Querying
              , names
              , row
+             , rows
              , size
              , sourceInfo
              , toString
@@ -125,6 +126,10 @@ size = _size
 -- |Returns the names of the rows.
 names :: Model -> Maybe [String]
 names = _names
+
+-- |Returns the rows of the model.
+rows :: Model -> [Row]
+rows = IM.elems . _rows
 
 -- |Changes one field.
 changeField :: RowPos -> ColPos -> Field -> Model -> Model

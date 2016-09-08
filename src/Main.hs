@@ -76,6 +76,7 @@ main = do
       info = ListatabInfo fileName
                           (opts ^. inputSeparator)
                           (opts ^. outputSeparator)
+                          Comment
       model0 = empty
       state0 = mkState model0
 
