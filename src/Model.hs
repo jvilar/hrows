@@ -89,7 +89,7 @@ empty :: Model
 empty = Model { _rows = IM.empty
               , _names = Nothing
               , _size = 0
-              , _sourceInfo = toSourceInfo ()
+              , _sourceInfo = mkSourceInfo Nothing ()
               }
 
 -- |Adds a `Row` to a `Model`.
@@ -107,8 +107,8 @@ setNames :: [String] -> Model -> Model
 setNames l m = m { _names = Just l }
 
 -- |Set the associated information.
-setSourceInfo :: SourceInfoClass si => si -> Model -> Model
-setSourceInfo si m = m { _sourceInfo = toSourceInfo si }
+setSourceInfo :: SourceInfo -> Model -> Model
+setSourceInfo si m = m { _sourceInfo = si }
 
 -- |Get the associated information
 sourceInfo :: Model -> SourceInfo

@@ -2,8 +2,7 @@ module ListatabInfo ( ListatabInfo(..)
                     , HeaderType(..)
                     ) where
 
-data ListatabInfo = ListatabInfo { ltFileName :: FilePath
-                                 , ltInputSeparator :: Char
+data ListatabInfo = ListatabInfo { ltInputSeparator :: Char
                                  , ltOutputSeparator :: Char
                                  , ltHeaderType :: HeaderType
                                  } deriving Show

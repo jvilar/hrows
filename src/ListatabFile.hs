@@ -11,18 +11,18 @@ import System.IO (Handle, hGetContents, hPutStrLn, openFile, IOMode(ReadMode, Wr
 import Text.Megaparsec hiding (try)
 
 import HRowsException
-import ListatabInfo
+import SourceInfo
 import Model
 
 -- |Creates a `Model` from a listatab file.
-fromListatab :: ListatabInfo -> IO Model
-fromListatab info = do
-  mf <- try (openFile (ltFileName info) ReadMode >>= hGetContents)
+fromListatab :: ListatabInfo -> FilePath -> IO Model
+fromListatab info fp = do
+  mf <- try (openFile fp ReadMode >>= hGetContents)
   case mf of
-      Right f -> case parse (analyze (ltInputSeparator info)) (ltFileName info) f of
-          Right m -> return $ setSourceInfo info m
+      Right f -> case parse (analyze (ltInputSeparator info)) fp f of
+          Right m -> return $ setSourceInfo (mkSourceInfo (Just fp) info) m
           Left e -> throwIO $ HRowsException $
-                       "Error reading file " ++ (ltFileName info) ++ ":\n"
+                       "Error reading file " ++ fp ++ ":\n"
                         ++ parseErrorPretty e
       Left e -> throwIO $ HRowsException $ "Exception: " ++ displayException (e :: IOException)
 
@@ -44,9 +44,9 @@ analyze separator = do
              Just h' -> setNames h' model
 
 -- |Writes a model to a listatab file.
-toListatab :: ListatabInfo -> Model -> IO ()
-toListatab info model = do
-    mh <- try (openFile (ltFileName info) WriteMode)
+toListatab :: ListatabInfo -> FilePath -> Model -> IO ()
+toListatab info fp model = do
+    mh <- try (openFile fp WriteMode)
     case mh of
         Right h -> do
                      case names model of

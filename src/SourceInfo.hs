@@ -1,26 +1,41 @@
 module SourceInfo ( SourceInfo(..)
-                  , SourceInfoClass(..)
+                  , FormatInfo(..)
+                  , FormatInfoClass(..)
                   , changeFileName
+                  , changeFormatInfo
+                  , mkSourceInfo
                   , module ListatabInfo
                   ) where
 
 
 import ListatabInfo
 
--- |The information about the source of the model
-data SourceInfo = EmptySource
-                | ListatabSource ListatabInfo
-                  deriving Show
+-- |The information about the source of the model. It contains
+-- the possible file path and the options related to te format.
+data SourceInfo = SourceInfo { siFilePath :: Maybe FilePath
+                             , siFormat :: FormatInfo
+                             } deriving Show
 
-class SourceInfoClass t where
-    toSourceInfo :: t -> SourceInfo
+-- |The information about the format of the model.
+data FormatInfo = NoFormatInfo
+                | ListatabFormat ListatabInfo
+                deriving Show
 
 changeFileName :: FilePath -> SourceInfo -> SourceInfo
-changeFileName n EmptySource = EmptySource
-changeFileName n (ListatabSource lt) = ListatabSource lt { ltFileName = n }
+changeFileName p s = s { siFilePath = (Just p) }
 
-instance SourceInfoClass () where
-    toSourceInfo () = EmptySource
+changeFormatInfo :: FormatInfo -> SourceInfo -> SourceInfo
+changeFormatInfo f s = s { siFormat = f }
 
-instance SourceInfoClass ListatabInfo where
-    toSourceInfo = ListatabSource
+mkSourceInfo :: FormatInfoClass i => Maybe FilePath -> i -> SourceInfo
+mkSourceInfo p = SourceInfo p . toFormatInfo
+
+class FormatInfoClass t where
+    toFormatInfo :: t -> FormatInfo
+
+instance FormatInfoClass () where
+    toFormatInfo () = NoFormatInfo
+
+instance FormatInfoClass ListatabInfo where
+    toFormatInfo = ListatabFormat
+

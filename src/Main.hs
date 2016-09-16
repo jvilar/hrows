@@ -73,8 +73,7 @@ main :: IO ()
 main = do
   opts <- getOptions
   let Just fileName = opts ^. inputFileName
-      info = ListatabInfo fileName
-                          (opts ^. inputSeparator)
+      info = ListatabInfo (opts ^. inputSeparator)
                           (opts ^. outputSeparator)
                           Comment
       model0 = empty
@@ -86,7 +85,7 @@ main = do
                             (updateScreen control)
                             inputChan
                             (presenter state0)
-  writeChan inputChan $ InputFile (LoadFile $ toSourceInfo info)
+  writeChan inputChan $ InputFile (LoadFile $ mkSourceInfo (Just fileName) info)
   mainGUI
 
 updateScreen :: GUIControl -> DisplayInfo -> IO Bool
