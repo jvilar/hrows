@@ -138,8 +138,9 @@ updateRows control dinfo = do
   forM_ (enumerate $ zip (fieldNames dinfo) (fields dinfo)) $ \(r, (name, field)) -> do
                              Just lbl <- gridGetChildAt grid 0 r
                              labelSetText (castToLabel lbl) name
-                             Just entry <- gridGetChildAt grid 1 r
-                             set (castToEntry entry) [ entryText := field ]
+                             Just tv <- gridGetChildAt grid 1 r
+                             buffer <- textViewGetBuffer $ castToTextView tv
+                             textBufferSetText buffer field
   widgetShowAll grid
 
 adjustRows :: GUIControl -> Int -> IO ()
@@ -157,16 +158,20 @@ addRows grid rows chan = forM_ rows $ \r -> do
                  lbl <- labelNew $ Just ""
                  widgetSetHAlign lbl AlignStart
                  gridAttach grid lbl 0 r 1 1
-                 entry <- entryNew
-                 set entry [ entryText := ""
-                           , widgetCanFocus := True
-                           , widgetHExpand := True
-                           ]
-                 entry `on` focusOutEvent $ liftIO $ do
-                   text <- get entry entryText
-                   writeChan chan (InputUpdate $ UpdateField r (toField (text::String)))
-                   return False
-                 gridAttach grid entry 1 r 1 1
+                 textView <- textViewNew
+                 set textView [ textViewWrapMode := WrapWord
+                              , textViewAcceptsTab := False
+                              , widgetCanFocus := True
+                              , widgetHExpand := True
+                              ]
+                 buffer <- textViewGetBuffer textView
+                 textView `on` focusOutEvent $ liftIO $ do
+                     begin <- textBufferGetStartIter buffer
+                     end <- textBufferGetEndIter buffer
+                     text <- textBufferGetText buffer begin end False
+                     writeChan chan (InputUpdate $ UpdateField r (toField (text::String)))
+                     return False
+                 gridAttach grid textView 1 r 1 1
 
 deleteRows :: Grid -> [Int] -> IO ()
 deleteRows grid rows = forM_ rows $ \r ->
