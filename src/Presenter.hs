@@ -7,45 +7,53 @@ module Presenter (
                  , module Input
 ) where
 
-import Control.Auto(Auto, arrM, emitJusts, holdWith_, perBlip, id, (.))
+import Control.Auto(Auto, arrM, fromBlips, emitJusts, holdWith_, perBlip, id, (.))
 import Prelude hiding((.), id)
 
-import AppState
-import DisplayInfo
+import GUICommand
 import Input
 import Model
 
 -- |The presenter admits inputs and produces information
 -- for updating the display.
-presenter :: AppState -> Auto IO Input DisplayInfo
-presenter state0 = proc inp -> do
+presenter :: Model -> Auto IO Input [GUICommand]
+presenter model0 = proc inp -> do
              rec
-               m <- updateModel (model state0) -< (inp, p)
-               p <- updatePosition (pos state0) -< (inp, m)
-               pending <- updatePending (pendingIteration state0) -< inp
-             id -< buildDisplay $ AppState m p pending
+               (model, modelList) <- updateModel model0 -< (inp, pos)
+               (pos, posList) <- updatePosition 0 -< (inp, model)
+               iterList <- updateIteration -< inp
+             id -< concat [modelList, posList, iterList]
 
-updateModel :: Model -> Auto IO (Input, Int) Model
+updateModel :: Model -> Auto IO (Input, Int) (Model, [GUICommand])
 updateModel model0 = proc (inp, pos) -> do
                 b <- emitJusts getUpdates -< inp
-                u <- perBlip (updateAuto model0) -< ((,pos) <$> b)
-                model <- holdWith_ model0 -< u
-                id -< model
+                bmodelCmds <- perBlip (updateAuto model0) -< ((,pos) <$> b)
+                model <- holdWith_ model0 -< fst <$> bmodelCmds
+                cmds <- fromBlips [] -< snd <$> bmodelCmds
+                id -< (model, cmds)
 
 getUpdates :: Input -> Maybe UpdateCommand
 getUpdates (InputUpdate cmd) = Just cmd
 getUpdates _ = Nothing
 
-updatePosition :: Int -> Auto IO (Input, Model) Int
+updatePosition :: Int -> Auto IO (Input, Model) (Int, [GUICommand])
 updatePosition pos0 = proc (inp, model) -> do
-                         b <- emitJusts getMoves -< inp
-                         u <- perBlip (movementAuto pos0) -< ((, model) <$> b)
-                         pos <- holdWith_ pos0 -< u
-                         id -< pos
+                         bmoves <- emitJusts getMoves -< inp
+                         bposCmds <- perBlip (movementAuto pos0) -< ((, model) <$> bmoves)
+                         pos <- holdWith_ pos0 -< fst <$> bposCmds
+                         cmds <- fromBlips [] -< snd <$> bposCmds
+                         id -< (pos, cmds)
 
 getMoves :: Input -> Maybe MoveCommand
 getMoves (InputMove cmd) = Just cmd
 getMoves _ = Nothing
 
-updatePending :: Iteration -> Auto IO Input Iteration
-updatePending = arrM . const . return
+updateIteration :: Auto IO Input [GUICommand]
+updateIteration = proc inp -> do
+                    b <- emitJusts getDialogs -< inp
+                    ds <- perBlip dialogAuto -< b
+                    fromBlips [] -< ds
+
+getDialogs :: Input -> Maybe DialogCommand
+getDialogs (InputDialog cmd) = Just cmd
+getDialogs _ = Nothing

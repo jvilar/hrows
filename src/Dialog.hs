@@ -1,16 +1,24 @@
+{-# LANGUAGE Arrows #-}
+
 module Dialog (
               -- *Types
               DialogCommand(..)
+              -- *Functions
+              , dialogAuto
 ) where
 
-import AppState
+
+import Control.Arrow(arr)
+import Control.Auto(Auto)
+
+import GUICommand
+import Iteration
 
 data DialogCommand = LoadFileDialog
                    | SaveAsFileDialog
-                   | DialogShown
                      deriving Show
 
-instance StateUpdater DialogCommand where
-    update LoadFileDialog s = return s { pendingIteration = AskReadFile }
-    update SaveAsFileDialog s = return s { pendingIteration = AskWriteFile }
-    update DialogShown s = return s { pendingIteration = NoIteration }
+dialogAuto :: Auto IO DialogCommand [GUICommand]
+dialogAuto = arr $ \input -> case input of
+                               LoadFileDialog -> [ ShowIteration AskReadFile ]
+                               SaveAsFileDialog -> [ ShowIteration AskWriteFile ]

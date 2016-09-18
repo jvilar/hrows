@@ -6,8 +6,8 @@ import Control.Auto.Run(runOnChanM)
 import Control.Concurrent(forkIO)
 import Control.Concurrent.Chan(newChan, writeChan)
 import Control.Lens (makeLenses, (^.), set, Getting)
-import Control.Monad(unless, void, when)
-import Graphics.UI.Gtk (mainGUI, postGUISync)
+import Control.Monad(forM_, unless, void, when)
+import Graphics.UI.Gtk (mainGUI, postGUIAsync)
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
@@ -76,20 +76,20 @@ main = do
       info = ListatabInfo (opts ^. inputSeparator)
                           (opts ^. outputSeparator)
                           Comment
-      model0 = empty
-      state0 = mkState model0
+      model0 = addRow (addRow empty (map toField [1,2,3::Int]))
+                      (map toField [3,4,5::Int])
 
   inputChan <- newChan
   control <- makeGUI inputChan
   forkIO $ void $ runOnChanM id
                             (updateScreen control)
                             inputChan
-                            (presenter state0)
+                            (presenter model0)
   writeChan inputChan $ InputFile (LoadFile $ mkSourceInfo (Just fileName) info)
   mainGUI
 
-updateScreen :: GUIControl -> DisplayInfo -> IO Bool
-updateScreen control info = do
-  postGUISync (updateGUI control info)
+updateScreen :: GUIControl -> [GUICommand] -> IO Bool
+updateScreen control commands = do
+  forM_ commands $ \command -> postGUIAsync (updateGUI command control)
   return True
 

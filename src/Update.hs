@@ -6,12 +6,15 @@ module Update (
 
 import Control.Auto(Auto, accum_)
 
+import GUICommand
 import Model
 
 data UpdateCommand = UpdateField Int Field deriving Show
 
-updateAuto :: Model -> Auto IO (UpdateCommand, Int) Model
-updateAuto = accum_ update
+updateAuto :: Model -> Auto IO (UpdateCommand, Int) (Model, [GUICommand])
+updateAuto model0 = accum_ (update . fst) (model0, [])
 
-update :: Model -> (UpdateCommand, Int) -> Model
-update model (UpdateField c v, pos) = changeField pos c v model
+update :: Model -> (UpdateCommand, Int) -> (Model, [GUICommand])
+update model (UpdateField c v, pos) = (model', [ShowRow r])
+                                      where r = map toString $ row pos model'
+                                            model' = changeField pos c v model

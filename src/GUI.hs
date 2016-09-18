@@ -1,22 +1,25 @@
 module GUI (
             -- *Types
             GUIControl
+            , GUICommand
             -- *Functions
             , makeGUI
             , updateGUI
 ) where
 
 import Control.Concurrent.Chan(Chan, writeChan)
-import Control.Monad(forM_, void)
+import Control.Monad(forM_, void, when)
 import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Reader(ask, ReaderT, runReaderT)
 import Data.IORef(IORef, newIORef, readIORef, writeIORef)
+import Data.Maybe(isJust, fromJust)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
 
 import Paths_hrows(getDataFileName)
 
 import DisplayInfo
+import GUICommand
 import Input
 import Iteration
 import Model
@@ -108,43 +111,49 @@ prepareFileMenu control = do
   menuItemAction "saveAsMenuItem" $ writeChan (inputChan control) (InputDialog SaveAsFileDialog)
   menuItemAction "quitMenuItem" $ mainQuit
 
-updateGUI :: GUIControl -> DisplayInfo -> IO ()
-updateGUI control dinfo = case iteration dinfo of
-    NoIteration -> do
-        updatePosition control dinfo
-        updateRows control dinfo
-    AskReadFile -> askReadFile control
-    AskWriteFile -> askWriteFile control
-    DisplayMessage m -> displayMessage m control
+updateGUI :: GUICommand -> GUIControl -> IO ()
+updateGUI (ShowPosition pos size) = updatePosition pos size
+updateGUI (ShowRow row) = updateRow row
+updateGUI (ShowNames names) = updateNames names
+updateGUI (ShowIteration AskReadFile) = askReadFile
+updateGUI (ShowIteration AskWriteFile) = askWriteFile
+updateGUI (ShowIteration (DisplayMessage m)) = displayMessage m
 
-updatePosition :: GUIControl -> DisplayInfo -> IO ()
-updatePosition control dinfo = labelSetText (positionLabel control) positionText
+updatePosition :: Int -> Int -> GUIControl -> IO ()
+updatePosition pos size control = labelSetText (positionLabel control) positionText
     where positionText = let
-              pos = if size == 0
+              p = if size == 0
                     then 0
-                    else position dinfo + 1
-              size = modelSize dinfo
+                    else pos + 1
               in show pos ++ "/" ++ show size
 
 enumerate :: [a] -> [(Int, a)]
 enumerate = zip [0..]
 
-updateRows :: GUIControl -> DisplayInfo -> IO ()
-updateRows control dinfo = do
+updateRow :: [String] -> GUIControl -> IO ()
+updateRow row control = do
   let grid = rowsGrid control
 
-  adjustRows control (length $ fields dinfo)
+  adjustRows (length row) control
 
-  forM_ (enumerate $ zip (fieldNames dinfo) (fields dinfo)) $ \(r, (name, field)) -> do
-                             Just lbl <- gridGetChildAt grid 0 r
-                             labelSetText (castToLabel lbl) name
+  forM_ (enumerate row) $ \(r, field) -> do
                              Just tv <- gridGetChildAt grid 1 r
                              buffer <- textViewGetBuffer $ castToTextView tv
                              textBufferSetText buffer field
   widgetShowAll grid
 
-adjustRows :: GUIControl -> Int -> IO ()
-adjustRows control nrows = do
+updateNames :: [String] -> GUIControl -> IO ()
+updateNames names control = do
+  let grid = rowsGrid control
+  adjustRows (length names) control
+
+  forM_ (enumerate names) $ \(r, name) -> do
+                             Just lbl <- gridGetChildAt grid 0 r
+                             labelSetText (castToLabel lbl) name
+  widgetShowAll grid
+
+adjustRows :: Int -> GUIControl -> IO ()
+adjustRows nrows control = do
   let grid = rowsGrid control
   current <- readIORef $ currentRows control
   case compare current nrows of
@@ -180,10 +189,10 @@ deleteRows grid rows = forM_ rows $ \r ->
                              widgetDestroy w
 
 displayMessage :: Message -> GUIControl -> IO ()
-displayMessage (ErrorMessage m) control = noResponseMessage m MessageError control
-displayMessage (WarningMessage m) control = noResponseMessage m MessageWarning control
-displayMessage (InformationMessage m) control = noResponseMessage m MessageWarning control
-displayMessage (QuestionMessage m) control = undefined
+displayMessage (ErrorMessage m) = noResponseMessage m MessageError
+displayMessage (WarningMessage m) = noResponseMessage m MessageWarning
+displayMessage (InformationMessage m) = noResponseMessage m MessageWarning
+displayMessage (QuestionMessage m) = undefined
 
 noResponseMessage :: String -> MessageType -> GUIControl -> IO ()
 noResponseMessage m mtype control = do
@@ -193,7 +202,6 @@ noResponseMessage m mtype control = do
                             ButtonsOk
                             m
     dialogRun dlg
-    writeChan (inputChan control) (InputDialog DialogShown)
     widgetDestroy dlg
 
 askReadFile :: GUIControl -> IO ()
@@ -203,14 +211,10 @@ askReadFile control = do
                                 FileChooserActionOpen
                                 [("OK", ResponseOk), ("Cancelar", ResponseCancel)]
     r <- dialogRun dlg
-    case r of
-        ResponseOk -> do
+    when (r == ResponseOk) $ do
             file <- fileChooserGetFilename dlg
-            maybe (writeChan (inputChan control) (InputDialog DialogShown))
-                  (\name -> writeChan (inputChan control) (InputFile $ LoadFileFromName name))
-                  file
-        ResponseCancel -> writeChan (inputChan control) (InputDialog DialogShown)
-        ResponseNone -> writeChan (inputChan control) (InputDialog DialogShown)
+            when (isJust file) $
+                 writeChan (inputChan control) (InputFile $ LoadFileFromName (fromJust file))
     widgetDestroy dlg
 
 askWriteFile :: GUIControl -> IO ()
@@ -220,12 +224,8 @@ askWriteFile control = do
                                 FileChooserActionSave
                                 [("OK", ResponseOk), ("Cancelar", ResponseCancel)]
     r <- dialogRun dlg
-    case r of
-        ResponseOk -> do
+    when (r == ResponseOk) $ do
             file <- fileChooserGetFilename dlg
-            maybe (writeChan (inputChan control) (InputDialog DialogShown))
-                  (\name -> writeChan (inputChan control) (InputFile $ WriteFileFromName name))
-                  file
-        ResponseCancel -> writeChan (inputChan control) (InputDialog DialogShown)
-        ResponseNone -> writeChan (inputChan control) (InputDialog DialogShown)
+            when (isJust file) $
+                 writeChan (inputChan control) (InputFile $ WriteFileFromName (fromJust file))
     widgetDestroy dlg

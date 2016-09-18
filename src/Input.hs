@@ -8,8 +8,6 @@ module Input (
              , module Update
 ) where
 
-import AppState
-
 import Dialog
 import File
 import Movement
@@ -21,10 +19,4 @@ data Input = InputMove MoveCommand
            | InputFile FileCommand
            | InputDialog DialogCommand
              deriving Show
-
-instance StateUpdater Input where
-    update (InputMove _) = undefined
-    update (InputUpdate cmd) = undefined
-    update (InputFile cmd) = update cmd
-    update (InputDialog cmd) = update cmd
 
