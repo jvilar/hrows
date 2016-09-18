@@ -19,4 +19,3 @@ data Input = InputMove MoveCommand
            | InputFile FileCommand
            | InputDialog DialogCommand
              deriving Show
-

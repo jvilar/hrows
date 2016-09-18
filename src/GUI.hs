@@ -18,7 +18,6 @@ import Graphics.UI.Gtk.General.Enums(Align(..))
 
 import Paths_hrows(getDataFileName)
 
-import DisplayInfo
 import GUICommand
 import Input
 import Iteration

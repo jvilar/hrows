@@ -14,8 +14,6 @@ import System.IO (hPutStrLn, stderr)
 
 import System.Console.JMVOptions
 
-import AppState
-import DisplayInfo
 import GUI
 import Model
 import Presenter
