@@ -1,13 +1,17 @@
 module Update (
                -- *Types
                UpdateCommand(..)
+              , updateAuto
 ) where
 
-import AppState
+import Control.Auto(Auto, accum_)
+
 import Model
 
 data UpdateCommand = UpdateField Int Field deriving Show
 
-instance StateUpdater UpdateCommand where
-    update (UpdateField c v) s = return s { model = newModel }
-        where newModel = changeField (pos s) c v (model s)
+updateAuto :: Model -> Auto IO (UpdateCommand, Int) Model
+updateAuto = accum_ update
+
+update :: Model -> (UpdateCommand, Int) -> Model
+update model (UpdateField c v, pos) = changeField pos c v model

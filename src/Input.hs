@@ -23,7 +23,8 @@ data Input = InputMove MoveCommand
              deriving Show
 
 instance StateUpdater Input where
-    update (InputMove cmd) = update cmd
-    update (InputUpdate cmd) = update cmd
+    update (InputMove _) = undefined
+    update (InputUpdate cmd) = undefined
     update (InputFile cmd) = update cmd
     update (InputDialog cmd) = update cmd
+

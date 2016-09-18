@@ -1,9 +1,11 @@
 module Movement (
                  -- *Types
                  MoveCommand(..)
+                , movementAuto
 ) where
 
-import AppState
+import Control.Auto(Auto, accum)
+
 import Model
 
 -- |Commands related to movement.
@@ -12,13 +14,13 @@ data MoveCommand = MoveNext
                  | MoveBegin
                  | MoveEnd deriving Show
 
-instance StateUpdater MoveCommand where
-    update MoveNext = checkedMovement (+1)
-    update MovePrevious = checkedMovement (subtract 1)
-    update MoveBegin = checkedMovement (const 0)
-    update MoveEnd = \s -> checkedMovement (const $ size (model s) - 1) s
+movementAuto :: Int -> Auto IO (MoveCommand, Model) Int
+movementAuto = accum move
 
-checkedMovement :: (Int -> Int) -> AppState -> IO AppState
-checkedMovement f s | 0 <= newPos && newPos < size (model s) = return s { pos = newPos }
-                    | otherwise = return s
-    where newPos = f $ pos s
+move :: Int -> (MoveCommand, Model) -> Int
+move pos (MoveNext, model) | pos < size model - 1 = pos + 1
+                           | otherwise = pos
+move pos (MovePrevious, _) | pos > 0 = pos - 1
+                           | otherwise = pos
+move _ (MoveBegin, _) = 0
+move _ (MoveEnd, m) = size m - 1
