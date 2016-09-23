@@ -81,7 +81,7 @@ data Model = Model { _rows :: IntMap Row
                    , _names :: Maybe [String]
                    , _size :: Int
                    , _sourceInfo :: SourceInfo
-                   }
+                   } deriving Show
 
 
 -- |An empty `Model`.

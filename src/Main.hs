@@ -74,8 +74,9 @@ main = do
       info = ListatabInfo (opts ^. inputSeparator)
                           (opts ^. outputSeparator)
                           Comment
-      model0 = addRow (addRow empty (map toField [1,2,3::Int]))
-                      (map toField [3,4,5::Int])
+      model0 = addRow (addRow (addRow empty (map toField [1,2,3::Int]))
+                              (map toField [3,4,5::Int]))
+                              (map toField [5,4,3::Int])
 
   inputChan <- newChan
   control <- makeGUI inputChan

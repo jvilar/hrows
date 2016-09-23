@@ -9,3 +9,4 @@ data GUICommand = ShowPosition Int Int
                 | ShowRow [String]
                 | ShowNames [String]
                 | ShowIteration Iteration
+                deriving Show
