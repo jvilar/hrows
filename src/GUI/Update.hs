@@ -119,29 +119,22 @@ noResponseMessage m mtype control = do
     widgetDestroy dlg
 
 askReadFile :: GUIControl -> IO ()
-askReadFile control = do
-    dlg <- fileChooserDialogNew (Just "Abrir fichero" :: Maybe String)
-                                (Just $ mainWindow control)
-                                FileChooserActionOpen
-                                [("OK", ResponseOk), ("Cancelar", ResponseCancel)]
-    r <- dialogRun dlg
-    when (r == ResponseOk) $ do
-            file <- fileChooserGetFilename dlg
-            when (isJust file) $
-                 sendInput control $ LoadFileFromName (fromJust file)
-    widgetDestroy dlg
+askReadFile = askFile FileChooserActionOpen LoadFileFromName
 
 askWriteFile :: GUIControl -> IO ()
-askWriteFile control = do
+askWriteFile = askFile FileChooserActionSave WriteFileFromName
+
+askFile :: IsInput t => FileChooserAction -> (String -> t) -> GUIControl -> IO ()
+askFile action input control = do
     dlg <- fileChooserDialogNew (Just "Escribir fichero" :: Maybe String)
                                 (Just $ mainWindow control)
-                                FileChooserActionSave
+                                action
                                 [("OK", ResponseOk), ("Cancelar", ResponseCancel)]
     r <- dialogRun dlg
     when (r == ResponseOk) $ do
             file <- fileChooserGetFilename dlg
             when (isJust file) $
-                 sendInput control $ WriteFileFromName (fromJust file)
+                 sendInput control $ input (fromJust file)
     widgetDestroy dlg
 
 confirmExit :: GUIControl -> IO ()
