@@ -14,7 +14,8 @@ import System.IO (hPutStrLn, stderr)
 
 import System.Console.JMVOptions
 
-import GUI
+import GUI.Build
+import GUI.Update
 import Model
 import Presenter
 

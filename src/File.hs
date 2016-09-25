@@ -10,7 +10,7 @@ module File (
 import Control.Auto(Auto, arrM)
 import Control.Exception(try)
 
-import GUICommand
+import GUI.Command
 import HRowsException
 import Iteration
 import ListatabFile

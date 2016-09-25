@@ -1,4 +1,4 @@
-module GUICommand(
+module GUI.Command(
                   GUICommand(..)
                  , module Iteration
                   ) where

@@ -7,7 +7,7 @@ module Control (
 import Control.Auto(Auto, arrM)
 import System.Exit(exitSuccess)
 
-import GUICommand
+import GUI.Command
 
 data ControlCommand = ExitProgram
                     | DoExit

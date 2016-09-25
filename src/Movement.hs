@@ -6,7 +6,7 @@ module Movement (
 
 import Control.Auto(Auto, accum_)
 
-import GUICommand
+import GUI.Command
 import Model
 
 -- |Commands related to movement.

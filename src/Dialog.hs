@@ -9,7 +9,7 @@ module Dialog (
 import Control.Arrow(arr)
 import Control.Auto(Auto)
 
-import GUICommand
+import GUI.Command
 import Iteration
 
 data DialogCommand = LoadFileDialog

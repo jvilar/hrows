@@ -7,7 +7,7 @@ module Update (
 import Control.Auto(Auto, accum_)
 import Data.Maybe(fromMaybe)
 
-import GUICommand
+import GUI.Command
 import Model
 
 data UpdateCommand = UpdateField Int Field

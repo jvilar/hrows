@@ -14,7 +14,7 @@ import Data.Maybe(fromMaybe, isJust)
 import Data.Monoid((<>))
 import Prelude hiding((.), id)
 
-import GUICommand
+import GUI.Command
 import Input
 import Model
 
