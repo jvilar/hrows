@@ -19,6 +19,7 @@ module Model (
              , names
              , row
              , rows
+             , ncols
              , size
              , sourceInfo
              , toString
@@ -79,6 +80,7 @@ type ColPos = Int
 -- |Holds the rows.
 data Model = Model { _rows :: IntMap Row
                    , _names :: Maybe [String]
+                   , _ncols :: Int
                    , _size :: Int
                    , _sourceInfo :: SourceInfo
                    } deriving Show
@@ -88,6 +90,7 @@ data Model = Model { _rows :: IntMap Row
 empty :: Model
 empty = Model { _rows = IM.empty
               , _names = Nothing
+              , _ncols = 0
               , _size = 0
               , _sourceInfo = mkSourceInfo Nothing ()
               }
@@ -96,6 +99,7 @@ empty = Model { _rows = IM.empty
 addRow :: Model -> Row -> Model
 addRow m r = m { _rows = IM.insert (_size m) r (_rows m)
                , _size = _size m + 1
+               , _ncols = max (_ncols m) (length r)
                }
 
 -- |Creates a model from a list of `Row`s.
@@ -117,11 +121,15 @@ sourceInfo = _sourceInfo
 -- |Returns one row of the `Model`.
 row :: RowPos -> Model -> Row
 row n m | IM.null (_rows m) = emptyRow
-        | otherwise = (IM.! n) $ _rows m
+        | otherwise = take (ncols m) $ (_rows m IM.! n) ++ repeat Empty
 
 -- |Number of rows of the `Model`.
 size :: Model -> Int
 size = _size
+
+-- |Number of columnes of each row.
+ncols :: Model -> Int
+ncols = _ncols
 
 -- |Returns the names of the rows.
 names :: Model -> Maybe [String]
@@ -137,4 +145,5 @@ changeField r c field m = m { _rows = IM.adjust (adjustCol c field) r (_rows m) 
 
 adjustCol :: ColPos -> Field -> Row -> Row
 adjustCol 0 x (_:xs) = x:xs
+adjustCol n x [] = replicate n Empty ++ [x]
 adjustCol n x (y:ys) = y : adjustCol (n-1) x ys
