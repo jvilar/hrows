@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module GUI (
             -- *Types
             GUIControl
@@ -30,6 +32,9 @@ data GUIControl = GUIControl { mainWindow :: Window
                              , inputChan :: Chan Input
                              }
 
+sendInput :: IsInput cmd => GUIControl -> cmd -> IO ()
+sendInput control = writeChan (inputChan control) . toInput
+
 makeGUI :: Chan Input -> IO GUIControl
 makeGUI iChan = do
   initGUI
@@ -43,7 +48,7 @@ makeGUI iChan = do
 
                 liftIO $ prepareMainWindow control
                 prepareMovementButtons iChan
-                prepareQuitButton
+                prepareQuitButton control
                 prepareFileMenu control
                 return control
              ) builder
@@ -82,14 +87,34 @@ prepareControl iChan = do
                     , inputChan = iChan
                     }
 
+global_keys = [ (("Page_Down", []), toInput MoveNext)
+              , (("Page_Up", []), toInput MovePrevious)
+              , (("q", [Control]), toInput ExitProgram)
+              ]
 
 prepareMainWindow :: GUIControl -> IO ()
 prepareMainWindow control = do
   let window = mainWindow control
   void (window `on` deleteEvent $ do
-        liftIO mainQuit
+        liftIO $ sendInput control ExitProgram
         return False)
+  void (window `on` keyPressEvent $ do
+          name <- eventKeyName
+          mods <- eventModifier
+          -- showEvent
+          let cmd = lookup (name, mods) global_keys
+          liftIO $ print cmd
+          maybe (return False)
+                (\c -> liftIO $ sendInput control c >> return True)
+                cmd
+       )
   widgetShowAll window
+
+showEvent = do
+  name <- eventKeyName
+  liftIO $ putStrLn $ "Key name: " ++ show name
+  mods <- eventModifier
+  liftIO $ putStrLn $ "Modifiers: " ++ show mods
 
 prepareMovementButtons :: Chan Input -> BuildMonad ()
 prepareMovementButtons iChan =
@@ -100,15 +125,16 @@ prepareMovementButtons iChan =
         ] $ \(name, input) ->
     buttonAction name $ writeChan iChan (InputMove input)
 
-prepareQuitButton :: BuildMonad ()
-prepareQuitButton = buttonAction "quitButton" mainQuit
+prepareQuitButton :: GUIControl -> BuildMonad ()
+prepareQuitButton control = buttonAction "quitButton" $ sendInput control ExitProgram
 
 prepareFileMenu :: GUIControl -> BuildMonad ()
-prepareFileMenu control = do
-  menuItemAction "openMenuItem" $ writeChan (inputChan control) (InputDialog LoadFileDialog)
-  menuItemAction "saveMenuItem" $ writeChan (inputChan control) (InputFile WriteFile)
-  menuItemAction "saveAsMenuItem" $ writeChan (inputChan control) (InputDialog SaveAsFileDialog)
-  menuItemAction "quitMenuItem" mainQuit
+prepareFileMenu control = mapM_ (\(n, cmd) -> menuItemAction n $ sendInput control cmd)
+                            [("openMenuItem", toInput LoadFileDialog)
+                            ,("saveMenuItem",  toInput WriteFile)
+                            ,("saveAsMenuItem", toInput SaveAsFileDialog)
+                            ,("quitMenuItem", toInput ExitProgram)
+                            ]
 
 updateGUI :: GUICommand -> GUIControl -> IO ()
 updateGUI (ShowPosition pos size) = updatePosition pos size
@@ -117,6 +143,7 @@ updateGUI (ShowNames names) = updateNames names
 updateGUI (ShowIteration AskReadFile) = askReadFile
 updateGUI (ShowIteration AskWriteFile) = askWriteFile
 updateGUI (ShowIteration (DisplayMessage m)) = displayMessage m
+updateGUI (ShowIteration ConfirmExit) = confirmExit
 
 updatePosition :: Int -> Int -> GUIControl -> IO ()
 updatePosition pos size control = labelSetText (positionLabel control) positionText
@@ -163,7 +190,7 @@ adjustRows nrows control = do
 
 addRows :: Grid -> [Int] -> Chan Input -> IO ()
 addRows grid rows chan = forM_ rows $ \r -> do
-                 lbl <- labelNew $ Just ""
+                 lbl <- labelNew $ Just ("" :: String)
                  widgetSetHAlign lbl AlignStart
                  gridAttach grid lbl 0 r 1 1
                  textView <- textViewNew
@@ -177,7 +204,7 @@ addRows grid rows chan = forM_ rows $ \r -> do
                      begin <- textBufferGetStartIter buffer
                      end <- textBufferGetEndIter buffer
                      text <- textBufferGetText buffer begin end False
-                     writeChan chan (InputUpdate $ UpdateField r (toField (text::String)))
+                     writeChan chan (toInput $ UpdateField r (toField (text::String)))
                      return False
                  gridAttach grid textView 1 r 1 1
 
@@ -205,7 +232,7 @@ noResponseMessage m mtype control = do
 
 askReadFile :: GUIControl -> IO ()
 askReadFile control = do
-    dlg <- fileChooserDialogNew (Just "Abrir fichero")
+    dlg <- fileChooserDialogNew (Just "Abrir fichero" :: Maybe String)
                                 (Just $ mainWindow control)
                                 FileChooserActionOpen
                                 [("OK", ResponseOk), ("Cancelar", ResponseCancel)]
@@ -213,12 +240,12 @@ askReadFile control = do
     when (r == ResponseOk) $ do
             file <- fileChooserGetFilename dlg
             when (isJust file) $
-                 writeChan (inputChan control) (InputFile $ LoadFileFromName (fromJust file))
+                 sendInput control $ LoadFileFromName (fromJust file)
     widgetDestroy dlg
 
 askWriteFile :: GUIControl -> IO ()
 askWriteFile control = do
-    dlg <- fileChooserDialogNew (Just "Escribir fichero")
+    dlg <- fileChooserDialogNew (Just "Escribir fichero" :: Maybe String)
                                 (Just $ mainWindow control)
                                 FileChooserActionSave
                                 [("OK", ResponseOk), ("Cancelar", ResponseCancel)]
@@ -226,5 +253,18 @@ askWriteFile control = do
     when (r == ResponseOk) $ do
             file <- fileChooserGetFilename dlg
             when (isJust file) $
-                 writeChan (inputChan control) (InputFile $ WriteFileFromName (fromJust file))
+                 sendInput control $ WriteFileFromName (fromJust file)
     widgetDestroy dlg
+
+confirmExit :: GUIControl -> IO ()
+confirmExit control = do
+  dlg <- messageDialogNew (Just $ mainWindow control)
+                          [DialogModal]
+                          MessageQuestion
+                          ButtonsYesNo
+                          ("Seguro que quieres salir" :: String)
+  r <- dialogRun dlg
+  when (r == ResponseYes) $ do
+                        sendInput control DoExit
+                        mainQuit
+  widgetDestroy dlg

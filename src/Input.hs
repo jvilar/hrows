@@ -1,10 +1,13 @@
 module Input (
               -- *Types
               Input(..)
+              -- *Clases
+              , IsInput(..)
               -- *Reexported
              , module X
 ) where
 
+import Control as X
 import Dialog as X
 import File as X
 import Movement as X
@@ -15,4 +18,26 @@ data Input = InputMove MoveCommand
            | InputUpdate UpdateCommand
            | InputFile FileCommand
            | InputDialog DialogCommand
+           | InputControl ControlCommand
              deriving Show
+
+class IsInput t where
+    toInput :: t -> Input
+
+instance IsInput Input where
+    toInput = id
+
+instance IsInput MoveCommand where
+    toInput = InputMove
+
+instance IsInput UpdateCommand where
+    toInput = InputUpdate
+
+instance IsInput FileCommand where
+    toInput = InputFile
+
+instance IsInput DialogCommand where
+    toInput = InputDialog
+
+instance IsInput ControlCommand where
+    toInput = InputControl

@@ -45,7 +45,8 @@ processInput model0 = proc inp -> do
                (newInput, fileList) <- processFileCommands -< (inp, model)
                (pos, moveList) <- processMoveCommands 0 -< (inp, model)
                dialogList <- processDialogCommands -< inp
-             id -< (concat [updateList, moveList, dialogList, fileList], newInput)
+               controlList <- processControlCommands -< inp
+             id -< (concat [updateList, moveList, dialogList, fileList, controlList], newInput)
 
 processUpdateCommands :: Model -> Auto IO (Input, Int) (Model, [GUICommand])
 processUpdateCommands model0 = proc (inp, pos) -> do
@@ -94,3 +95,13 @@ processDialogCommands = proc inp -> do
 getDialogs :: Input -> Maybe DialogCommand
 getDialogs (InputDialog cmd) = Just cmd
 getDialogs _ = Nothing
+
+processControlCommands :: Auto IO Input [GUICommand]
+processControlCommands = proc inp -> do
+                           b <- emitJusts getControls -< inp
+                           cmds <- perBlip controlAuto -< b
+                           fromBlips [] -< cmds
+
+getControls :: Input -> Maybe ControlCommand
+getControls (InputControl cmd) = Just cmd
+getControls _ = Nothing

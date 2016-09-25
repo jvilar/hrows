@@ -1,5 +1,6 @@
 module GUICommand(
                   GUICommand(..)
+                 , module Iteration
                   ) where
 
 
