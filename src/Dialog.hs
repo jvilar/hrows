@@ -1,5 +1,3 @@
-{-# LANGUAGE Arrows #-}
-
 module Dialog (
               -- *Types
               DialogCommand(..)

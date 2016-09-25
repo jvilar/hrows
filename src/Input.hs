@@ -2,16 +2,13 @@ module Input (
               -- *Types
               Input(..)
               -- *Reexported
-             , module Dialog
-             , module File
-             , module Movement
-             , module Update
+             , module X
 ) where
 
-import Dialog
-import File
-import Movement
-import Update
+import Dialog as X
+import File as X
+import Movement as X
+import Update as X
 
 -- |The input that the presenter can receive.
 data Input = InputMove MoveCommand

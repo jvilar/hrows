@@ -22,7 +22,7 @@ data FormatInfo = NoFormatInfo
                 deriving Show
 
 changeFileName :: FilePath -> SourceInfo -> SourceInfo
-changeFileName p s = s { siFilePath = (Just p) }
+changeFileName p s = s { siFilePath = Just p }
 
 changeFormatInfo :: FormatInfo -> SourceInfo -> SourceInfo
 changeFormatInfo f s = s { siFormat = f }

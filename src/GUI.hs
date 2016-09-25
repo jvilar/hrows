@@ -75,12 +75,12 @@ prepareControl iChan = do
   grid <- getObject castToGrid "rowsGrid"
   window <- getObject castToWindow "mainWindow"
   rows <- liftIO $ newIORef 0
-  return $ GUIControl { mainWindow = window
-                      , positionLabel = lbl
-                      , rowsGrid = grid
-                      , currentRows = rows
-                      , inputChan = iChan
-                      }
+  return GUIControl { mainWindow = window
+                    , positionLabel = lbl
+                    , rowsGrid = grid
+                    , currentRows = rows
+                    , inputChan = iChan
+                    }
 
 
 prepareMainWindow :: GUIControl -> IO ()
@@ -97,7 +97,7 @@ prepareMovementButtons iChan =
         , ("endButton", MoveEnd)
         , ("leftButton", MovePrevious)
         , ("rightButton", MoveNext)
-        ] $ \(name, input) -> do
+        ] $ \(name, input) ->
     buttonAction name $ writeChan iChan (InputMove input)
 
 prepareQuitButton :: BuildMonad ()
@@ -108,7 +108,7 @@ prepareFileMenu control = do
   menuItemAction "openMenuItem" $ writeChan (inputChan control) (InputDialog LoadFileDialog)
   menuItemAction "saveMenuItem" $ writeChan (inputChan control) (InputFile WriteFile)
   menuItemAction "saveAsMenuItem" $ writeChan (inputChan control) (InputDialog SaveAsFileDialog)
-  menuItemAction "quitMenuItem" $ mainQuit
+  menuItemAction "quitMenuItem" mainQuit
 
 updateGUI :: GUICommand -> GUIControl -> IO ()
 updateGUI (ShowPosition pos size) = updatePosition pos size
