@@ -10,6 +10,8 @@ module Presenter (
 import Control.Arrow(arr, first, (>>>))
 import Control.Auto(Auto, accum_, accumM_, arrM, delay_, fromBlips, emitJusts, holdWith_, perBlip, stepAuto, id, (.))
 import Control.Monad(foldM)
+import Control.Monad.Writer.Strict(runWriterT)
+import Data.Either(partitionEithers)
 import Data.Maybe(fromMaybe, isJust)
 import Data.Monoid((<>))
 import Prelude hiding((.), id)
@@ -17,6 +19,13 @@ import Prelude hiding((.), id)
 import GUI.Command
 import Input
 import Model
+import PresenterAuto
+
+import ControlAuto
+import DialogAuto
+import FileAuto
+import MovementAuto
+import UpdateAuto
 
 
 presenter :: Model -> Auto IO Input [GUICommand]
@@ -29,42 +38,35 @@ updater model0 = proc inputs -> do
         (cmds, auto) <- arrM (uncurry pr) -< (dauto, inputs)
     id -< cmds
 
-pr :: Auto IO Input ([GUICommand], [Input]) -> [Input] -> IO ([GUICommand], Auto IO Input ([GUICommand], [Input]))
+pr :: PresenterAuto Input () -> [Input] -> IO ([GUICommand], PresenterAuto Input ())
 pr auto [] = return ([], auto)
 pr auto (i:is) = do
-    ((cmds, is'), auto') <- stepAuto auto i
+    (((), auto'), cmdsIs) <- runWriterT (stepAuto auto i)
+    let (cmds, is') = partitionEithers cmdsIs
     (cmds', auto'') <- pr auto' (is ++ is')
     return (cmds ++ cmds', auto'')
 
--- |The presenter admits inputs and produces information
--- for updating the display.
-processInput :: Model -> Auto IO Input ([GUICommand], [Input])
+processInput :: Model -> PresenterAuto Input ()
 processInput model0 = proc inp -> do
              rec
-               (model, updateList) <- processUpdateCommands model0 -< (inp, pos)
-               (newInput, fileList) <- processFileCommands -< (inp, model)
-               (pos, moveList) <- processMoveCommands 0 -< (inp, model)
-               dialogList <- processDialogCommands -< inp
-               controlList <- processControlCommands -< inp
-             id -< (concat [updateList, moveList, dialogList, fileList, controlList], newInput)
+               model <- processUpdateCommands model0 -< (inp, pos)
+               pos <- processMoveCommands 0 -< (inp, model)
+             processFileCommands -< (inp, model)
+             processDialogCommands -< inp
+             processControlCommands -< inp
 
-processUpdateCommands :: Model -> Auto IO (Input, Int) (Model, [GUICommand])
+processUpdateCommands :: Model -> PresenterAuto (Input, Int) Model
 processUpdateCommands model0 = proc (inp, pos) -> do
                 bupdates <- emitJusts getUpdates -< inp
-                bmodelCmds <- perBlip (updateAuto model0) -< (,pos) <$> bupdates
-                model <- holdWith_ model0 -< fst <$> bmodelCmds
-                cmds <- fromBlips [] -< snd <$> bmodelCmds
-                id -< (model, cmds)
+                bmodel <- perBlip (updateAuto model0) -< (,pos) <$> bupdates
+                model <- holdWith_ model0 -< bmodel
+                id -< model
 
-processFileCommands :: Auto IO (Input, Model) ([Input], [GUICommand])
+processFileCommands :: PresenterAuto (Input, Model) ()
 processFileCommands = proc (inp, model) -> do
                         bfiles <- emitJusts getFileCommands -< inp
-                        bmodelCmds <- perBlip fileAuto -< (, model) <$> bfiles
-                        let binputCmds = first (arr toInput) <$> bmodelCmds
-                        fromBlips ([], []) -< binputCmds
-                      where toInput Nothing = []
-                            toInput (Just m) = [ InputUpdate (ChangeModel m)
-                                               , InputMove MoveBegin ]
+                        perBlip fileAuto -< (, model) <$> bfiles
+                        id -< ()
 
 getUpdates :: Input -> Maybe UpdateCommand
 getUpdates (InputUpdate cmd) = Just cmd
@@ -74,33 +76,31 @@ getFileCommands :: Input -> Maybe FileCommand
 getFileCommands (InputFile cmd) = Just cmd
 getFileCommands _ = Nothing
 
-processMoveCommands :: Int -> Auto IO (Input, Model) (Int, [GUICommand])
+processMoveCommands :: Int -> PresenterAuto (Input, Model) Int
 processMoveCommands pos0 = proc (inp, model) -> do
                              bmoves <- emitJusts getMoves -< inp
-                             bposCmds <- perBlip (movementAuto pos0) -< (, model) <$> bmoves
-                             pos <- holdWith_ pos0 -< fst <$> bposCmds
-                             cmds <- fromBlips [] -< snd <$> bposCmds
-                             id -< (pos, cmds)
+                             bpos <- perBlip (movementAuto pos0) -< (, model) <$> bmoves
+                             holdWith_ pos0 -< bpos
 
 getMoves :: Input -> Maybe MoveCommand
 getMoves (InputMove cmd) = Just cmd
 getMoves _ = Nothing
 
-processDialogCommands :: Auto IO Input [GUICommand]
+processDialogCommands :: PresenterAuto Input ()
 processDialogCommands = proc inp -> do
                     b <- emitJusts getDialogs -< inp
-                    ds <- perBlip dialogAuto -< b
-                    fromBlips [] -< ds
+                    perBlip dialogAuto -< b
+                    id -< ()
 
 getDialogs :: Input -> Maybe DialogCommand
 getDialogs (InputDialog cmd) = Just cmd
 getDialogs _ = Nothing
 
-processControlCommands :: Auto IO Input [GUICommand]
+processControlCommands :: PresenterAuto Input ()
 processControlCommands = proc inp -> do
                            b <- emitJusts getControls -< inp
-                           cmds <- perBlip controlAuto -< b
-                           fromBlips [] -< cmds
+                           perBlip controlAuto -< b
+                           id -< ()
 
 getControls :: Input -> Maybe ControlCommand
 getControls (InputControl cmd) = Just cmd
