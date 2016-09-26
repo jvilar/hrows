@@ -11,5 +11,6 @@ import Model
 
 data UpdateCommand = UpdateField Int Field
                    | ChangeModel Model
+                   | NewRow
+                   | DeleteRow
                      deriving Show
-

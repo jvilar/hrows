@@ -34,7 +34,8 @@ makeGUI iChan = do
                 control <- prepareControl iChan
 
                 liftIO $ prepareMainWindow control
-                prepareMovementButtons iChan
+                prepareMovementButtons control
+                prepareRecordButtons control
                 prepareQuitButton control
                 prepareFileMenu control
                 return control
@@ -103,14 +104,21 @@ showEvent = do
   mods <- eventModifier
   liftIO $ putStrLn $ "Modifiers: " ++ show mods
 
-prepareMovementButtons :: Chan Input -> BuildMonad ()
-prepareMovementButtons iChan =
-  forM_ [ ("beginButton", MoveBegin)
-        , ("endButton", MoveEnd)
-        , ("leftButton", MovePrevious)
-        , ("rightButton", MoveNext)
-        ] $ \(name, input) ->
-    buttonAction name $ writeChan iChan (InputMove input)
+prepareMovementButtons :: GUIControl -> BuildMonad ()
+prepareMovementButtons control =
+    mapM_ (\(name, input) -> buttonAction name $ sendInput control input)
+              [ ("beginButton", MoveBegin)
+              , ("endButton", MoveEnd)
+              , ("leftButton", MovePrevious)
+              , ("rightButton", MoveNext)
+              ]
+
+prepareRecordButtons :: GUIControl -> BuildMonad ()
+prepareRecordButtons control =
+    mapM_ (\(name, input) -> buttonAction name $ sendInput control input)
+              [ ("newButton", NewRow)
+              , ("deleteButton", DeleteRow)
+              ]
 
 prepareQuitButton :: GUIControl -> BuildMonad ()
 prepareQuitButton control = buttonAction "quitButton" $ sendInput control ExitProgram

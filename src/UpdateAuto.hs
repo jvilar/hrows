@@ -11,7 +11,7 @@ import Model
 import PresenterAuto
 
 updateAuto :: Model -> PresenterAuto (UpdateCommand, Int) Model
-updateAuto model0 = accumM_ update model0
+updateAuto = accumM_ update
 
 update :: Model -> (UpdateCommand, Int) -> PresenterM Model
 update model (UpdateField c v, pos) = do
@@ -23,6 +23,12 @@ update _ (ChangeModel model, _) = do
     sendGUIM $ ShowNames (fnames model)
     sendInputM MoveBegin
     return model
+update model (NewRow, _) = do
+    sendInputM MoveEnd
+    return $ addEmptyRow model
+update model (DeleteRow, pos) = do
+    sendInputM $ MoveHere pos
+    return $ deleteRow pos model
 
 fnames :: Model -> [String]
 fnames model = map (++ ": ") $ fromMaybe

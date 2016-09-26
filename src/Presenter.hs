@@ -27,7 +27,6 @@ import FileAuto
 import MovementAuto
 import UpdateAuto
 
-
 presenter :: Model -> Auto IO Input [GUICommand]
 presenter model0 = arr (:[]) >>> updater model0
 

@@ -13,6 +13,8 @@ module Model (
              , emptyRow
              , empty
              , addRow
+             , addEmptyRow
+             , deleteRow
              , setNames
              , fromRows
              -- **Querying
@@ -101,6 +103,18 @@ addRow m r = m { _rows = IM.insert (_size m) r (_rows m)
                , _size = _size m + 1
                , _ncols = max (_ncols m) (length r)
                }
+
+-- |Adds an empty `Row` to a `Model`.
+addEmptyRow :: Model -> Model
+addEmptyRow m = addRow m (replicate (ncols m) $ toField "")
+
+-- |Deletes a 'Row' from a 'Model'.
+deleteRow :: Int -> Model -> Model
+deleteRow pos m = m { _rows = IM.mapKeys f (_rows m)
+                    , _size = _size m - 1
+                    }
+                  where f n | n <= pos = n
+                            | otherwise = n - 1
 
 -- |Creates a model from a list of `Row`s.
 fromRows :: [Row] -> Model
