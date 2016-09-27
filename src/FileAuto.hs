@@ -16,43 +16,46 @@ import Model
 import PresenterAuto
 import SourceInfo
 
-fileAuto :: PresenterAuto (FileCommand, Model) ()
-fileAuto = arrM (uncurry applyCommand)
+fileAuto :: PresenterAuto (FileCommand, Model, SourceInfo) ()
+fileAuto = arrM (uncurry3 applyCommand)
+
+uncurry3 :: (a -> b -> c -> d) -> ((a, b, c) -> d)
+uncurry3 f (a, b, c) = f a b c
 
 message :: Message -> PresenterM ()
 message = sendGUIM . ShowIteration . DisplayMessage
 
-applyCommand :: FileCommand -> Model -> PresenterM ()
-applyCommand (LoadFile (SourceInfo Nothing _)) _ = message $ ErrorMessage "No puedo cargar un fichero vacío"
-applyCommand (LoadFile (SourceInfo (Just fp) (ListatabFormat info))) _ = do
+applyCommand :: FileCommand -> Model -> SourceInfo -> PresenterM ()
+applyCommand LoadFile _ (SourceInfo Nothing _) = message $ ErrorMessage "No puedo cargar un fichero vacío"
+applyCommand LoadFile _ info@(SourceInfo (Just fp) (ListatabFormat format)) = do
     r <- liftIO $ do
-        r <- try $ fromListatab info fp
+        r <- try $ fromListatab format fp
         putStrLn $ "Read: " ++ fp
         case r of
             Right _ -> putStrLn "OK"
             Left m -> print m
         return r
     case r of
-        Right model -> sendInputM $ ChangeModel model
+        Right model -> do
+            sendInputM $ ChangeModel model
+            sendInputM $ SetSource info
         Left (HRowsException mess) -> message $ ErrorMessage mess
-applyCommand (LoadFileFromName n) model = do
-    let info = changeFileName n (sourceInfo model)
+applyCommand (LoadFileFromName n) model info = do
+    let info' = changeFileName n info
     liftIO $ do
         putStrLn $ "Name: " ++ n
         print $ size model
-        print $ sourceInfo model
-        print info
-    applyCommand (LoadFile info) model
-applyCommand WriteFile model = applyCommand (WriteFileFromName fp) model
-        where info = sourceInfo model
-              ListatabFormat ltinfo = siFormat info
+        print $ info'
+    applyCommand LoadFile model info'
+applyCommand WriteFile model info = applyCommand (WriteFileFromName fp) model info
+        where ListatabFormat ltinfo = siFormat info
               Just fp = siFilePath info
-applyCommand (WriteFileFromName fp) model = do
-        let info = sourceInfo model
-            ListatabFormat ltinfo = siFormat info
-        when (Just fp /= siFilePath info) $
-            sendInputM $ ChangeModel (setSourceInfo (changeFileName fp info) model)
+applyCommand (WriteFileFromName fp) model info = do
+        let ListatabFormat ltinfo = siFormat info
         r <- liftIO $ try $ toListatab ltinfo fp model
         case r of
-            Right _ -> message $ InformationMessage "Fichero escrito correctamente."
+            Right _ -> do
+                          message $ InformationMessage "Fichero escrito correctamente."
+                          when (Just fp /= siFilePath info) $
+                              sendInputM $ SetSource (changeFileName fp info)
             Left (HRowsException m) -> message $ ErrorMessage m

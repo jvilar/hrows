@@ -21,11 +21,9 @@ module Model (
              , rows
              , ncols
              , size
-             , sourceInfo
              , toString
              -- **Updating
              , changeField
-             , setSourceInfo
 ) where
 
 import Data.IntMap.Strict(IntMap)

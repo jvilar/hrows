@@ -20,21 +20,23 @@ import GUI.Command
 import Input
 import Model
 import PresenterAuto
+import SourceInfo
 
 import ControlAuto
 import DialogAuto
 import FileAuto
 import MovementAuto
+import SourceAuto
 import UpdateAuto
 
 
-presenter :: Model -> Auto IO Input [GUICommand]
-presenter model0 = arr (:[]) >>> updater model0
+presenter :: Model -> SourceInfo -> Auto IO Input [GUICommand]
+presenter model0 si0 = arr (:[]) >>> updater model0 si0
 
-updater :: Model -> Auto IO [Input] [GUICommand]
-updater model0 = proc inputs -> do
+updater :: Model -> SourceInfo -> Auto IO [Input] [GUICommand]
+updater model0 si0 = proc inputs -> do
     rec
-        dauto <- delay_ (processInput model0) -< auto
+        dauto <- delay_ (processInput model0 si0) -< auto
         (cmds, auto) <- arrM (uncurry pr) -< (dauto, inputs)
     id -< cmds
 
@@ -46,12 +48,13 @@ pr auto (i:is) = do
     (cmds', auto'') <- pr auto' (is ++ is')
     return (cmds ++ cmds', auto'')
 
-processInput :: Model -> PresenterAuto Input ()
-processInput model0 = proc inp -> do
+processInput :: Model -> SourceInfo -> PresenterAuto Input ()
+processInput model0 si0 = proc inp -> do
              rec
                model <- processUpdateCommands model0 -< (inp, pos)
                pos <- processMoveCommands 0 -< (inp, model)
-             processFileCommands -< (inp, model)
+             si <- processSourceCommands si0 -< inp
+             processFileCommands -< (inp, model, si)
              processDialogCommands -< inp
              processControlCommands -< inp
 
@@ -62,10 +65,10 @@ processUpdateCommands model0 = proc (inp, pos) -> do
                 model <- holdWith_ model0 -< bmodel
                 id -< model
 
-processFileCommands :: PresenterAuto (Input, Model) ()
-processFileCommands = proc (inp, model) -> do
+processFileCommands :: PresenterAuto (Input, Model, SourceInfo) ()
+processFileCommands = proc (inp, model, si) -> do
                         bfiles <- emitJusts getFileCommands -< inp
-                        perBlip fileAuto -< (, model) <$> bfiles
+                        perBlip fileAuto -< (, model, si) <$> bfiles
                         id -< ()
 
 getUpdates :: Input -> Maybe UpdateCommand
@@ -105,3 +108,13 @@ processControlCommands = proc inp -> do
 getControls :: Input -> Maybe ControlCommand
 getControls (InputControl cmd) = Just cmd
 getControls _ = Nothing
+
+processSourceCommands :: SourceInfo -> PresenterAuto Input SourceInfo
+processSourceCommands si0 = proc inp -> do
+                              b <- emitJusts getSources -< inp
+                              bsi <- perBlip (sourceAuto si0) -< b
+                              holdWith_ si0 -< bsi
+
+getSources :: Input -> Maybe SourceCommand
+getSources (InputSource cmd) = Just cmd
+getSources _ = Nothing

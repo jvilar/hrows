@@ -20,7 +20,7 @@ fromListatab info fp = do
   mf <- try (openFile fp ReadMode >>= hGetContents)
   case mf of
       Right f -> case parse (analyze (ltInputSeparator info)) fp f of
-          Right m -> return $ setSourceInfo (mkSourceInfo (Just fp) info) m
+          Right m -> return m
           Left e -> throwIO $ HRowsException $
                        "Error reading file " ++ fp ++ ":\n"
                         ++ parseErrorPretty e

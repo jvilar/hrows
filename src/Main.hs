@@ -71,10 +71,10 @@ myError m = do
 main :: IO ()
 main = do
   opts <- getOptions
-  let Just fileName = opts ^. inputFileName
-      info = ListatabInfo (opts ^. inputSeparator)
-                          (opts ^. outputSeparator)
-                          Comment
+  let ltinfo = ListatabInfo (opts ^. inputSeparator)
+                            (opts ^. outputSeparator)
+                            Comment
+      si0 =  mkSourceInfo (opts ^. inputFileName) ltinfo
       model0 = addRow (addRow (addRow empty (map toField [1,2,3::Int]))
                               (map toField [3,4,5::Int]))
                               (map toField [5,4,3::Int])
@@ -84,8 +84,8 @@ main = do
   forkIO $ void $ runOnChanM id
                             (updateScreen control)
                             inputChan
-                            (presenter model0)
-  writeChan inputChan $ InputFile (LoadFile $ mkSourceInfo (Just fileName) info)
+                            (presenter model0 si0)
+  writeChan inputChan $ InputFile LoadFile
   mainGUI
 
 updateScreen :: GUIControl -> [GUICommand] -> IO Bool

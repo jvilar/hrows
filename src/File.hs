@@ -15,7 +15,7 @@ import ListatabFile
 import Model
 import SourceInfo
 
-data FileCommand = LoadFile SourceInfo
+data FileCommand = LoadFile
                  | LoadFileFromName FilePath
                  | WriteFile
                  | WriteFileFromName FilePath
