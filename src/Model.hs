@@ -30,8 +30,6 @@ import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
 import Data.List(foldl')
 
-import SourceInfo
-
 -- |A field can store an Int, a Double or a String or it may be empty.
 data Field = AInt Int
            | ADouble Double
@@ -80,7 +78,6 @@ data Model = Model { _rows :: IntMap Row
                    , _names :: Maybe [String]
                    , _ncols :: Int
                    , _size :: Int
-                   , _sourceInfo :: SourceInfo
                    } deriving Show
 
 
@@ -90,7 +87,6 @@ empty = Model { _rows = IM.empty
               , _names = Nothing
               , _ncols = 0
               , _size = 0
-              , _sourceInfo = mkSourceInfo Nothing ()
               }
 
 -- |Adds a `Row` to a `Model`.
@@ -107,14 +103,6 @@ fromRows = foldl' addRow empty
 -- |Sets the names of the field.
 setNames :: [String] -> Model -> Model
 setNames l m = m { _names = Just l }
-
--- |Set the associated information.
-setSourceInfo :: SourceInfo -> Model -> Model
-setSourceInfo si m = m { _sourceInfo = si }
-
--- |Get the associated information
-sourceInfo :: Model -> SourceInfo
-sourceInfo = _sourceInfo
 
 -- |Returns one row of the `Model`.
 row :: RowPos -> Model -> Row
