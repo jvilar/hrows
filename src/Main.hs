@@ -75,17 +75,15 @@ main = do
                             (opts ^. outputSeparator)
                             Comment
       si0 =  mkSourceInfo (opts ^. inputFileName) ltinfo
-      model0 = addRow (addRow (addRow empty (map toField [1,2,3::Int]))
-                              (map toField [3,4,5::Int]))
-                              (map toField [5,4,3::Int])
 
   inputChan <- newChan
   control <- makeGUI inputChan
   forkIO $ void $ runOnChanM id
                             (updateScreen control)
                             inputChan
-                            (presenter model0 si0)
-  writeChan inputChan $ InputFile LoadFile
+                            (presenter si0)
+  writeChan inputChan $ toInput MoveBegin
+  writeChan inputChan $ toInput LoadFile
   mainGUI
 
 updateScreen :: GUIControl -> [GUICommand] -> IO Bool

@@ -30,13 +30,13 @@ import SourceAuto
 import UpdateAuto
 
 
-presenter :: Model -> SourceInfo -> Auto IO Input [GUICommand]
-presenter model0 si0 = arr (:[]) >>> updater model0 si0
+presenter ::  SourceInfo -> Auto IO Input [GUICommand]
+presenter si0 = arr (:[]) >>> updater si0
 
-updater :: Model -> SourceInfo -> Auto IO [Input] [GUICommand]
-updater model0 si0 = proc inputs -> do
+updater ::  SourceInfo -> Auto IO [Input] [GUICommand]
+updater si0 = proc inputs -> do
     rec
-        dauto <- delay_ (processInput model0 si0) -< auto
+        dauto <- delay_ (processInput si0) -< auto
         (cmds, auto) <- arrM (uncurry pr) -< (dauto, inputs)
     id -< cmds
 
@@ -48,21 +48,21 @@ pr auto (i:is) = do
     (cmds', auto'') <- pr auto' (is ++ is')
     return (cmds ++ cmds', auto'')
 
-processInput :: Model -> SourceInfo -> PresenterAuto Input ()
-processInput model0 si0 = proc inp -> do
+processInput ::  SourceInfo -> PresenterAuto Input ()
+processInput si0 = proc inp -> do
              rec
-               model <- processUpdateCommands model0 -< (inp, pos)
+               model <- processUpdateCommands -< (inp, pos)
                pos <- processMoveCommands 0 -< (inp, model)
              si <- processSourceCommands si0 -< inp
              processFileCommands -< (inp, model, si)
              processDialogCommands -< inp
              processControlCommands -< inp
 
-processUpdateCommands :: Model -> PresenterAuto (Input, Int) Model
-processUpdateCommands model0 = proc (inp, pos) -> do
+processUpdateCommands :: PresenterAuto (Input, Int) Model
+processUpdateCommands = proc (inp, pos) -> do
                 bupdates <- emitJusts getUpdates -< inp
-                bmodel <- perBlip (updateAuto model0) -< (,pos) <$> bupdates
-                model <- holdWith_ model0 -< bmodel
+                bmodel <- perBlip updateAuto -< (,pos) <$> bupdates
+                model <- holdWith_ empty -< bmodel
                 id -< model
 
 processFileCommands :: PresenterAuto (Input, Model, SourceInfo) ()

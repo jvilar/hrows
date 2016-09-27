@@ -10,8 +10,8 @@ import GUI.Command
 import Model
 import PresenterAuto
 
-updateAuto :: Model -> PresenterAuto (UpdateCommand, Int) Model
-updateAuto model0 = accumM_ update model0
+updateAuto :: PresenterAuto (UpdateCommand, Int) Model
+updateAuto = accumM_ update empty
 
 update :: Model -> (UpdateCommand, Int) -> PresenterM Model
 update model (UpdateField c v, pos) = do
