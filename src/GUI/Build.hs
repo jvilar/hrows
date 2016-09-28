@@ -19,8 +19,8 @@ import Graphics.UI.Gtk.General.Enums(Align(..))
 import Paths_hrows(getDataFileName)
 
 import GUI.Control
+import GUI.Iteration
 import Input
-import Iteration
 
 makeGUI :: Chan Input -> IO GUIControl
 makeGUI iChan = do

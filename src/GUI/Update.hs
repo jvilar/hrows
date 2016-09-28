@@ -20,18 +20,15 @@ import Paths_hrows(getDataFileName)
 
 import GUI.Command
 import GUI.Control
+import GUI.Iteration
 import Input
-import Iteration
 import Model
 
 updateGUI :: GUICommand -> GUIControl -> IO ()
 updateGUI (ShowPosition pos size) = updatePosition pos size
 updateGUI (ShowRow row) = updateRow row
 updateGUI (ShowNames names) = updateNames names
-updateGUI (ShowIteration AskReadFile) = askReadFile
-updateGUI (ShowIteration AskWriteFile) = askWriteFile
-updateGUI (ShowIteration (DisplayMessage m)) = displayMessage m
-updateGUI (ShowIteration ConfirmExit) = confirmExit
+updateGUI (ShowIteration iter) = showIteration iter
 
 updatePosition :: Int -> Int -> GUIControl -> IO ()
 updatePosition pos size control = labelSetText (positionLabel control) positionText
@@ -101,6 +98,12 @@ deleteRows grid rows = forM_ rows $ \r ->
                          forM_ [0, 1] $ \c -> do
                              Just w <- gridGetChildAt grid c r
                              widgetDestroy w
+
+showIteration :: Iteration -> GUIControl -> IO ()
+showIteration AskReadFile = askReadFile
+showIteration AskWriteFile = askWriteFile
+showIteration (DisplayMessage m) = displayMessage m
+showIteration ConfirmExit = confirmExit
 
 displayMessage :: Message -> GUIControl -> IO ()
 displayMessage (ErrorMessage m) = noResponseMessage m MessageError

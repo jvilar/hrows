@@ -10,7 +10,6 @@ import Control.Exception(try)
 
 import GUI.Command
 import HRowsException
-import Iteration
 import ListatabFile
 import Model
 import SourceInfo

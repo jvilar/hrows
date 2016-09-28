@@ -1,4 +1,4 @@
-module Iteration (
+module GUI.Iteration (
     -- *Types
     Iteration(..)
     -- *Reexported modules

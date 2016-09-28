@@ -1,10 +1,10 @@
 module GUI.Command(
                   GUICommand(..)
-                 , module Iteration
+                 , module GUI.Iteration
                   ) where
 
 
-import Iteration
+import GUI.Iteration
 
 data GUICommand = ShowPosition Int Int
                 | ShowRow [String]
