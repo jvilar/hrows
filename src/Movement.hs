@@ -6,6 +6,7 @@ module Movement (
 -- |Commands related to movement.
 data MoveCommand = MoveNext
                  | MovePrevious
+                 | MoveHere Int
                  | MoveBegin
                  | MoveEnd deriving Show
 

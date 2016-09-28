@@ -29,7 +29,6 @@ import MovementAuto
 import SourceAuto
 import UpdateAuto
 
-
 presenter ::  Auto IO Input [GUICommand]
 presenter = arr (:[]) >>> updater
 

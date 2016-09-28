@@ -23,6 +23,12 @@ update _ (ChangeModel model, _) = do
     sendGUIM $ ShowNames (fnames model)
     sendInputM MoveBegin
     return model
+update model (NewRow, _) = do
+    sendInputM MoveEnd
+    return $ addEmptyRow model
+update model (DeleteRow, pos) = do
+    sendInputM $ MoveHere pos
+    return $ deleteRow pos model
 
 fnames :: Model -> [String]
 fnames model = map (++ ": ") $ fromMaybe
