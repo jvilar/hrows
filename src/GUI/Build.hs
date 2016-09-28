@@ -10,7 +10,7 @@ module GUI.Build (
 import Control.Concurrent.Chan(Chan, writeChan)
 import Control.Monad(forM_, void, when)
 import Control.Monad.IO.Class(liftIO)
-import Control.Monad.Reader(ask, ReaderT, runReaderT)
+import Control.Monad.Reader(asks, ReaderT, runReaderT)
 import Data.IORef(IORef, newIORef, readIORef, writeIORef)
 import Data.Maybe(isJust, fromJust)
 import Graphics.UI.Gtk
@@ -30,44 +30,56 @@ makeGUI iChan = do
   gladefn <- getDataFileName "hrows.glade"
   builderAddFromFile builder gladefn
 
+  control <- prepareControl iChan builder
   runReaderT (do
-                control <- prepareControl iChan
-
-                liftIO $ prepareMainWindow control
-                prepareMovementButtons control
-                prepareRecordButtons control
-                prepareQuitButton control
-                prepareFileMenu control
-                return control
-             ) builder
+                prepareMainWindow
+                prepareMovementButtons
+                prepareRecordButtons
+                prepareQuitButton
+                prepareFileMenu
+             ) (builder, control)
+  return control
 
 
-type BuildMonad = ReaderT Builder IO
+type BuildMonad = ReaderT (Builder, GUIControl) IO
 
 getObject :: GObjectClass obj => (GObject -> obj) -> String -> BuildMonad obj
 getObject cast s = do
-    builder <- ask
+    builder <- asks fst
     liftIO $ builderGetObject builder cast s
+
+getMainWindow :: BuildMonad Window
+getMainWindow = asks $ mainWindow . snd
+
+getControl :: BuildMonad GUIControl
+getControl = asks snd
 
 ioVoid :: IO a -> BuildMonad ()
 ioVoid = liftIO . void
 
-buttonAction :: String -> IO () -> BuildMonad ()
-buttonAction name action = do
+buttonAction :: IsInput cmd => String -> cmd -> BuildMonad ()
+buttonAction name input = do
+    control <- getControl
     btn <- getObject castToButton name
-    ioVoid (btn `on` buttonActivated $ action)
+    ioVoid (btn `on` buttonActivated $ sendInput control input)
 
-menuItemAction :: String -> IO () -> BuildMonad ()
-menuItemAction name action = do
+buttons :: IsInput cmd => [(String, cmd)] -> BuildMonad ()
+buttons = mapM_ (uncurry buttonAction)
+
+
+menuItemAction :: String -> Input -> BuildMonad ()
+menuItemAction name input = do
+    control <- getControl
     itm <- getObject castToMenuItem name
-    ioVoid (itm `on` menuItemActivated $ action)
+    ioVoid (itm `on` menuItemActivated $ sendInput control input)
 
-prepareControl :: Chan Input -> BuildMonad GUIControl
-prepareControl iChan = do
-  lbl <- getObject castToLabel "positionLabel"
-  grid <- getObject castToGrid "rowsGrid"
-  window <- getObject castToWindow "mainWindow"
-  rows <- liftIO $ newIORef 0
+prepareControl :: Chan Input -> Builder -> IO GUIControl
+prepareControl iChan builder = do
+  let object cast s = builderGetObject builder cast (s :: String)
+  lbl <- object castToLabel "positionLabel"
+  grid <- object castToGrid "rowsGrid"
+  window <- object castToWindow "mainWindow"
+  rows <- newIORef 0
   return GUIControl { mainWindow = window
                     , positionLabel = lbl
                     , rowsGrid = grid
@@ -80,13 +92,15 @@ globalKeys = [ (("Page_Down", []), toInput MoveNext)
              , (("q", [Control]), toInput ExitProgram)
              ]
 
-prepareMainWindow :: GUIControl -> IO ()
-prepareMainWindow control = do
-  let window = mainWindow control
-  void (window `on` deleteEvent $ do
+prepareMainWindow :: BuildMonad ()
+prepareMainWindow = do
+  window <- getMainWindow
+  control <- getControl
+  liftIO $ do
+      void (window `on` deleteEvent $ do
         liftIO $ sendInput control ExitProgram
         return False)
-  void (window `on` keyPressEvent $ do
+      void (window `on` keyPressEvent $ do
           name <- eventKeyName
           mods <- eventModifier
           -- showEvent
@@ -96,7 +110,7 @@ prepareMainWindow control = do
                 (\c -> liftIO $ sendInput control c >> return True)
                 cmd
        )
-  widgetShowAll window
+      widgetShowAll window
 
 showEvent = do
   name <- eventKeyName
@@ -104,30 +118,28 @@ showEvent = do
   mods <- eventModifier
   liftIO $ putStrLn $ "Modifiers: " ++ show mods
 
-prepareMovementButtons :: GUIControl -> BuildMonad ()
-prepareMovementButtons control =
-    mapM_ (\(name, input) -> buttonAction name $ sendInput control input)
-              [ ("beginButton", MoveBegin)
-              , ("endButton", MoveEnd)
-              , ("leftButton", MovePrevious)
-              , ("rightButton", MoveNext)
-              ]
+prepareMovementButtons :: BuildMonad ()
+prepareMovementButtons = buttons
+                         [ ("beginButton", MoveBegin)
+                         , ("endButton", MoveEnd)
+                         , ("leftButton", MovePrevious)
+                         , ("rightButton", MoveNext)
+                         ]
 
-prepareRecordButtons :: GUIControl -> BuildMonad ()
-prepareRecordButtons control =
-    mapM_ (\(name, input) -> buttonAction name $ sendInput control input)
-              [ ("newButton", NewRow)
-              , ("deleteButton", DeleteRow)
-              ]
+prepareRecordButtons :: BuildMonad ()
+prepareRecordButtons = buttons
+                       [ ("newButton", NewRow)
+                       , ("deleteButton", DeleteRow)
+                       ]
 
-prepareQuitButton :: GUIControl -> BuildMonad ()
-prepareQuitButton control = buttonAction "quitButton" $ sendInput control ExitProgram
+prepareQuitButton :: BuildMonad ()
+prepareQuitButton = buttonAction "quitButton" ExitProgram
 
-prepareFileMenu :: GUIControl -> BuildMonad ()
-prepareFileMenu control = mapM_ (\(n, cmd) -> menuItemAction n $ sendInput control cmd)
-                            [("openMenuItem", toInput LoadFileDialog)
-                            ,("saveMenuItem",  toInput WriteFile)
-                            ,("saveAsMenuItem", toInput SaveAsFileDialog)
-                            ,("quitMenuItem", toInput ExitProgram)
-                            ]
+prepareFileMenu :: BuildMonad ()
+prepareFileMenu  = mapM_ (uncurry menuItemAction)
+                             [("openMenuItem", toInput LoadFileDialog)
+                             ,("saveMenuItem",  toInput WriteFile)
+                             ,("saveAsMenuItem", toInput SaveAsFileDialog)
+                             ,("quitMenuItem", toInput ExitProgram)
+                             ]
 
