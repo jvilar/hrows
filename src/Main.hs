@@ -74,16 +74,17 @@ main = do
   let ltinfo = ListatabInfo (opts ^. inputSeparator)
                             (opts ^. outputSeparator)
                             Comment
-      si0 =  mkSourceInfo (opts ^. inputFileName) ltinfo
+      sinfo =  mkSourceInfo (opts ^. inputFileName) ltinfo
 
   inputChan <- newChan
   control <- makeGUI inputChan
   forkIO $ void $ runOnChanM id
                             (updateScreen control)
                             inputChan
-                            (presenter si0)
-  writeChan inputChan $ toInput MoveBegin
-  writeChan inputChan $ toInput LoadFile
+                            presenter
+  mapM_ (writeChan inputChan) [ toInput MoveBegin
+                              , toInput $ SetSource sinfo
+                              , toInput LoadFile]
   mainGUI
 
 updateScreen :: GUIControl -> [GUICommand] -> IO Bool

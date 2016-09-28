@@ -10,8 +10,8 @@ import GUI.Command
 import Model
 import PresenterAuto
 
-movementAuto :: Int -> PresenterAuto (MoveCommand, Model) Int
-movementAuto = accumM_ move
+movementAuto :: PresenterAuto (MoveCommand, Model) Int
+movementAuto = accumM_ move 0
 
 move :: Int -> (MoveCommand, Model) -> PresenterM Int
 move pos (MoveNext, model) = checkedMove (+1) pos model
@@ -25,6 +25,9 @@ checkedMove f pos model | 0 <= pos' && pos' < s = do
                               sendGUIM $ ShowPosition (pos' + 1) s
                               sendGUIM $ ShowRow r
                               return pos'
+                        | pos' == 0 && s == 0 = do
+                              sendGUIM $ ShowPosition 0 0
+                              return 0
                         | otherwise = return pos
                         where pos' = f pos
                               s = size model

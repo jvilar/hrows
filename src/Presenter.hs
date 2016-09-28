@@ -30,13 +30,13 @@ import SourceAuto
 import UpdateAuto
 
 
-presenter ::  SourceInfo -> Auto IO Input [GUICommand]
-presenter si0 = arr (:[]) >>> updater si0
+presenter ::  Auto IO Input [GUICommand]
+presenter = arr (:[]) >>> updater
 
-updater ::  SourceInfo -> Auto IO [Input] [GUICommand]
-updater si0 = proc inputs -> do
+updater :: Auto IO [Input] [GUICommand]
+updater = proc inputs -> do
     rec
-        dauto <- delay_ (processInput si0) -< auto
+        dauto <- delay_ processInput -< auto
         (cmds, auto) <- arrM (uncurry pr) -< (dauto, inputs)
     id -< cmds
 
@@ -48,12 +48,12 @@ pr auto (i:is) = do
     (cmds', auto'') <- pr auto' (is ++ is')
     return (cmds ++ cmds', auto'')
 
-processInput ::  SourceInfo -> PresenterAuto Input ()
-processInput si0 = proc inp -> do
+processInput :: PresenterAuto Input ()
+processInput = proc inp -> do
              rec
                model <- processUpdateCommands -< (inp, pos)
-               pos <- processMoveCommands 0 -< (inp, model)
-             si <- processSourceCommands si0 -< inp
+               pos <- processMoveCommands -< (inp, model)
+             si <- processSourceCommands -< inp
              processFileCommands -< (inp, model, si)
              processDialogCommands -< inp
              processControlCommands -< inp
@@ -79,11 +79,11 @@ getFileCommands :: Input -> Maybe FileCommand
 getFileCommands (InputFile cmd) = Just cmd
 getFileCommands _ = Nothing
 
-processMoveCommands :: Int -> PresenterAuto (Input, Model) Int
-processMoveCommands pos0 = proc (inp, model) -> do
-                             bmoves <- emitJusts getMoves -< inp
-                             bpos <- perBlip (movementAuto pos0) -< (, model) <$> bmoves
-                             holdWith_ pos0 -< bpos
+processMoveCommands :: PresenterAuto (Input, Model) Int
+processMoveCommands = proc (inp, model) -> do
+                        bmoves <- emitJusts getMoves -< inp
+                        bpos <- perBlip movementAuto -< (, model) <$> bmoves
+                        holdWith_ 0 -< bpos
 
 getMoves :: Input -> Maybe MoveCommand
 getMoves (InputMove cmd) = Just cmd
@@ -109,11 +109,12 @@ getControls :: Input -> Maybe ControlCommand
 getControls (InputControl cmd) = Just cmd
 getControls _ = Nothing
 
-processSourceCommands :: SourceInfo -> PresenterAuto Input SourceInfo
-processSourceCommands si0 = proc inp -> do
-                              b <- emitJusts getSources -< inp
-                              bsi <- perBlip (sourceAuto si0) -< b
-                              holdWith_ si0 -< bsi
+processSourceCommands :: PresenterAuto Input SourceInfo
+processSourceCommands = proc inp -> do
+                          b <- emitJusts getSources -< inp
+                          bsi <- perBlip (sourceAuto si0) -< b
+                          holdWith_ si0 -< bsi
+                        where si0 = mkSourceInfo Nothing ()
 
 getSources :: Input -> Maybe SourceCommand
 getSources (InputSource cmd) = Just cmd
