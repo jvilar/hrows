@@ -23,6 +23,7 @@ update _ (ChangeModel model, _) = do
     sendGUIM $ ShowNames (cnames model)
     sendInputM MoveBegin
     return model
+update model (DoNothing, _) = return model
 update model (NewRow, _) = do
     sendInputM MoveEnd
     return $ addEmptyRow model

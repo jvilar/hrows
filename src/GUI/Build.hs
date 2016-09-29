@@ -90,6 +90,7 @@ prepareControl iChan builder = do
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
              , (("Page_Up", []), toInput MovePrevious)
              , (("q", [Control]), toInput ExitProgram)
+             , (("Return", []), toInput DoNothing)
              ]
 
 prepareMainWindow :: BuildMonad ()
@@ -105,7 +106,7 @@ prepareMainWindow = do
           mods <- eventModifier
           -- showEvent
           let cmd = lookup (name, mods) globalKeys
-          liftIO $ print cmd
+          -- liftIO $ print cmd
           maybe (return False)
                 (\c -> liftIO $ sendInput control c >> return True)
                 cmd

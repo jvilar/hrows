@@ -11,6 +11,7 @@ import Model
 
 data UpdateCommand = UpdateField Int Field
                    | ChangeModel Model
+                   | DoNothing
                    | NewRow
                    | DeleteRow
                    | NewFields [(String, FieldType)]
