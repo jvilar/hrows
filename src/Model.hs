@@ -1,13 +1,9 @@
-{-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 module Model (
               -- *Types
               Model
              , Row
-             , Field
              , RowPos
              , ColPos
-             -- *Classes
-             , ToField(..)
              -- *Functions
              -- **Construction
              , emptyRow
@@ -23,44 +19,17 @@ module Model (
              , rows
              , ncols
              , size
-             , toString
              -- **Updating
              , changeField
+             -- *Rexported
+             , module Field
 ) where
 
 import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
 import Data.List(foldl')
 
--- |A field can store an Int, a Double or a String or it may be empty.
-data Field = AInt Int
-           | ADouble Double
-           | AString String
-           | Empty
-             deriving Show
-
-class ToField t where
-    toField :: t -> Field
-
-instance ToField Int where
-    toField = AInt
-
-instance ToField Double where
-    toField = ADouble
-
-instance ToField String where
-    toField = AString
-
-instance ToField f => ToField (Maybe f) where
-    toField Nothing = Empty
-    toField (Just v) = toField v
-
--- |The string associated to a `Field`.
-toString :: Field -> String
-toString (AInt n) = show n
-toString (ADouble d) = show d
-toString (AString s) = s
-toString Empty = "---"
+import Field
 
 -- |A row is a list of fields.
 type Row = [Field]
@@ -121,7 +90,7 @@ setNames l m = m { _names = Just l }
 -- |Returns one row of the `Model`.
 row :: RowPos -> Model -> Row
 row n m | IM.null (_rows m) = emptyRow
-        | otherwise = take (ncols m) $ (_rows m IM.! n) ++ repeat Empty
+        | otherwise = take (ncols m) $ (_rows m IM.! n) ++ repeat (toField ())
 
 -- |Number of rows of the `Model`.
 size :: Model -> Int
@@ -145,5 +114,5 @@ changeField r c field m = m { _rows = IM.adjust (adjustCol c field) r (_rows m) 
 
 adjustCol :: ColPos -> Field -> Row -> Row
 adjustCol 0 x (_:xs) = x:xs
-adjustCol n x [] = replicate n Empty ++ [x]
+adjustCol n x [] = replicate n (toField ()) ++ [x]
 adjustCol n x (y:ys) = y : adjustCol (n-1) x ys
