@@ -8,21 +8,21 @@ module GUI.Update (
 ) where
 
 import Control.Concurrent.Chan(Chan, writeChan)
-import Control.Monad(forM_, void, when)
+import Control.Monad(forM, forM_, unless, void, when)
 import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Reader(ask, ReaderT, runReaderT)
 import Data.IORef(IORef, newIORef, readIORef, writeIORef)
-import Data.Maybe(isJust, fromJust)
+import Data.Maybe(catMaybes, fromJust, isJust)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
 
 import Paths_hrows(getDataFileName)
 
+import Field
 import GUI.Command
 import GUI.Control
 import GUI.Iteration
 import Input
-import Model
 
 updateGUI :: GUICommand -> GUIControl -> IO ()
 updateGUI (ShowPosition pos size) = updatePosition pos size
@@ -102,6 +102,8 @@ deleteRows grid rows = forM_ rows $ \r ->
 showIteration :: Iteration -> GUIControl -> IO ()
 showIteration AskReadFile = askReadFile
 showIteration AskWriteFile = askWriteFile
+showIteration AskCreateField = askCreateField
+showIteration AskDeleteField = askDeleteField
 showIteration (DisplayMessage m) = displayMessage m
 showIteration ConfirmExit = confirmExit
 
@@ -152,3 +154,77 @@ confirmExit control = do
                         sendInput control DoExit
                         mainQuit
   widgetDestroy dlg
+
+askCreateField :: GUIControl -> IO ()
+askCreateField control = do
+    dlg <- dialogNew
+    set dlg [ windowTransientFor := mainWindow control
+            , windowModal := True
+            ]
+    dialogAddButton dlg
+                    ("Crear" :: String)
+                    ResponseOk
+    dialogAddButton dlg
+                    ("Cancelar" :: String)
+                    ResponseCancel
+    content <- castToContainer <$> dialogGetContentArea dlg
+    labelNew (Just ("Crear Campos" :: String)) >>= containerAdd content
+
+    grid <- gridNew
+    addLabel grid "Nombre" 0 0
+    addLabel grid "Tipo" 1 0
+    entries <- forM [1..5] $ \row -> (,)
+                                    <$> addEntry grid 0 row
+                                    <*> addComboBox grid ["Cadena", "Entero", "Flotante"] 1 row
+
+    actionArea <- castToContainer <$> dialogGetActionArea dlg
+    containerAdd actionArea grid
+
+    widgetShowAll dlg
+    r <- dialogRun dlg
+
+    when (r == ResponseOk) $ do
+        fields <- catMaybes <$> (forM entries $ \(entry, cbox) -> do
+                                        name <- entryGetText entry
+                                        if null name
+                                            then return Nothing
+                                            else do
+                                               mtext <- comboBoxGetActiveText cbox
+                                               return $ do
+                                                   text <- mtext
+                                                   t <- lookup text [("Cadena", TypeString)
+                                                                    ,("Entero", TypeInt)
+                                                                    ,("Flotante", TypeDouble)
+                                                                    ]
+                                                   return (name, t)
+                                )
+        unless (null fields) $ sendInput control $ NewFields fields
+    widgetDestroy dlg
+
+addLabel :: Grid -> String -> Int -> Int -> IO ()
+addLabel grid text left top = do
+    lbl <- labelNew $ Just text
+    gridAttach grid lbl left top 1 1
+
+addEntry :: Grid -> Int -> Int -> IO Entry
+addEntry grid left top = do
+    entry <- entryNew
+    gridAttach grid entry left top 1 1
+    return entry
+
+addComboBox :: Grid -> [ComboBoxText] -> Int -> Int -> IO ComboBox
+addComboBox grid options left top = do
+    cbox <- comboBoxNewWithEntry
+    renderer <- cellRendererComboNew
+    comboBoxSetModelText cbox
+    cellLayoutPackStart cbox renderer True
+    forM_ options $ comboBoxAppendText cbox
+    set renderer [ cellComboHasEntry := False ]
+    gridAttach grid cbox left top 1 1
+    return cbox
+
+askDeleteField :: GUIControl -> IO ()
+askDeleteField = unimplemented "Borrar campo"
+
+unimplemented :: String -> GUIControl -> IO ()
+unimplemented func control = sendInput control . MessageDialog . ErrorMessage $ "Función " ++ func ++ " no implementada"

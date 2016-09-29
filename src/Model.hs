@@ -15,12 +15,14 @@ module Model (
              , fromRows
              -- **Querying
              , names
+             , fnames
              , row
              , rows
              , ncols
              , size
              -- **Updating
              , changeField
+             , newFields
              -- *Rexported
              , module Field
 ) where
@@ -28,6 +30,7 @@ module Model (
 import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
 import Data.List(foldl')
+import Data.Maybe(fromMaybe)
 
 import Field
 
@@ -104,6 +107,13 @@ ncols = _ncols
 names :: Model -> Maybe [String]
 names = _names
 
+-- |Returns the names of the model with a default format.
+fnames :: Model -> [String]
+fnames model = fromMaybe
+                   (map (("Campo " ++).show) [1 .. ncols model])
+                   (names model)
+
+
 -- |Returns the rows of the model.
 rows :: Model -> [Row]
 rows = IM.elems . _rows
@@ -116,3 +126,10 @@ adjustCol :: ColPos -> Field -> Row -> Row
 adjustCol 0 x (_:xs) = x:xs
 adjustCol n x [] = replicate n (toField ()) ++ [x]
 adjustCol n x (y:ys) = y : adjustCol (n-1) x ys
+
+-- |Adds new fields to the model.
+newFields :: [(String, FieldType)] -> Model -> Model
+newFields l m = m { _names = Just $ fnames m ++ map fst l
+                  , _rows = IM.map (++ map (defaultValue . snd) l) (_rows m)
+                  , _ncols = _ncols m + length l
+                  }

@@ -141,5 +141,7 @@ prepareFileMenu  = mapM_ (uncurry menuItemAction)
                              ,("saveMenuItem",  toInput WriteFile)
                              ,("saveAsMenuItem", toInput SaveAsFileDialog)
                              ,("quitMenuItem", toInput ExitProgram)
+                             ,("createFieldMenuItem", toInput CreateFieldDialog)
+                             ,("deleteFieldMenuItem", toInput DeleteFieldDialog)
                              ]
 

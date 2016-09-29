@@ -7,6 +7,7 @@ module Field ( Field
              -- *Functions
              , typeOf
              , toString
+             , defaultValue
 ) where
 
 -- |A field can store an Int, a Double or a String or it may be empty.
@@ -53,3 +54,9 @@ typeOf (AInt _) = TypeInt
 typeOf (ADouble _) = TypeDouble
 typeOf (AString _) = TypeString
 typeOf Empty = TypeEmpty
+
+defaultValue :: FieldType -> Field
+defaultValue TypeInt = AInt 0
+defaultValue TypeDouble = ADouble 0
+defaultValue TypeString = AString ""
+defaultValue TypeEmpty = Empty

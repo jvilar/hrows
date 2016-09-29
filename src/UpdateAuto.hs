@@ -20,7 +20,7 @@ update model (UpdateField c v, pos) = do
     sendGUIM $ ShowRow r
     return model'
 update _ (ChangeModel model, _) = do
-    sendGUIM $ ShowNames (fnames model)
+    sendGUIM $ ShowNames (cnames model)
     sendInputM MoveBegin
     return model
 update model (NewRow, _) = do
@@ -29,8 +29,12 @@ update model (NewRow, _) = do
 update model (DeleteRow, pos) = do
     sendInputM $ MoveHere pos
     return $ deleteRow pos model
+update model (NewFields l, pos) = do
+    sendInputM $ MoveHere pos
+    let model' = newFields l model
+    sendGUIM $ ShowNames (cnames model')
+    return model'
 
-fnames :: Model -> [String]
-fnames model = map (++ ": ") $ fromMaybe
-                   (map (("Campo " ++).show) [1 .. ncols model])
-                   (names model)
+
+cnames :: Model -> [String]
+cnames = map (++ ": ") . fnames

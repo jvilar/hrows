@@ -13,4 +13,5 @@ data UpdateCommand = UpdateField Int Field
                    | ChangeModel Model
                    | NewRow
                    | DeleteRow
+                   | NewFields [(String, FieldType)]
                      deriving Show
