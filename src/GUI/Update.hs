@@ -29,6 +29,7 @@ updateGUI (ShowPosition pos size) = updatePosition pos size
 updateGUI (ShowRow row) = updateRow row
 updateGUI (ShowNames names) = updateNames names
 updateGUI (ShowIteration iter) = showIteration iter
+updateGUI DisableTextViews = disableTextViews
 
 updatePosition :: Int -> Int -> GUIControl -> IO ()
 updatePosition pos size control = labelSetText (positionLabel control) positionText
@@ -49,9 +50,25 @@ updateRow row control = do
 
   forM_ (enumerate row) $ \(r, field) -> do
                              Just tv <- gridGetChildAt grid 1 r
-                             buffer <- textViewGetBuffer $ castToTextView tv
+                             let textView = castToTextView tv
+                             set textView [ textViewEditable := True
+                                          , widgetCanFocus := True
+                                          ]
+                             buffer <- textViewGetBuffer textView
                              textBufferSetText buffer field
   widgetShowAll grid
+
+disableTextViews :: GUIControl -> IO ()
+disableTextViews control = do
+  let grid = rowsGrid control
+  nrows <- readIORef $ currentRows control
+  forM_ [0..nrows-1] $ \r -> do
+                             Just tv <- gridGetChildAt grid 1 r
+                             let textView = castToTextView tv
+                             set textView [ textViewEditable := False
+                                          , widgetCanFocus := False
+                                          , widgetState := StateNormal
+                                          ]
 
 updateNames :: [String] -> GUIControl -> IO ()
 updateNames names control = do
@@ -81,11 +98,13 @@ addRows grid rows chan = forM_ rows $ \r -> do
                  textView <- textViewNew
                  set textView [ textViewWrapMode := WrapWord
                               , textViewAcceptsTab := False
-                              , widgetCanFocus := True
+                              , textViewEditable := False
+                              , widgetState := StateInsensitive
+                              , widgetCanFocus := False
                               , widgetHExpand := True
                               ]
                  buffer <- textViewGetBuffer textView
-                 textView `on` focusOutEvent $ liftIO $ do
+                 textView `on` keyReleaseEvent $ liftIO $ do
                      begin <- textBufferGetStartIter buffer
                      end <- textBufferGetEndIter buffer
                      text <- textBufferGetText buffer begin end False

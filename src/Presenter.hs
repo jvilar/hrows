@@ -10,6 +10,7 @@ module Presenter (
 import Control.Arrow(arr, first, (>>>))
 import Control.Auto(Auto, accum_, accumM_, arrM, delay_, fromBlips, emitJusts, holdWith_, perBlip, stepAuto, id, (.))
 import Control.Monad(foldM)
+import Control.Monad.Trans(liftIO)
 import Control.Monad.Writer.Strict(runWriterT)
 import Data.Either(partitionEithers)
 import Data.Maybe(fromMaybe, isJust)
@@ -37,6 +38,7 @@ updater = proc inputs -> do
     rec
         dauto <- delay_ processInput -< auto
         (cmds, auto) <- arrM (uncurry pr) -< (dauto, inputs)
+    arrM putStrLn -< "GUI commands: " ++ show cmds
     id -< cmds
 
 pr :: PresenterAuto Input () -> [Input] -> IO ([GUICommand], PresenterAuto Input ())
@@ -49,6 +51,7 @@ pr auto (i:is) = do
 
 processInput :: PresenterAuto Input ()
 processInput = proc inp -> do
+             arrM (liftIO . putStrLn) -< "inp: " ++ show inp
              rec
                model <- processUpdateCommands -< (inp, pos)
                pos <- processMoveCommands -< (inp, model)
@@ -56,6 +59,7 @@ processInput = proc inp -> do
              processFileCommands -< (inp, model, si)
              processDialogCommands -< inp
              processControlCommands -< inp
+             arrM (liftIO . putStrLn) -< "pos': " ++ show pos
 
 processUpdateCommands :: PresenterAuto (Input, Int) Model
 processUpdateCommands = proc (inp, pos) -> do

@@ -16,7 +16,7 @@ movementAuto = accumM_ move 0
 move :: Int -> (MoveCommand, Model) -> PresenterM Int
 move pos (MoveNext, model) = checkedMove (+1) pos model
 move pos (MovePrevious, model) = checkedMove (subtract 1) pos model
-move _ (MoveHere pos, model) = checkedMove (const pos) (adjust pos) model
+move pos (MoveHere pos', model) = checkedMove (const $ adjust pos') pos model
                                where adjust p | p < 0 = 0
                                               | p < size model = p
                                               | size model == 0 = 0
@@ -32,6 +32,7 @@ checkedMove f pos model | 0 <= pos' && pos' < s = do
                               return pos'
                         | pos' == 0 && s == 0 = do
                               sendGUIM $ ShowPosition 0 0
+                              sendGUIM DisableTextViews
                               return 0
                         | otherwise = return pos
                         where pos' = f pos
