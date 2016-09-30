@@ -2,6 +2,7 @@ module UpdateAuto (
     updateAuto
 ) where
 
+import Control.Arrow(first)
 import Control.Auto(Auto, accumM_)
 import Data.Maybe(fromMaybe)
 
@@ -31,7 +32,7 @@ update model (DeleteRow, pos) = do
     return $ deleteRow pos model
 update model (NewFields l, pos) = do
     sendInputM $ MoveHere pos
-    let model' = newFields l model
+    let model' = newFields (map (first Just) l) model
     sendGUIM $ ShowNames (cnames model')
     return model'
 

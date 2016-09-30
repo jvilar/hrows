@@ -30,7 +30,7 @@ module Model (
 import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
 import Data.List(foldl')
-import Data.Maybe(fromMaybe)
+import Data.Maybe(fromMaybe, isJust)
 
 import Field
 
@@ -52,6 +52,7 @@ data Model = Model { _rows :: IntMap Row
                    , _names :: Maybe [String]
                    , _ncols :: Int
                    , _size :: Int
+                   , _types :: [FieldType]
                    } deriving Show
 
 
@@ -61,18 +62,23 @@ empty = Model { _rows = IM.empty
               , _names = Nothing
               , _ncols = 0
               , _size = 0
+              , _types = []
               }
+
+fillEmpty :: Row -> Row
+fillEmpty = (++ repeat (toField()))
 
 -- |Adds a `Row` to a `Model`.
 addRow :: Model -> Row -> Model
-addRow m r = m { _rows = IM.insert (_size m) r (_rows m)
-               , _size = _size m + 1
-               , _ncols = max (_ncols m) (length r)
-               }
+addRow m r = let
+               r' = zipWith convert (fillEmpty r) (_types m)
+             in m { _rows = IM.insert (_size m) r' (_rows m)
+                  , _size = _size m + 1
+                  }
 
 -- |Adds an empty `Row` to a `Model`.
 addEmptyRow :: Model -> Model
-addEmptyRow m = addRow m (replicate (ncols m) $ toField "")
+addEmptyRow m = addRow m (map defaultValue $ _types m)
 
 -- |Deletes a 'Row' from a 'Model'.
 deleteRow :: Int -> Model -> Model
@@ -84,7 +90,13 @@ deleteRow pos m = m { _rows = IM.mapKeys f (_rows m)
 
 -- |Creates a model from a list of `Row`s.
 fromRows :: [Row] -> Model
-fromRows = foldl' addRow empty
+fromRows rs = let
+    types = foldl' combine [] rs
+    combine xs row = xs ++ drop (length xs) (map typeOf row)
+    m = empty { _ncols = length types
+              , _types = types
+              }
+    in foldl' addRow m rs
 
 -- |Sets the names of the field.
 setNames :: [String] -> Model -> Model
@@ -93,13 +105,13 @@ setNames l m = m { _names = Just l }
 -- |Returns one row of the `Model`.
 row :: RowPos -> Model -> Row
 row n m | IM.null (_rows m) = emptyRow
-        | otherwise = take (ncols m) $ (_rows m IM.! n) ++ repeat (toField ())
+        | otherwise = take (ncols m) $ fillEmpty (_rows m IM.! n)
 
 -- |Number of rows of the `Model`.
 size :: Model -> Int
 size = _size
 
--- |Number of columnes of each row.
+-- |Number of columns of each row.
 ncols :: Model -> Int
 ncols = _ncols
 
@@ -112,7 +124,6 @@ fnames :: Model -> [String]
 fnames model = fromMaybe
                    (map (("Campo " ++).show) [1 .. ncols model])
                    (names model)
-
 
 -- |Returns the rows of the model.
 rows :: Model -> [Row]
@@ -128,8 +139,16 @@ adjustCol n x [] = replicate n (toField ()) ++ [x]
 adjustCol n x (y:ys) = y : adjustCol (n-1) x ys
 
 -- |Adds new fields to the model.
-newFields :: [(String, FieldType)] -> Model -> Model
-newFields l m = m { _names = Just $ fnames m ++ map fst l
+newFields :: [(Maybe String, FieldType)] -> Model -> Model
+newFields l m = m { _names = adjustNames m (map fst l)
                   , _rows = IM.map (++ map (defaultValue . snd) l) (_rows m)
                   , _ncols = _ncols m + length l
+                  , _types = _types m ++ map snd l
                   }
+
+adjustNames :: Model -> [Maybe String] -> Maybe [String]
+adjustNames m newNames
+    | any isJust newNames || isJust (names m) = Just $ fnames m ++ newNames'
+    | otherwise = Nothing
+    where newNames' = zipWith combine [ncols m + 1 ..] newNames
+          combine n = fromMaybe ("Campo " ++ show n)

@@ -8,12 +8,18 @@ module Field ( Field
              , typeOf
              , toString
              , defaultValue
+             , isError
+             , convert
 ) where
 
--- |A field can store an Int, a Double or a String or it may be empty.
+-- |A field can store an Int, a Double or a String or it may be
+-- empty. The special constructor AnError stores an erroneous string
+-- for the type. It is useful for converting without loosing the
+-- original value.
 data Field = AInt Int
            | ADouble Double
            | AString String
+           | AnError FieldType String
            | Empty
              deriving Show
 
@@ -41,18 +47,20 @@ toString :: Field -> String
 toString (AInt n) = show n
 toString (ADouble d) = show d
 toString (AString s) = s
-toString Empty = "---"
+toString (AnError _ s) = s
+toString Empty = "-----"
 
 data FieldType = TypeInt
                | TypeDouble
                | TypeString
                | TypeEmpty
-               deriving Show
+               deriving (Show, Eq)
 
 typeOf :: Field -> FieldType
 typeOf (AInt _) = TypeInt
 typeOf (ADouble _) = TypeDouble
 typeOf (AString _) = TypeString
+typeOf (AnError t _) = t
 typeOf Empty = TypeEmpty
 
 defaultValue :: FieldType -> Field
@@ -60,3 +68,23 @@ defaultValue TypeInt = AInt 0
 defaultValue TypeDouble = ADouble 0
 defaultValue TypeString = AString ""
 defaultValue TypeEmpty = Empty
+
+convert :: Field -> FieldType -> Field
+convert f t | typeOf f == t = f
+            | otherwise = doConvert f t
+
+doConvert :: Field -> FieldType -> Field
+doConvert f TypeInt = case reads str of
+                        [(n, "")] -> AInt n
+                        _ -> AnError TypeInt str
+                    where str = toString f
+doConvert f TypeDouble = case reads str of
+                           [(d, "")] -> ADouble d
+                           _ -> AnError TypeDouble str
+                       where str = toString f
+doConvert f TypeString = AString $ toString f
+doConvert f TypeEmpty = AnError TypeEmpty $ toString f
+
+isError :: Field -> Bool
+isError (AnError _ _) = True
+isError _ = False
