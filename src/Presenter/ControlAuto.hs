@@ -1,4 +1,4 @@
-module ControlAuto (
+module Presenter.ControlAuto (
                controlAuto
                ) where
 
@@ -6,9 +6,9 @@ import Control.Auto(Auto, arrM)
 import Control.Monad.Trans(liftIO)
 import System.Exit(exitSuccess)
 
-import Control
 import GUI.Command
-import PresenterAuto
+import Presenter.Auto
+import Presenter.Control
 
 controlAuto :: PresenterAuto ControlCommand ()
 controlAuto = arrM processCommand

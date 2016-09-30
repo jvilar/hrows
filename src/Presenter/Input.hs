@@ -1,4 +1,4 @@
-module Input (
+module Presenter.Input (
               -- *Types
               Input(..)
               -- *Clases
@@ -7,12 +7,12 @@ module Input (
              , module X
 ) where
 
-import Control as X
-import Dialog as X
-import File as X
-import Movement as X
-import Update as X
-import Source as X
+import Presenter.Control as X
+import Presenter.Dialog as X
+import Presenter.File as X
+import Presenter.Movement as X
+import Presenter.Update as X
+import Presenter.Source as X
 
 -- |The input that the presenter can receive.
 data Input = InputMove MoveCommand

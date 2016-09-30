@@ -1,4 +1,4 @@
-module PresenterAuto (
+module Presenter.Auto (
     PresenterAuto
     , PresenterM
     , sendGUIA
@@ -11,7 +11,7 @@ import Control.Auto(Auto, arrM)
 import Control.Monad.Writer.Strict(tell, WriterT)
 
 import GUI.Command
-import Input
+import Presenter.Input
 
 type PresenterM = WriterT [Either GUICommand Input] IO
 

@@ -1,4 +1,4 @@
-module Control (
+module Presenter.Control (
                 -- *Types
                 ControlCommand(..)
                ) where

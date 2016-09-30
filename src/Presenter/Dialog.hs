@@ -1,4 +1,4 @@
-module Dialog (
+module Presenter.Dialog (
               -- *Types
               DialogCommand(..)
 ) where

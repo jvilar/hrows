@@ -1,4 +1,4 @@
-module DialogAuto (
+module Presenter.DialogAuto (
               -- *Functions
               dialogAuto
 ) where
@@ -7,8 +7,8 @@ module DialogAuto (
 import Control.Auto(arrM)
 
 import GUI.Command
-import Input
-import PresenterAuto
+import Presenter.Input
+import Presenter.Auto
 
 dialogAuto :: PresenterAuto DialogCommand ()
 dialogAuto = arrM $ \input -> sendGUIM $ case input of

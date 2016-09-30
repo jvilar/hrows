@@ -1,4 +1,4 @@
-module Update (
+module Presenter.Update (
                -- *Types
                UpdateCommand(..)
 ) where

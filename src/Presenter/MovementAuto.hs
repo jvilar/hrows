@@ -1,14 +1,14 @@
-module MovementAuto (
+module Presenter.MovementAuto (
                  -- *Types
                 movementAuto
 ) where
 
 import Control.Auto(Auto, accumM_)
 
-import Input
 import GUI.Command
 import Model
-import PresenterAuto
+import Presenter.Auto
+import Presenter.Input
 
 movementAuto :: PresenterAuto (MoveCommand, Model) Int
 movementAuto = accumM_ move 0

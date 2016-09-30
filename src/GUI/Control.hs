@@ -11,7 +11,7 @@ import Control.Concurrent.Chan(Chan, writeChan)
 import Data.IORef(IORef, newIORef, readIORef, writeIORef)
 import Graphics.UI.Gtk
 
-import Input
+import Presenter.Input
 
 data GUIControl = GUIControl { mainWindow :: Window
                              , positionLabel :: Label

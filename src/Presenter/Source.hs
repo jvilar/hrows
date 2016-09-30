@@ -1,4 +1,4 @@
-module Source (
+module Presenter.Source (
     SourceCommand(..)
     ) where
 

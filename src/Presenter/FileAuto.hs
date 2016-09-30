@@ -1,4 +1,4 @@
-module FileAuto (
+module Presenter.FileAuto (
               -- *Functions
               fileAuto
 ) where
@@ -10,10 +10,10 @@ import Control.Monad.Trans(liftIO)
 
 import GUI.Command
 import HRowsException
-import Input
 import ListatabFile
 import Model
-import PresenterAuto
+import Presenter.Input
+import Presenter.Auto
 import SourceInfo
 
 fileAuto :: PresenterAuto (FileCommand, Model, SourceInfo) ()

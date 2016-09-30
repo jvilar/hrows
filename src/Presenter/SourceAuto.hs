@@ -1,12 +1,12 @@
-module SourceAuto (
+module Presenter.SourceAuto (
     sourceAuto
 ) where
 
 import Control.Auto(Auto, accum_)
 
-import Input
+import Presenter.Input
 
-import PresenterAuto
+import Presenter.Auto
 import SourceInfo
 
 sourceAuto :: SourceInfo -> PresenterAuto SourceCommand SourceInfo

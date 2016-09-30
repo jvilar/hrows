@@ -22,7 +22,7 @@ import Field
 import GUI.Command
 import GUI.Control
 import GUI.Iteration
-import Input
+import Presenter.Input
 
 updateGUI :: GUICommand -> GUIControl -> IO ()
 updateGUI (ShowPosition pos size) = updatePosition pos size

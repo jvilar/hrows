@@ -1,4 +1,4 @@
-module UpdateAuto (
+module Presenter.UpdateAuto (
     updateAuto
 ) where
 
@@ -6,10 +6,10 @@ import Control.Arrow(first)
 import Control.Auto(Auto, accumM_)
 import Data.Maybe(fromMaybe)
 
-import Input
 import GUI.Command
 import Model
-import PresenterAuto
+import Presenter.Auto
+import Presenter.Input
 
 updateAuto :: PresenterAuto (UpdateCommand, Int) Model
 updateAuto = accumM_ update empty

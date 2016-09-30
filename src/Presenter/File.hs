@@ -1,4 +1,4 @@
-module File (
+module Presenter.File (
               -- *Types
               FileCommand(..)
               -- *Reexported

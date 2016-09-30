@@ -4,7 +4,7 @@ module Presenter (
                  -- *Functions
                  presenter
                  -- *Reexported
-                 , module Input
+                 , module Presenter.Input
 ) where
 
 import Control.Arrow(arr, first, (>>>))
@@ -18,17 +18,17 @@ import Data.Monoid((<>))
 import Prelude hiding((.), id)
 
 import GUI.Command
-import Input
 import Model
-import PresenterAuto
+import Presenter.Auto
+import Presenter.Input
 import SourceInfo
 
-import ControlAuto
-import DialogAuto
-import FileAuto
-import MovementAuto
-import SourceAuto
-import UpdateAuto
+import Presenter.ControlAuto
+import Presenter.DialogAuto
+import Presenter.FileAuto
+import Presenter.MovementAuto
+import Presenter.SourceAuto
+import Presenter.UpdateAuto
 
 presenter ::  Auto IO Input [GUICommand]
 presenter = arr (:[]) >>> updater

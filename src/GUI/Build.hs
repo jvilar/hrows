@@ -20,7 +20,7 @@ import Paths_hrows(getDataFileName)
 
 import GUI.Control
 import GUI.Iteration
-import Input
+import Presenter.Input
 
 makeGUI :: Chan Input -> IO GUIControl
 makeGUI iChan = do

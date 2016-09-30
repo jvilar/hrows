@@ -1,4 +1,4 @@
-module Movement (
+module Presenter.Movement (
                  -- *Types
                  MoveCommand(..)
 ) where
