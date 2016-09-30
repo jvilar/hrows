@@ -53,6 +53,7 @@ updateRow row control = do
                              let textView = castToTextView tv
                              set textView [ textViewEditable := True
                                           , widgetCanFocus := True
+                                          , widgetState := StateNormal
                                           ]
                              buffer <- textViewGetBuffer textView
                              textBufferSetText buffer field
@@ -67,7 +68,7 @@ disableTextViews control = do
                              let textView = castToTextView tv
                              set textView [ textViewEditable := False
                                           , widgetCanFocus := False
-                                          , widgetState := StateNormal
+                                          , widgetState := StateInsensitive
                                           ]
 
 updateNames :: [String] -> GUIControl -> IO ()
