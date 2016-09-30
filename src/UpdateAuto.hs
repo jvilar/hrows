@@ -16,8 +16,11 @@ updateAuto = accumM_ update empty
 
 update :: Model -> (UpdateCommand, Int) -> PresenterM Model
 update model (UpdateField c v, pos) = do
-    let r = map toString $ row pos model'
+    let f = row pos model' !! c
         model' = changeField pos c v model
+    sendGUIM $ ShowFieldState c $ if isError f
+                                  then ErrorFieldState
+                                  else NormalFieldState
     return model'
 update _ (ChangeModel model, _) = do
     sendGUIM $ ShowNames (cnames model)

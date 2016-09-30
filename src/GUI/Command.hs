@@ -11,6 +11,7 @@ data GUICommand = ShowPosition Int Int
                 | ShowRow [(String, FieldState)]
                 | ShowNames [String]
                 | ShowIteration Iteration
+                | ShowFieldState Int FieldState
                 | DisableTextViews
                 deriving Show
 

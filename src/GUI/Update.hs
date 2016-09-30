@@ -27,6 +27,7 @@ import Input
 updateGUI :: GUICommand -> GUIControl -> IO ()
 updateGUI (ShowPosition pos size) = updatePosition pos size
 updateGUI (ShowRow row) = updateRow row
+updateGUI (ShowFieldState c s) = showFieldState c s
 updateGUI (ShowNames names) = updateNames names
 updateGUI (ShowIteration iter) = showIteration iter
 updateGUI DisableTextViews = disableTextViews
@@ -42,18 +43,18 @@ updatePosition pos size control = labelSetText (positionLabel control) positionT
 enumerate :: [a] -> [(Int, a)]
 enumerate = zip [0..]
 
+red :: Color
+red = Color 65535 0 0
+
 updateRow :: [(String, FieldState)] -> GUIControl -> IO ()
 updateRow row control = do
   let grid = rowsGrid control
 
   adjustRows (length row) control
 
-  forM_ (enumerate row) $ \(r, (field, s)) -> do
-                             Just tv <- gridGetChildAt grid 1 r
-                             let textView = castToTextView tv
-                             widgetOverrideBackgroundColor textView StateNormal $ case s of
-                                                                                      NormalFieldState ->  Nothing
-                                                                                      ErrorFieldState -> Just (Color 65535 0 0)
+  forM_ (enumerate row) $ \(c, (field, s)) -> do
+                             textView <- recoverColumnView c control
+                             changeBackground s textView
                              set textView [ textViewEditable := True
                                           , widgetCanFocus := True
                                           , widgetState := StateNormal
@@ -62,17 +63,30 @@ updateRow row control = do
                              textBufferSetText buffer field
   widgetShowAll grid
 
+showFieldState :: Int -> FieldState -> GUIControl -> IO ()
+showFieldState c s control = recoverColumnView c control >>= changeBackground s
+
+changeBackground :: FieldState -> TextView -> IO ()
+changeBackground s textView =
+    widgetOverrideBackgroundColor textView StateNormal $ case s of
+                                                             NormalFieldState ->  Nothing
+                                                             ErrorFieldState -> Just red
+
+recoverColumnView :: Int -> GUIControl -> IO TextView
+recoverColumnView c control = do
+    Just tv <- gridGetChildAt (rowsGrid control) 1 c
+    return $ castToTextView tv
+
 disableTextViews :: GUIControl -> IO ()
 disableTextViews control = do
   let grid = rowsGrid control
   nrows <- readIORef $ currentRows control
   forM_ [0..nrows-1] $ \r -> do
-                             Just tv <- gridGetChildAt grid 1 r
-                             let textView = castToTextView tv
-                             set textView [ textViewEditable := False
-                                          , widgetCanFocus := False
-                                          , widgetState := StateInsensitive
-                                          ]
+                               textView <- recoverColumnView r control
+                               set textView [ textViewEditable := False
+                                            , widgetCanFocus := False
+                                            , widgetState := StateInsensitive
+                                            ]
 
 updateNames :: [String] -> GUIControl -> IO ()
 updateNames names control = do
@@ -171,7 +185,7 @@ confirmExit control = do
                           [DialogModal]
                           MessageQuestion
                           ButtonsYesNo
-                          ("Seguro que quieres salir" :: String)
+                          ("¿Seguro que quieres salir?" :: String)
   r <- dialogRun dlg
   when (r == ResponseYes) $ do
                         sendInput control DoExit
