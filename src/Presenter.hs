@@ -64,9 +64,7 @@ processInput = proc inp -> do
 processUpdateCommands :: PresenterAuto (Input, Int) Model
 processUpdateCommands = proc (inp, pos) -> do
                 bupdates <- emitJusts getUpdates -< inp
-                bmodel <- perBlip updateAuto -< (,pos) <$> bupdates
-                model <- holdWith_ empty -< bmodel
-                id -< model
+                holdWith_ empty . perBlip updateAuto -< (,pos) <$> bupdates
 
 processFileCommands :: PresenterAuto (Input, Model, SourceInfo) ()
 processFileCommands = proc (inp, model, si) -> do
@@ -85,38 +83,28 @@ getFileCommands _ = Nothing
 processMoveCommands :: PresenterAuto (Input, Model) Int
 processMoveCommands = proc (inp, model) -> do
                         bmoves <- emitJusts getMoves -< inp
-                        bpos <- perBlip movementAuto -< (, model) <$> bmoves
-                        holdWith_ 0 -< bpos
+                        holdWith_ 0 . perBlip movementAuto -< (, model) <$> bmoves
 
 getMoves :: Input -> Maybe MoveCommand
 getMoves (InputMove cmd) = Just cmd
 getMoves _ = Nothing
 
 processDialogCommands :: PresenterAuto Input ()
-processDialogCommands = proc inp -> do
-                    b <- emitJusts getDialogs -< inp
-                    perBlip dialogAuto -< b
-                    id -< ()
+processDialogCommands = emitJusts getDialogs >>> perBlip dialogAuto >>> arr (const ())
 
 getDialogs :: Input -> Maybe DialogCommand
 getDialogs (InputDialog cmd) = Just cmd
 getDialogs _ = Nothing
 
 processControlCommands :: PresenterAuto Input ()
-processControlCommands = proc inp -> do
-                           b <- emitJusts getControls -< inp
-                           perBlip controlAuto -< b
-                           id -< ()
+processControlCommands = emitJusts getControls >>> perBlip controlAuto >>> arr (const ())
 
 getControls :: Input -> Maybe ControlCommand
 getControls (InputControl cmd) = Just cmd
 getControls _ = Nothing
 
 processSourceCommands :: PresenterAuto Input SourceInfo
-processSourceCommands = proc inp -> do
-                          b <- emitJusts getSources -< inp
-                          bsi <- perBlip (sourceAuto si0) -< b
-                          holdWith_ si0 -< bsi
+processSourceCommands = emitJusts getSources >>> holdWith_ si0 . perBlip (sourceAuto si0)
                         where si0 = mkSourceInfo Nothing ()
 
 getSources :: Input -> Maybe SourceCommand
