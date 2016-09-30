@@ -42,15 +42,18 @@ updatePosition pos size control = labelSetText (positionLabel control) positionT
 enumerate :: [a] -> [(Int, a)]
 enumerate = zip [0..]
 
-updateRow :: [String] -> GUIControl -> IO ()
+updateRow :: [(String, FieldState)] -> GUIControl -> IO ()
 updateRow row control = do
   let grid = rowsGrid control
 
   adjustRows (length row) control
 
-  forM_ (enumerate row) $ \(r, field) -> do
+  forM_ (enumerate row) $ \(r, (field, s)) -> do
                              Just tv <- gridGetChildAt grid 1 r
                              let textView = castToTextView tv
+                             widgetOverrideBackgroundColor textView StateNormal $ case s of
+                                                                                      NormalFieldState ->  Nothing
+                                                                                      ErrorFieldState -> Just (Color 65535 0 0)
                              set textView [ textViewEditable := True
                                           , widgetCanFocus := True
                                           , widgetState := StateNormal

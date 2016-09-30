@@ -131,7 +131,9 @@ rows = IM.elems . _rows
 
 -- |Changes one field.
 changeField :: RowPos -> ColPos -> Field -> Model -> Model
-changeField r c field m = m { _rows = IM.adjust (adjustCol c field) r (_rows m) }
+changeField r c field m = let
+    field' = convert field $ (_types m !! c)
+    in m { _rows = IM.adjust (adjustCol c field') r (_rows m) }
 
 adjustCol :: ColPos -> Field -> Row -> Row
 adjustCol 0 x (_:xs) = x:xs

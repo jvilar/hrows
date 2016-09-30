@@ -26,7 +26,11 @@ move _ (MoveEnd, model) = checkedMove (const $ size model - 1) 0 model
 
 checkedMove :: (Int -> Int) -> Int -> Model -> PresenterM Int
 checkedMove f pos model | 0 <= pos' && pos' < s = do
-                              let r = map toString $ row pos' model
+                              let r = map strStatus $ row pos' model
+                                  strStatus f = (toString f,
+                                                 if isError f
+                                                 then ErrorFieldState
+                                                 else NormalFieldState)
                               sendGUIM $ ShowPosition (pos' + 1) s
                               sendGUIM $ ShowRow r
                               return pos'
