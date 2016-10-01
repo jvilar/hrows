@@ -75,16 +75,25 @@ menuItemAction name input = do
 
 prepareControl :: Chan Input -> Builder -> IO GUIControl
 prepareControl iChan builder = do
-  let object cast s = builderGetObject builder cast (s :: String)
-  lbl <- object castToLabel "positionLabel"
-  grid <- object castToGrid "rowsGrid"
-  window <- object castToWindow "mainWindow"
+  let getObject :: GObjectClass obj => (GObject -> obj) -> String -> IO obj
+      getObject = builderGetObject builder
+  lbl <- getObject castToLabel "positionLabel"
+  grid <- getObject castToGrid "rowsGrid"
+  window <- getObject castToWindow "mainWindow"
+  bButton <- getObject castToButton "beginButton"
+  eButton <- getObject castToButton "endButton"
+  lButton <- getObject castToButton "leftButton"
+  rButton <- getObject castToButton "rightButton"
   rows <- newIORef 0
   return GUIControl { mainWindow = window
                     , positionLabel = lbl
                     , rowsGrid = grid
                     , currentRows = rows
                     , inputChan = iChan
+                    , beginButton = bButton
+                    , endButton = eButton
+                    , leftButton = lButton
+                    , rightButton = rButton
                     }
 
 globalKeys = [ (("Page_Down", []), toInput MoveNext)

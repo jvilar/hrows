@@ -18,6 +18,10 @@ data GUIControl = GUIControl { mainWindow :: Window
                              , rowsGrid :: Grid
                              , currentRows :: IORef Int
                              , inputChan :: Chan Input
+                             , beginButton :: Button
+                             , endButton :: Button
+                             , leftButton :: Button
+                             , rightButton :: Button
                              }
 
 sendInput :: IsInput cmd => GUIControl -> cmd -> IO ()

@@ -8,15 +8,12 @@ module GUI.Update (
 ) where
 
 import Control.Concurrent.Chan(Chan, writeChan)
-import Control.Monad(forM, forM_, unless, void, when)
+import Control.Monad(forM, forM_, unless, when)
 import Control.Monad.IO.Class(liftIO)
-import Control.Monad.Reader(ask, ReaderT, runReaderT)
-import Data.IORef(IORef, newIORef, readIORef, writeIORef)
+import Data.IORef(readIORef, writeIORef)
 import Data.Maybe(catMaybes, fromJust, isJust)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
-
-import Paths_hrows(getDataFileName)
 
 import Field
 import GUI.Command
@@ -33,12 +30,13 @@ updateGUI (ShowIteration iter) = showIteration iter
 updateGUI DisableTextViews = disableTextViews
 
 updatePosition :: Int -> Int -> GUIControl -> IO ()
-updatePosition pos size control = labelSetText (positionLabel control) positionText
-    where positionText = let
-              p = if size == 0
-                    then 0
-                    else pos + 1
-              in show pos ++ "/" ++ show size
+updatePosition pos size control = do
+    widgetSetSensitive (beginButton control) $ pos > 1
+    widgetSetSensitive (leftButton control) $ pos > 1
+    widgetSetSensitive (endButton control) $ pos < size
+    widgetSetSensitive (rightButton control) $ pos < size
+
+    labelSetText (positionLabel control) $ show pos ++ "/" ++ show size
 
 enumerate :: [a] -> [(Int, a)]
 enumerate = zip [0..]
