@@ -22,12 +22,17 @@ import GUI.Iteration
 import Presenter.Input
 
 updateGUI :: GUICommand -> GUIControl -> IO ()
+updateGUI (ChangeTitle title) = changeTitle title
 updateGUI (ShowPosition pos size) = updatePosition pos size
 updateGUI (ShowRow row) = updateRow row
 updateGUI (ShowFieldState c s) = showFieldState c s
 updateGUI (ShowNames names) = updateNames names
 updateGUI (ShowIteration iter) = showIteration iter
 updateGUI DisableTextViews = disableTextViews
+
+
+changeTitle :: String -> GUIControl -> IO ()
+changeTitle title control = set (mainWindow control) [ windowTitle := title ]
 
 updatePosition :: Int -> Int -> GUIControl -> IO ()
 updatePosition pos size control = do

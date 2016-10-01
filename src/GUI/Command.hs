@@ -7,7 +7,8 @@ module GUI.Command(
 
 import GUI.Iteration
 
-data GUICommand = ShowPosition Int Int
+data GUICommand = ChangeTitle String
+                | ShowPosition Int Int
                 | ShowRow [(String, FieldState)]
                 | ShowNames [String]
                 | ShowIteration Iteration
