@@ -4,7 +4,7 @@ module Main where
 
 import Control.Auto.Run(runOnChanM)
 import Control.Concurrent(forkIO)
-import Control.Concurrent.Chan(newChan, writeChan)
+import Control.Concurrent.Chan(newChan, writeList2Chan)
 import Control.Lens (makeLenses, (^.), set, Getting)
 import Control.Monad(forM_, unless, void, when)
 import Graphics.UI.Gtk (mainGUI, postGUIAsync)
@@ -82,9 +82,9 @@ main = do
                             (updateScreen control)
                             inputChan
                             presenter
-  mapM_ (writeChan inputChan) [ toInput MoveBegin
-                              , toInput $ SetSource sinfo
-                              , toInput LoadFile]
+  writeList2Chan inputChan [ toInput MoveBegin
+                           , toInput $ SetSource sinfo
+                           , toInput LoadFile]
   mainGUI
 
 updateScreen :: GUIControl -> [GUICommand] -> IO Bool

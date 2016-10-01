@@ -219,7 +219,7 @@ askCreateField control = do
     r <- dialogRun dlg
 
     when (r == ResponseOk) $ do
-        fields <- catMaybes <$> (forM entries $ \(entry, cbox) -> do
+        fields <- catMaybes <$> forM entries (\(entry, cbox) -> do
                                         name <- entryGetText entry
                                         if null name
                                             then return Nothing

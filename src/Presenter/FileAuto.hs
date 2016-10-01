@@ -45,7 +45,7 @@ applyCommand (LoadFileFromName n) model info = do
     liftIO $ do
         putStrLn $ "Name: " ++ n
         print $ size model
-        print $ info'
+        print info'
     applyCommand LoadFile model info'
 applyCommand WriteFile model info = applyCommand (WriteFileFromName fp) model info
         where ListatabFormat ltinfo = siFormat info
