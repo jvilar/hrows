@@ -37,6 +37,7 @@ makeGUI iChan = do
                 prepareRecordButtons
                 prepareQuitButton
                 prepareFileMenu
+                prepareFieldMenu
              ) (builder, control)
   return control
 
@@ -66,12 +67,16 @@ buttonAction name input = do
 buttons :: IsInput cmd => [(String, cmd)] -> BuildMonad ()
 buttons = mapM_ (uncurry buttonAction)
 
+menuItemInput :: String -> Input -> BuildMonad ()
+menuItemInput name input = do
+    control <- getControl
+    menuItemAction name $ sendInput control input
 
-menuItemAction :: String -> Input -> BuildMonad ()
-menuItemAction name input = do
+menuItemAction :: String -> IO () -> BuildMonad ()
+menuItemAction name io = do
     control <- getControl
     itm <- getObject castToMenuItem name
-    ioVoid (itm `on` menuItemActivated $ sendInput control input)
+    ioVoid (itm `on` menuItemActivated $ io)
 
 prepareControl :: Chan Input -> Builder -> IO GUIControl
 prepareControl iChan builder = do
@@ -150,12 +155,22 @@ prepareQuitButton :: BuildMonad ()
 prepareQuitButton = buttonAction "quitButton" ExitProgram
 
 prepareFileMenu :: BuildMonad ()
-prepareFileMenu  = mapM_ (uncurry menuItemAction)
+prepareFileMenu  = mapM_ (uncurry menuItemInput)
                              [("openMenuItem", toInput LoadFileDialog)
                              ,("saveMenuItem",  toInput WriteFile)
                              ,("saveAsMenuItem", toInput SaveAsFileDialog)
                              ,("quitMenuItem", toInput ExitProgram)
-                             ,("createFieldMenuItem", toInput CreateFieldDialog)
-                             ,("deleteFieldMenuItem", toInput DeleteFieldDialog)
+                             ,("createFieldsMenuItem", toInput CreateFieldsDialog)
+                             ,("deleteFieldsMenuItem", toInput DeleteFieldsDialog)
                              ]
 
+prepareFieldMenu :: BuildMonad ()
+prepareFieldMenu = do
+                     control <- getControl
+                     menuItemAction "deleteFieldMenuItem" $ readIORef (currentField control) >>=
+                                                             sendInput control . DeleteField
+                     menuItemInput "formulaMenuItem" $ notImplementedDialog "Fórmula"
+                     menuItemInput "changeTypeMenuItem" $ notImplementedDialog "Cambia tipo"
+
+notImplementedDialog :: String -> Input
+notImplementedDialog f = toInput $ MessageDialog (InformationMessage $ "Opción " ++ f ++ " no implementada")

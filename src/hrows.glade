@@ -6,7 +6,7 @@
     <property name="visible">True</property>
     <property name="can_focus">False</property>
     <child>
-      <object class="GtkMenuItem" id="deleteFielMenuItem">
+      <object class="GtkMenuItem" id="deleteFieldMenuItem">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
         <property name="label" translatable="yes">Eliminar Campo</property>
@@ -135,7 +135,7 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <child>
-                      <object class="GtkMenuItem" id="createFieldMenuItem">
+                      <object class="GtkMenuItem" id="createFieldsMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
                         <property name="label" translatable="yes">Crear</property>
@@ -143,7 +143,7 @@
                       </object>
                     </child>
                     <child>
-                      <object class="GtkMenuItem" id="deleteFieldMenuItem">
+                      <object class="GtkMenuItem" id="deleteFieldsMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
                         <property name="label" translatable="yes">Eliminar</property>

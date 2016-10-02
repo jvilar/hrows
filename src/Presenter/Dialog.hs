@@ -7,7 +7,7 @@ import Message
 
 data DialogCommand = LoadFileDialog
                    | SaveAsFileDialog
-                   | CreateFieldDialog
-                   | DeleteFieldDialog
+                   | CreateFieldsDialog
+                   | DeleteFieldsDialog
                    | MessageDialog Message
                      deriving Show

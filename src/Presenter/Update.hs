@@ -3,10 +3,6 @@ module Presenter.Update (
                UpdateCommand(..)
 ) where
 
-import Control.Auto(Auto, accum_)
-import Data.Maybe(fromMaybe)
-
-import GUI.Command
 import Model
 
 data UpdateCommand = UpdateField Int Field
@@ -15,4 +11,5 @@ data UpdateCommand = UpdateField Int Field
                    | NewRow
                    | DeleteRow
                    | NewFields [(String, FieldType)]
+                   | DeleteField Int
                      deriving Show

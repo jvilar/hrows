@@ -14,6 +14,6 @@ dialogAuto :: PresenterAuto DialogCommand ()
 dialogAuto = arrM $ \input -> sendGUIM $ case input of
                                              LoadFileDialog -> ShowIteration AskReadFile
                                              SaveAsFileDialog -> ShowIteration AskWriteFile
-                                             CreateFieldDialog -> ShowIteration AskCreateField
-                                             DeleteFieldDialog -> ShowIteration AskDeleteField
+                                             CreateFieldsDialog -> ShowIteration AskCreateField
+                                             DeleteFieldsDialog -> ShowIteration AskDeleteField
                                              MessageDialog m -> ShowIteration (DisplayMessage m)

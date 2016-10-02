@@ -23,10 +23,12 @@ module Model (
              -- **Updating
              , changeField
              , newFields
+             , deleteField
              -- *Rexported
              , module Field
 ) where
 
+import Control.Arrow((&&&))
 import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
 import Data.List(foldl')
@@ -154,3 +156,11 @@ adjustNames m newNames
     | otherwise = Nothing
     where newNames' = zipWith combine [ncols m + 1 ..] newNames
           combine n = fromMaybe ("Campo " ++ show n)
+
+deleteField :: Int -> Model -> Model
+deleteField n m = m { _names = del <$> _names m
+                    , _rows = IM.map del (_rows m)
+                    , _types = del $ _types m
+                    , _ncols = _ncols m - 1
+                    }
+    where del = uncurry (++) . (take n &&& drop (n+1))
