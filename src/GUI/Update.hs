@@ -12,7 +12,6 @@ import Control.Monad(forM, forM_, unless, when)
 import Control.Monad.IO.Class(liftIO)
 import Data.IORef(readIORef, writeIORef)
 import Data.Maybe(catMaybes, fromJust, isJust)
-import Data.Text(Text)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
 
@@ -202,12 +201,6 @@ confirmExit control = do
                         sendInput control DoExit
                         mainQuit
   widgetDestroy dlg
-
-typeLabels :: [(FieldType, Text)]
-typeLabels = [ (TypeString, "Cadena")
-             , (TypeInt, "Entero")
-             , (TypeDouble, "Flotante")
-             ]
 
 askCreateField :: GUIControl -> IO ()
 askCreateField control = do

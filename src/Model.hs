@@ -24,6 +24,7 @@ module Model (
              , changeField
              , newFields
              , deleteField
+             , changeFieldType
              -- *Rexported
              , module Field
 ) where
@@ -94,7 +95,7 @@ deleteRow pos m = m { _rows = IM.mapKeys f (_rows m)
 fromRows :: [Row] -> Model
 fromRows rs = let
     types = foldl' combine [] rs
-    combine xs row = xs ++ drop (length xs) (map typeOf row)
+    combine xs r = xs ++ drop (length xs) (map typeOf r)
     m = empty { _ncols = length types
               , _types = types
               }
@@ -157,6 +158,7 @@ adjustNames m newNames
     where newNames' = zipWith combine [ncols m + 1 ..] newNames
           combine n = fromMaybe ("Campo " ++ show n)
 
+-- |Deletes the given field from the model.
 deleteField :: Int -> Model -> Model
 deleteField n m = m { _names = del <$> _names m
                     , _rows = IM.map del (_rows m)
@@ -164,3 +166,12 @@ deleteField n m = m { _names = del <$> _names m
                     , _ncols = _ncols m - 1
                     }
     where del = uncurry (++) . (take n &&& drop (n+1))
+
+-- |Changes the type of the field.
+changeFieldType :: FieldType -> Int -> Model -> Model
+changeFieldType t n m | t /= _types m !! n =
+                          m { _types = change (const t) $ _types m
+                            , _rows = IM.map (change $ flip convert t) (_rows m)
+                            }
+                      | otherwise = m
+    where change f l = take n l ++ f (l !! n) : drop (n+1) l

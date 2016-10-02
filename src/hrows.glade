@@ -25,6 +25,36 @@
         <property name="can_focus">False</property>
         <property name="label" translatable="yes">Cambiar Tipo</property>
         <property name="use_underline">True</property>
+        <child type="submenu">
+          <object class="GtkMenu" id="menu5">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <child>
+              <object class="GtkMenuItem" id="changeToStringMenuItem">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="label" translatable="yes">Cadena</property>
+                <property name="use_underline">True</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkMenuItem" id="changeToIntMenuItem">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="label" translatable="yes">Entero</property>
+                <property name="use_underline">True</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkMenuItem" id="changeToFloatMenuItem">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="label" translatable="yes">Flotante</property>
+                <property name="use_underline">True</property>
+              </object>
+            </child>
+          </object>
+        </child>
       </object>
     </child>
   </object>

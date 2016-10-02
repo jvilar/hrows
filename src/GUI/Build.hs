@@ -18,6 +18,7 @@ import Graphics.UI.Gtk.General.Enums(Align(..))
 
 import Paths_hrows(getDataFileName)
 
+import Field
 import GUI.Control
 import GUI.Iteration
 import Presenter.Input
@@ -67,7 +68,7 @@ buttonAction name input = do
 buttons :: IsInput cmd => [(String, cmd)] -> BuildMonad ()
 buttons = mapM_ (uncurry buttonAction)
 
-menuItemInput :: String -> Input -> BuildMonad ()
+menuItemInput :: IsInput cmd => String -> cmd -> BuildMonad ()
 menuItemInput name input = do
     control <- getControl
     menuItemAction name $ sendInput control input
@@ -77,6 +78,12 @@ menuItemAction name io = do
     control <- getControl
     itm <- getObject castToMenuItem name
     ioVoid (itm `on` menuItemActivated $ io)
+
+fieldMenuAction :: IsInput cmd => String -> (Int -> cmd) -> BuildMonad ()
+fieldMenuAction name f = do
+    control <- getControl
+    menuItemAction name $ (f <$> readIORef (currentField control)) >>=
+                            sendInput control
 
 prepareControl :: Chan Input -> Builder -> IO GUIControl
 prepareControl iChan builder = do
@@ -167,10 +174,11 @@ prepareFileMenu  = mapM_ (uncurry menuItemInput)
 prepareFieldMenu :: BuildMonad ()
 prepareFieldMenu = do
                      control <- getControl
-                     menuItemAction "deleteFieldMenuItem" $ readIORef (currentField control) >>=
-                                                             sendInput control . DeleteField
+                     fieldMenuAction "deleteFieldMenuItem" DeleteField
                      menuItemInput "formulaMenuItem" $ notImplementedDialog "Fórmula"
-                     menuItemInput "changeTypeMenuItem" $ notImplementedDialog "Cambia tipo"
+                     fieldMenuAction "changeToStringMenuItem" (ChangeFieldType TypeString)
+                     fieldMenuAction "changeToIntMenuItem" (ChangeFieldType TypeInt)
+                     fieldMenuAction "changeToFloatMenuItem" (ChangeFieldType TypeDouble)
 
 notImplementedDialog :: String -> Input
 notImplementedDialog f = toInput $ MessageDialog (InformationMessage $ "Opción " ++ f ++ " no implementada")

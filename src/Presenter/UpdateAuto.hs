@@ -43,6 +43,9 @@ update model (DeleteField f, pos) = do
     let model' = deleteField f model
     sendGUIM $ ShowNames (cnames model')
     return model'
+update model (ChangeFieldType t f, pos) = do
+    sendInputM $ MoveHere pos
+    return $ changeFieldType t f model
 
 cnames :: Model -> [String]
 cnames = map (++ ": ") . fnames

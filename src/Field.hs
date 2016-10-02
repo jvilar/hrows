@@ -1,9 +1,11 @@
-{-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances, OverloadedStrings, TypeSynonymInstances #-}
 
 module Field ( Field
              , FieldType(..)
              -- *Classes
              , ToField(..)
+             -- *Constants
+             , typeLabels
              -- *Functions
              , typeOf
              , toString
@@ -11,6 +13,8 @@ module Field ( Field
              , isError
              , convert
 ) where
+
+import Data.Text(Text)
 
 -- |A field can store an Int, a Double or a String or it may be
 -- empty. The special constructor AnError stores an erroneous string
@@ -41,6 +45,13 @@ instance ToField () where
 instance ToField f => ToField (Maybe f) where
     toField Nothing = Empty
     toField (Just v) = toField v
+
+-- |The types that can be seen by the user and their labels
+typeLabels :: [(FieldType, Text)]
+typeLabels = [ (TypeString, "Cadena")
+             , (TypeInt, "Entero")
+             , (TypeDouble, "Flotante")
+             ]
 
 -- |The string associated to a `Field`.
 toString :: Field -> String
