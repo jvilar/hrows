@@ -254,12 +254,13 @@ addEntry grid left top = do
 
 addComboBox :: Grid -> [ComboBoxText] -> Int -> Int -> IO ComboBox
 addComboBox grid options left top = do
-    cbox <- comboBoxNewWithEntry
-    renderer <- cellRendererComboNew
-    comboBoxSetModelText cbox
-    cellLayoutPackStart cbox renderer True
+    cbox <- comboBoxNewText
+    -- renderer <- cellRendererComboNew
+    -- comboBoxSetModelText cbox
+    -- cellLayoutPackStart cbox renderer True
     forM_ options $ comboBoxAppendText cbox
-    set renderer [ cellComboHasEntry := False ]
+    -- set renderer [ cellComboHasEntry := False ]
+    comboBoxSetActive cbox 0
     gridAttach grid cbox left top 1 1
     return cbox
 
