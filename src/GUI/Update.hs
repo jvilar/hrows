@@ -12,6 +12,7 @@ import Control.Monad(forM, forM_, unless, when)
 import Control.Monad.IO.Class(liftIO)
 import Data.IORef(readIORef, writeIORef)
 import Data.Maybe(catMaybes, fromJust, isJust)
+import Data.Text(Text)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
 
@@ -195,6 +196,12 @@ confirmExit control = do
                         mainQuit
   widgetDestroy dlg
 
+typeLabels :: [(FieldType, Text)]
+typeLabels = [ (TypeString, "Cadena")
+             , (TypeInt, "Entero")
+             , (TypeDouble, "Flotante")
+             ]
+
 askCreateField :: GUIControl -> IO ()
 askCreateField control = do
     dlg <- dialogNew
@@ -215,7 +222,7 @@ askCreateField control = do
     addLabel grid "Tipo" 1 0
     entries <- forM [1..5] $ \row -> (,)
                                     <$> addEntry grid 0 row
-                                    <*> addComboBox grid ["Cadena", "Entero", "Flotante"] 1 row
+                                    <*> addComboBox grid (map snd typeLabels) 1 row
 
     actionArea <- castToContainer <$> dialogGetActionArea dlg
     containerAdd actionArea grid
@@ -226,17 +233,10 @@ askCreateField control = do
     when (r == ResponseOk) $ do
         fields <- catMaybes <$> forM entries (\(entry, cbox) -> do
                                         name <- entryGetText entry
-                                        if null name
-                                            then return Nothing
-                                            else do
-                                               mtext <- comboBoxGetActiveText cbox
-                                               return $ do
-                                                   text <- mtext
-                                                   t <- lookup text [("Cadena", TypeString)
-                                                                    ,("Entero", TypeInt)
-                                                                    ,("Flotante", TypeDouble)
-                                                                    ]
-                                                   return (name, t)
+                                        i <- comboBoxGetActive cbox
+                                        return $ if null name || i == -1
+                                                 then Nothing
+                                                 else Just (name, fst $ typeLabels !! i)
                                 )
         unless (null fields) $ sendInput control $ NewFields fields
     widgetDestroy dlg
@@ -255,11 +255,7 @@ addEntry grid left top = do
 addComboBox :: Grid -> [ComboBoxText] -> Int -> Int -> IO ComboBox
 addComboBox grid options left top = do
     cbox <- comboBoxNewText
-    -- renderer <- cellRendererComboNew
-    -- comboBoxSetModelText cbox
-    -- cellLayoutPackStart cbox renderer True
     forM_ options $ comboBoxAppendText cbox
-    -- set renderer [ cellComboHasEntry := False ]
     comboBoxSetActive cbox 0
     gridAttach grid cbox left top 1 1
     return cbox
