@@ -52,9 +52,9 @@ red = Color 65535 0 0
 
 updateRow :: [(String, FieldState)] -> GUIControl -> IO ()
 updateRow row control = do
-  let grid = rowsGrid control
+  let grid = fieldsGrid control
 
-  adjustRows (length row) control
+  adjustTextFields (length row) control
 
   forM_ (enumerate row) $ \(c, (field, s)) -> do
                              textView <- recoverColumnView c control
@@ -78,45 +78,44 @@ changeBackground s textView =
 
 recoverColumnView :: Int -> GUIControl -> IO TextView
 recoverColumnView c control = do
-    Just tv <- gridGetChildAt (rowsGrid control) 1 c
+    Just tv <- gridGetChildAt (fieldsGrid control) 1 c
     return $ castToTextView tv
 
 disableTextViews :: GUIControl -> IO ()
 disableTextViews control = do
-  let grid = rowsGrid control
-  nrows <- readIORef $ currentRows control
-  forM_ [0..nrows-1] $ \r -> do
-                               textView <- recoverColumnView r control
-                               set textView [ textViewEditable := False
-                                            , widgetCanFocus := False
-                                            , widgetState := StateInsensitive
-                                            ]
+  nfields <- readIORef $ numberOfFields control
+  forM_ [0..nfields-1] $ \f -> do
+                                textView <- recoverColumnView f control
+                                set textView [ textViewEditable := False
+                                             , widgetCanFocus := False
+                                             , widgetState := StateInsensitive
+                                             ]
 
 updateNames :: [String] -> GUIControl -> IO ()
 updateNames names control = do
-  let grid = rowsGrid control
-  adjustRows (length names) control
+  let grid = fieldsGrid control
+  adjustTextFields (length names) control
 
   forM_ (enumerate names) $ \(r, name) -> do
                              Just lbl <- gridGetChildAt grid 0 r
                              labelSetText (castToLabel lbl) name
   widgetShowAll grid
 
-adjustRows :: Int -> GUIControl -> IO ()
-adjustRows nrows control = do
-  let grid = rowsGrid control
-  current <- readIORef $ currentRows control
-  case compare current nrows of
-    LT -> addRows grid [current .. nrows - 1] (inputChan control)
+adjustTextFields :: Int -> GUIControl -> IO ()
+adjustTextFields nfields control = do
+  let grid = fieldsGrid control
+  current <- readIORef $ numberOfFields control
+  case compare current nfields of
+    LT -> addFields grid [current .. nfields - 1] control
     EQ -> return ()
-    GT -> deleteRows grid [nrows .. current - 1]
-  writeIORef (currentRows control) nrows
+    GT -> deleteFields grid [nfields .. current - 1]
+  writeIORef (numberOfFields control) nfields
 
-addRows :: Grid -> [Int] -> Chan Input -> IO ()
-addRows grid rows chan = forM_ rows $ \r -> do
+addFields :: Grid -> [Int] -> GUIControl -> IO ()
+addFields grid fields control = forM_ fields $ \f -> do
                  lbl <- labelNew $ Just ("" :: String)
                  widgetSetHAlign lbl AlignStart
-                 gridAttach grid lbl 0 r 1 1
+                 gridAttach grid lbl 0 f 1 1
                  textView <- textViewNew
                  set textView [ textViewWrapMode := WrapWord
                               , textViewAcceptsTab := False
@@ -130,14 +129,22 @@ addRows grid rows chan = forM_ rows $ \r -> do
                      begin <- textBufferGetStartIter buffer
                      end <- textBufferGetEndIter buffer
                      text <- textBufferGetText buffer begin end False
-                     writeChan chan (toInput $ UpdateField r (toField (text::String)))
+                     writeChan (inputChan control) (toInput $ UpdateField f (toField (text::String)))
                      return False
-                 gridAttach grid textView 1 r 1 1
+                 textView `on` buttonPressEvent $ do
+                     button <- eventButton
+                     if button == RightButton
+                     then liftIO $ do
+                       writeIORef (currentField control) f
+                       menuPopup (fieldMenu control) Nothing
+                       return True
+                     else return False
+                 gridAttach grid textView 1 f 1 1
 
-deleteRows :: Grid -> [Int] -> IO ()
-deleteRows grid rows = forM_ rows $ \r ->
+deleteFields :: Grid -> [Int] -> IO ()
+deleteFields grid fields = forM_ fields $ \f ->
                          forM_ [0, 1] $ \c -> do
-                             Just w <- gridGetChildAt grid c r
+                             Just w <- gridGetChildAt grid c f
                              widgetDestroy w
 
 showIteration :: Iteration -> GUIControl -> IO ()

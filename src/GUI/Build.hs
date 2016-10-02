@@ -78,18 +78,22 @@ prepareControl iChan builder = do
   let getObject :: GObjectClass obj => (GObject -> obj) -> String -> IO obj
       getObject = builderGetObject builder
   lbl <- getObject castToLabel "positionLabel"
-  grid <- getObject castToGrid "rowsGrid"
+  grid <- getObject castToGrid "fieldsGrid"
   window <- getObject castToWindow "mainWindow"
+  fmenu <- getObject castToMenu "fieldPopupMenu"
   bButton <- getObject castToButton "beginButton"
   eButton <- getObject castToButton "endButton"
   lButton <- getObject castToButton "leftButton"
   rButton <- getObject castToButton "rightButton"
-  rows <- newIORef 0
+  fields <- newIORef 0
+  cfield <- newIORef 0
   return GUIControl { mainWindow = window
                     , positionLabel = lbl
-                    , rowsGrid = grid
-                    , currentRows = rows
+                    , fieldsGrid = grid
+                    , numberOfFields = fields
+                    , currentField = cfield
                     , inputChan = iChan
+                    , fieldMenu = fmenu
                     , beginButton = bButton
                     , endButton = eButton
                     , leftButton = lButton
