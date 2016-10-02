@@ -47,7 +47,10 @@ enumerate :: [a] -> [(Int, a)]
 enumerate = zip [0..]
 
 red :: Color
-red = Color 65535 0 0
+red = Color 65535 20000 20000
+
+white :: Color
+white = Color 65535 65535 65535
 
 updateRow :: [(String, FieldState)] -> GUIControl -> IO ()
 updateRow row control = do
@@ -70,10 +73,9 @@ showFieldState :: Int -> FieldState -> GUIControl -> IO ()
 showFieldState c s control = recoverColumnView c control >>= changeBackground s
 
 changeBackground :: FieldState -> TextView -> IO ()
-changeBackground s textView =
-    widgetOverrideBackgroundColor textView StateNormal $ case s of
-                                                             NormalFieldState ->  Nothing
-                                                             ErrorFieldState -> Just red
+changeBackground s textView = widgetModifyBg textView StateNormal $ case s of
+                                                                        NormalFieldState -> white
+                                                                        ErrorFieldState -> red
 
 recoverColumnView :: Int -> GUIControl -> IO TextView
 recoverColumnView c control = do
