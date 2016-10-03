@@ -1,14 +1,14 @@
-module SourceInfo ( SourceInfo(..)
-                  , FormatInfo(..)
-                  , FormatInfoClass(..)
-                  , changeFileName
-                  , changeFormatInfo
-                  , mkSourceInfo
-                  , module ListatabInfo
-                  ) where
+module Model.SourceInfo ( SourceInfo(..)
+                        , FormatInfo(..)
+                        , FormatInfoClass(..)
+                        , changeFileName
+                        , changeFormatInfo
+                        , mkSourceInfo
+                        , module Model.ListatabInfo
+                        ) where
 
 
-import ListatabInfo
+import Model.ListatabInfo
 
 -- |The information about the source of the model. It contains
 -- the possible file path and the options related to te format.

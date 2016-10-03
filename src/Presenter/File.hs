@@ -2,7 +2,7 @@ module Presenter.File (
               -- *Types
               FileCommand(..)
               -- *Reexported
-              , module SourceInfo
+              , module Model.SourceInfo
 ) where
 
 import Control.Auto(Auto, arrM)
@@ -10,9 +10,9 @@ import Control.Exception(try)
 
 import GUI.Command
 import HRowsException
-import ListatabFile
 import Model
-import SourceInfo
+import Model.ListatabFile
+import Model.SourceInfo
 
 data FileCommand = LoadFile
                  | LoadFileFromName FilePath

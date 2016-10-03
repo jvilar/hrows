@@ -1,6 +1,6 @@
-module ListatabInfo ( ListatabInfo(..)
-                    , HeaderType(..)
-                    ) where
+module Model.ListatabInfo ( ListatabInfo(..)
+                          , HeaderType(..)
+                          ) where
 
 data ListatabInfo = ListatabInfo { ltInputSeparator :: Char
                                  , ltOutputSeparator :: Char

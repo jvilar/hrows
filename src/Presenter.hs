@@ -19,9 +19,9 @@ import Prelude hiding((.), id)
 
 import GUI.Command
 import Model
+import Model.SourceInfo
 import Presenter.Auto
 import Presenter.Input
-import SourceInfo
 
 import Presenter.ControlAuto
 import Presenter.DialogAuto

@@ -5,11 +5,10 @@ module Presenter.SourceAuto (
 import Control.Auto(Auto, accumM_)
 import Data.Maybe(fromMaybe)
 
-import Presenter.Input
 import GUI.Command
-
+import Model.SourceInfo
+import Presenter.Input
 import Presenter.Auto
-import SourceInfo
 
 sourceAuto :: SourceInfo -> PresenterAuto SourceCommand SourceInfo
 sourceAuto = accumM_ update

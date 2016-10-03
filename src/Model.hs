@@ -26,7 +26,7 @@ module Model (
              , deleteFields
              , changeFieldType
              -- *Rexported
-             , module Field
+             , module Model.Field
 ) where
 
 import Control.Arrow((&&&))
@@ -35,7 +35,7 @@ import qualified Data.IntMap.Strict as IM
 import Data.List(foldl', sort)
 import Data.Maybe(fromMaybe, isJust)
 
-import Field
+import Model.Field
 
 -- |A row is a list of fields.
 type Row = [Field]

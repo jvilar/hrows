@@ -15,10 +15,10 @@ import Data.Maybe(catMaybes, fromJust, isJust)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
 
-import Field
 import GUI.Command
 import GUI.Control
 import GUI.Iteration
+import Model.Field
 import Presenter.Input
 
 updateGUI :: GUICommand -> GUIControl -> IO ()

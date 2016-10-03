@@ -10,11 +10,11 @@ import Control.Monad.Trans(liftIO)
 
 import GUI.Command
 import HRowsException
-import ListatabFile
 import Model
+import Model.ListatabFile
+import Model.SourceInfo
 import Presenter.Input
 import Presenter.Auto
-import SourceInfo
 
 fileAuto :: PresenterAuto (FileCommand, Model, SourceInfo) ()
 fileAuto = arrM (uncurry3 applyCommand)

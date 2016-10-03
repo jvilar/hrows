@@ -1,18 +1,18 @@
 {-# LANGUAGE FlexibleInstances, OverloadedStrings, TypeSynonymInstances #-}
 
-module Field ( Field
-             , FieldType(..)
-             -- *Classes
-             , ToField(..)
-             -- *Constants
-             , typeLabels
-             -- *Functions
-             , typeOf
-             , toString
-             , defaultValue
-             , isError
-             , convert
-) where
+module Model.Field ( Field
+                   , FieldType(..)
+                   -- *Classes
+                   , ToField(..)
+                   -- *Constants
+                   , typeLabels
+                   -- *Functions
+                   , typeOf
+                   , toString
+                   , defaultValue
+                   , isError
+                   , convert
+                   ) where
 
 import Data.Text(Text)
 

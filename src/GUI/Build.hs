@@ -18,9 +18,9 @@ import Graphics.UI.Gtk.General.Enums(Align(..))
 
 import Paths_hrows(getDataFileName)
 
-import Field
 import GUI.Control
 import GUI.Iteration
+import Model.Field
 import Presenter.Input
 
 makeGUI :: Chan Input -> IO GUIControl

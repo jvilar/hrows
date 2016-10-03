@@ -1,4 +1,4 @@
-module ListatabFile (
+module Model.ListatabFile (
    -- *Functions
    fromListatab,
    toListatab
@@ -11,8 +11,8 @@ import System.IO (Handle, hGetContents, hPutStrLn, openFile, IOMode(ReadMode, Wr
 import Text.Megaparsec hiding (try)
 
 import HRowsException
-import SourceInfo
 import Model
+import Model.SourceInfo
 
 -- |Creates a `Model` from a listatab file.
 fromListatab :: ListatabInfo -> FilePath -> IO Model
