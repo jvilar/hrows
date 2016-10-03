@@ -23,7 +23,7 @@ module Model (
              -- **Updating
              , changeField
              , newFields
-             , deleteField
+             , deleteFields
              , changeFieldType
              -- *Rexported
              , module Field
@@ -32,7 +32,7 @@ module Model (
 import Control.Arrow((&&&))
 import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
-import Data.List(foldl')
+import Data.List(foldl', sort)
 import Data.Maybe(fromMaybe, isJust)
 
 import Field
@@ -158,14 +158,23 @@ adjustNames m newNames
     where newNames' = zipWith combine [ncols m + 1 ..] newNames
           combine n = fromMaybe ("Campo " ++ show n)
 
--- |Deletes the given field from the model.
-deleteField :: Int -> Model -> Model
-deleteField n m = m { _names = del <$> _names m
-                    , _rows = IM.map del (_rows m)
-                    , _types = del $ _types m
-                    , _ncols = _ncols m - 1
-                    }
-    where del = uncurry (++) . (take n &&& drop (n+1))
+-- |Deletes the given fields from the model.
+deleteFields :: [Int] -> Model -> Model
+deleteFields fs m = m { _names = del fs <$> _names m
+                      , _rows = IM.map (del fs) (_rows m)
+                      , _types = del fs $ _types m
+                      , _ncols = _ncols m - length fs
+                      }
+
+del :: [Int] -> [a] -> [a]
+del [] l = l
+del pos l = go ps l
+    where go [] l = l
+          go (n:ps) l = let
+              (i, _:t) = splitAt n l
+              in i ++ go ps t
+          spos = sort $ filter (< length l) pos
+          ps = head spos : zipWith (\n m -> n - m - 1) (tail spos) spos
 
 -- |Changes the type of the field.
 changeFieldType :: FieldType -> Int -> Model -> Model

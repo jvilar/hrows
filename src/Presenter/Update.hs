@@ -11,6 +11,6 @@ data UpdateCommand = UpdateField Int Field
                    | NewRow
                    | DeleteRow
                    | NewFields [(String, FieldType)]
-                   | DeleteField Int
+                   | DeleteFields [Int]
                    | ChangeFieldType FieldType Int
                      deriving Show

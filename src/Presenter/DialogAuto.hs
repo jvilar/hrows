@@ -7,13 +7,14 @@ module Presenter.DialogAuto (
 import Control.Auto(arrM)
 
 import GUI.Command
+import Model
 import Presenter.Input
 import Presenter.Auto
 
-dialogAuto :: PresenterAuto DialogCommand ()
-dialogAuto = arrM $ \input -> sendGUIM $ case input of
+dialogAuto :: PresenterAuto (DialogCommand, Model) ()
+dialogAuto = arrM $ \(input, model) -> sendGUIM $ case input of
                                              LoadFileDialog -> ShowIteration AskReadFile
                                              SaveAsFileDialog -> ShowIteration AskWriteFile
                                              CreateFieldsDialog -> ShowIteration AskCreateField
-                                             DeleteFieldsDialog -> ShowIteration AskDeleteField
+                                             DeleteFieldsDialog -> ShowIteration (AskDeleteFields $ fnames model)
                                              MessageDialog m -> ShowIteration (DisplayMessage m)

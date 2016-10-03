@@ -38,9 +38,9 @@ update model (NewFields l, pos) = do
     let model' = newFields (map (first Just) l) model
     sendGUIM $ ShowNames (cnames model')
     return model'
-update model (DeleteField f, pos) = do
+update model (DeleteFields fs, pos) = do
     sendInputM $ MoveHere pos
-    let model' = deleteField f model
+    let model' = deleteFields fs model
     sendGUIM $ ShowNames (cnames model')
     return model'
 update model (ChangeFieldType t f, pos) = do

@@ -8,7 +8,7 @@ module GUI.Update (
 ) where
 
 import Control.Concurrent.Chan(Chan, writeChan)
-import Control.Monad(forM, forM_, unless, when)
+import Control.Monad(filterM, forM, forM_, unless, when)
 import Control.Monad.IO.Class(liftIO)
 import Data.IORef(readIORef, writeIORef)
 import Data.Maybe(catMaybes, fromJust, isJust)
@@ -152,7 +152,7 @@ showIteration :: Iteration -> GUIControl -> IO ()
 showIteration AskReadFile = askReadFile
 showIteration AskWriteFile = askWriteFile
 showIteration AskCreateField = askCreateField
-showIteration AskDeleteField = askDeleteField
+showIteration (AskDeleteFields fs) = askDeleteField fs
 showIteration (DisplayMessage m) = displayMessage m
 showIteration ConfirmExit = confirmExit
 
@@ -248,6 +248,12 @@ addLabel grid text left top = do
     lbl <- labelNew $ Just text
     gridAttach grid lbl left top 1 1
 
+addCheckButton :: Grid -> String -> Int -> Int -> IO CheckButton
+addCheckButton grid label left top = do
+    btn <- checkButtonNewWithLabel label
+    gridAttach grid btn left top 1 1
+    return btn
+
 addEntry :: Grid -> Int -> Int -> IO Entry
 addEntry grid left top = do
     entry <- entryNew
@@ -262,8 +268,35 @@ addComboBox grid options left top = do
     gridAttach grid cbox left top 1 1
     return cbox
 
-askDeleteField :: GUIControl -> IO ()
-askDeleteField = unimplemented "Borrar campo"
+askDeleteField :: [String] -> GUIControl -> IO ()
+askDeleteField names control = do
+    dlg <- dialogNew
+    set dlg [ windowTransientFor := mainWindow control
+            , windowModal := True
+            ]
+    dialogAddButton dlg
+                    ("Borrar" :: String)
+                    ResponseOk
+    dialogAddButton dlg
+                    ("Cancelar" :: String)
+                    ResponseCancel
+    content <- castToContainer <$> dialogGetContentArea dlg
+    labelNew (Just ("Borrar Campos" :: String)) >>= containerAdd content
+
+    grid <- gridNew
+    cbuttons <- forM (enumerate names) $ \(row, name) -> addCheckButton grid name 0 row
+
+    actionArea <- castToContainer <$> dialogGetActionArea dlg
+    containerAdd actionArea grid
+
+    widgetShowAll dlg
+    r <- dialogRun dlg
+
+    when (r == ResponseOk) $ do
+        fields <- map fst <$> filterM (toggleButtonGetActive . snd) (enumerate cbuttons)
+        unless (null fields) $ sendInput control $ DeleteFields fields
+    widgetDestroy dlg
+
 
 unimplemented :: String -> GUIControl -> IO ()
 unimplemented func control = sendInput control . MessageDialog . ErrorMessage $ "Función " ++ func ++ " no implementada"

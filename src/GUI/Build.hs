@@ -174,7 +174,7 @@ prepareFileMenu  = mapM_ (uncurry menuItemInput)
 prepareFieldMenu :: BuildMonad ()
 prepareFieldMenu = do
                      control <- getControl
-                     fieldMenuAction "deleteFieldMenuItem" DeleteField
+                     fieldMenuAction "deleteFieldMenuItem" (DeleteFields . (:[]))
                      menuItemInput "formulaMenuItem" $ notImplementedDialog "Fórmula"
                      fieldMenuAction "changeToStringMenuItem" (ChangeFieldType TypeString)
                      fieldMenuAction "changeToIntMenuItem" (ChangeFieldType TypeInt)

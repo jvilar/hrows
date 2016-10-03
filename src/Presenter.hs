@@ -57,7 +57,7 @@ processInput = proc inp -> do
                pos <- processMoveCommands -< (inp, model)
              si <- processSourceCommands -< inp
              processFileCommands -< (inp, model, si)
-             processDialogCommands -< inp
+             processDialogCommands -< (inp, model)
              processControlCommands -< inp
              arrM (liftIO . putStrLn) -< "pos': " ++ show pos
 
@@ -89,8 +89,10 @@ getMoves :: Input -> Maybe MoveCommand
 getMoves (InputMove cmd) = Just cmd
 getMoves _ = Nothing
 
-processDialogCommands :: PresenterAuto Input ()
-processDialogCommands = emitJusts getDialogs >>> perBlip dialogAuto >>> arr (const ())
+processDialogCommands :: PresenterAuto (Input, Model) ()
+processDialogCommands = proc (inp, model) -> do
+                          bdialogs <- emitJusts getDialogs -< inp
+                          holdWith_ () . perBlip dialogAuto -< (, model) <$> bdialogs
 
 getDialogs :: Input -> Maybe DialogCommand
 getDialogs (InputDialog cmd) = Just cmd
