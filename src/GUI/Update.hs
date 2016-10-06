@@ -302,20 +302,25 @@ askDeleteField names control = do
 getFieldFormula :: Int -> String -> Maybe String -> GUIControl -> IO ()
 getFieldFormula fieldId fieldName mFormula control = do
     let dlg = changeFieldFormulaDialog control
+        btn = changeFieldFormulaButton control
+        entry = changeFieldFormulaEntry control
+        lbl = changeFieldFormulaLabel control
     set dlg [ windowTransientFor := mainWindow control
             , windowModal := True
             ]
-    toggleButtonSetActive (changeFieldFormulaButton control) (isJust mFormula)
-    entrySetText (changeFieldFormulaEntry control) (fromMaybe "" mFormula)
-    labelSetText (changeFieldFormulaLabel control) fieldName
+
+    toggleButtonSetActive btn $ isJust mFormula
+    entrySetText entry $ fromMaybe "" mFormula
+    widgetSetSensitive entry $ isJust mFormula
+    labelSetText lbl fieldName
 
     widgetShowAll dlg
     r <- dialogRun dlg
     widgetHide dlg
     putStrLn $ "Response: " ++ show r
     when (r == ResponseOk) $ do
-        active <- toggleButtonGetActive (changeFieldFormulaButton control)
-        f <- entryGetText (changeFieldFormulaEntry control)
+        active <- toggleButtonGetActive btn
+        f <- entryGetText entry
         sendInput control $ ChangeFieldFormula (if active
                                                 then Just f
                                                 else Nothing) fieldId

@@ -39,6 +39,7 @@ makeGUI iChan = do
                 prepareQuitButton
                 prepareFileMenu
                 prepareFieldMenu
+                prepareChangeFieldFormulaDialog
              ) (builder, control)
   return control
 
@@ -181,12 +182,20 @@ prepareFileMenu  = mapM_ (uncurry menuItemInput)
 
 prepareFieldMenu :: BuildMonad ()
 prepareFieldMenu = do
-                     control <- getControl
                      fieldMenuAction "deleteFieldMenuItem" (DeleteFields . (:[]))
                      fieldMenuAction "formulaMenuItem" ChangeFieldFormulaDialog
                      fieldMenuAction "changeToStringMenuItem" (ChangeFieldType TypeString)
                      fieldMenuAction "changeToIntMenuItem" (ChangeFieldType TypeInt)
                      fieldMenuAction "changeToFloatMenuItem" (ChangeFieldType TypeDouble)
+
+prepareChangeFieldFormulaDialog :: BuildMonad ()
+prepareChangeFieldFormulaDialog = do
+    control <- getControl
+    let btn = changeFieldFormulaButton control
+        entry = changeFieldFormulaEntry control
+    ioVoid $ btn `on` toggled $ toggleButtonGetActive btn >>=
+                                 widgetSetSensitive entry
+
 
 notImplementedDialog :: String -> Input
 notImplementedDialog f = toInput $ MessageDialog (InformationMessage $ "Opción " ++ f ++ " no implementada")
