@@ -13,4 +13,5 @@ data UpdateCommand = UpdateField Int Field
                    | NewFields [(String, FieldType)]
                    | DeleteFields [Int]
                    | ChangeFieldType FieldType Int
+                   | ChangeFieldFormula (Maybe String) Int
                      deriving Show

@@ -15,4 +15,5 @@ data Iteration = NoIteration -- ^No need to iterate.
                | AskDeleteFields [String] -- ^Ask for fields to delete.
                | DisplayMessage Message -- ^Display a message.
                | ConfirmExit -- ^Confirm exit program
+               | GetFieldFormula Int String (Maybe String) -- ^Introduce the formula for a field
                deriving Show

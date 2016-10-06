@@ -18,3 +18,4 @@ dialogAuto = arrM $ \(input, model) -> sendGUIM $ case input of
                                              CreateFieldsDialog -> ShowIteration AskCreateField
                                              DeleteFieldsDialog -> ShowIteration (AskDeleteFields $ fnames model)
                                              MessageDialog m -> ShowIteration (DisplayMessage m)
+                                             ChangeFieldFormulaDialog f -> ShowIteration $ GetFieldFormula f (fnames model !! f) (formulas model !! f)

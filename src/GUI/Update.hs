@@ -11,7 +11,7 @@ import Control.Concurrent.Chan(Chan, writeChan)
 import Control.Monad(filterM, forM, forM_, unless, when)
 import Control.Monad.IO.Class(liftIO)
 import Data.IORef(readIORef, writeIORef)
-import Data.Maybe(catMaybes, fromJust, isJust)
+import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
 
@@ -155,6 +155,7 @@ showIteration AskCreateField = askCreateField
 showIteration (AskDeleteFields fs) = askDeleteField fs
 showIteration (DisplayMessage m) = displayMessage m
 showIteration ConfirmExit = confirmExit
+showIteration (GetFieldFormula fid flabel ms) = getFieldFormula fid flabel ms
 
 displayMessage :: Message -> GUIControl -> IO ()
 displayMessage (ErrorMessage m) = noResponseMessage m MessageError
@@ -297,6 +298,27 @@ askDeleteField names control = do
         unless (null fields) $ sendInput control $ DeleteFields fields
     widgetDestroy dlg
 
+
+getFieldFormula :: Int -> String -> Maybe String -> GUIControl -> IO ()
+getFieldFormula fieldId fieldName mFormula control = do
+    let dlg = changeFieldFormulaDialog control
+    set dlg [ windowTransientFor := mainWindow control
+            , windowModal := True
+            ]
+    toggleButtonSetActive (changeFieldFormulaButton control) (isJust mFormula)
+    entrySetText (changeFieldFormulaEntry control) (fromMaybe "" mFormula)
+    labelSetText (changeFieldFormulaLabel control) fieldName
+
+    widgetShowAll dlg
+    r <- dialogRun dlg
+    widgetHide dlg
+    putStrLn $ "Response: " ++ show r
+    when (r == ResponseOk) $ do
+        active <- toggleButtonGetActive (changeFieldFormulaButton control)
+        f <- entryGetText (changeFieldFormulaEntry control)
+        sendInput control $ ChangeFieldFormula (if active
+                                                then Just f
+                                                else Nothing) fieldId
 
 unimplemented :: String -> GUIControl -> IO ()
 unimplemented func control = sendInput control . MessageDialog . ErrorMessage $ "Función " ++ func ++ " no implementada"

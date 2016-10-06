@@ -8,8 +8,8 @@ module Model.Expression ( Expression (..)
 
 import Control.Monad.Reader(Reader, ask, asks, runReader)
 import Data.List(elemIndex)
-import Model
 import Model.Field
+import Model.Row
 
 data Expression = Position Int
                 | NamedPosition String
@@ -17,6 +17,14 @@ data Expression = Position Int
                 | Unary UnaryOp Expression
                 | Binary BinaryOp Expression Expression
                 | Error String
+
+instance Show Expression where
+    show (Position n) = "Position " ++ show n
+    show (NamedPosition s) = "NamedPosition " ++ show s
+    show (Constant f) = "Constant " ++ show f
+    show (Unary _ e) = "Unary op (" ++ show e ++ ")"
+    show (Binary _ e1 e2) = "Binary op (" ++ show e1 ++ ") (" ++ show e2 ++ ")"
+    show (Error s) = "Error " ++ show s
 
 type UnaryOp = Field -> Field
 
@@ -52,12 +60,12 @@ evalIndex n = do
              then r !! n
              else mkError $ "Índice erróneo " ++ show n
 
-eliminateNames :: Model -> Expression -> Expression
-eliminateNames m exp = runReader (transform noNames exp) m
-    where noNames :: Expression -> Reader Model Expression
+eliminateNames :: [String] -> Expression -> Expression
+eliminateNames fnames exp = runReader (transform noNames exp) fnames
+    where noNames :: Expression -> Reader [String] Expression
           noNames (NamedPosition name) = do
-              m <- ask
-              return $ case elemIndex name (fnames m) of
+              fnames <- ask
+              return $ case elemIndex name fnames of
                  Nothing -> Error $ "Mal nombre de campo: " ++ name
                  Just i -> Position i
           noNames n = return n

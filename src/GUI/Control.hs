@@ -24,6 +24,10 @@ data GUIControl = GUIControl { mainWindow :: Window
                              , endButton :: Button
                              , leftButton :: Button
                              , rightButton :: Button
+                             , changeFieldFormulaDialog :: Dialog
+                             , changeFieldFormulaEntry :: Entry
+                             , changeFieldFormulaLabel :: Label
+                             , changeFieldFormulaButton :: CheckButton
                              }
 
 sendInput :: IsInput cmd => GUIControl -> cmd -> IO ()

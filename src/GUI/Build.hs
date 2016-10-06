@@ -99,6 +99,10 @@ prepareControl iChan builder = do
   rButton <- getObject castToButton "rightButton"
   fields <- newIORef 0
   cfield <- newIORef 0
+  cfDialog <- getObject castToDialog "changeFieldFormulaDialog"
+  cfEntry <- getObject castToEntry "changeFieldFormulaEntry"
+  cfLabel <- getObject castToLabel "changeFieldFormulaLabel"
+  cfButton <- getObject castToCheckButton "changeFieldFormulaCheckButton"
   return GUIControl { mainWindow = window
                     , positionLabel = lbl
                     , fieldsGrid = grid
@@ -110,6 +114,10 @@ prepareControl iChan builder = do
                     , endButton = eButton
                     , leftButton = lButton
                     , rightButton = rButton
+                    , changeFieldFormulaDialog = cfDialog
+                    , changeFieldFormulaEntry = cfEntry
+                    , changeFieldFormulaLabel = cfLabel
+                    , changeFieldFormulaButton = cfButton
                     }
 
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
@@ -175,7 +183,7 @@ prepareFieldMenu :: BuildMonad ()
 prepareFieldMenu = do
                      control <- getControl
                      fieldMenuAction "deleteFieldMenuItem" (DeleteFields . (:[]))
-                     menuItemInput "formulaMenuItem" $ notImplementedDialog "Fórmula"
+                     fieldMenuAction "formulaMenuItem" ChangeFieldFormulaDialog
                      fieldMenuAction "changeToStringMenuItem" (ChangeFieldType TypeString)
                      fieldMenuAction "changeToIntMenuItem" (ChangeFieldType TypeInt)
                      fieldMenuAction "changeToFloatMenuItem" (ChangeFieldType TypeDouble)

@@ -46,6 +46,8 @@ update model (DeleteFields fs, pos) = do
 update model (ChangeFieldType t f, pos) = do
     sendInputM $ MoveHere pos
     return $ changeFieldType t f model
-
+update model (ChangeFieldFormula mf f, pos) = do
+    sendInputM $ MoveHere pos
+    return $ changeFieldFormula mf f model
 cnames :: Model -> [String]
 cnames = map (++ ": ") . fnames
