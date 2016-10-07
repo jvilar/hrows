@@ -1,12 +1,19 @@
-module TopoSort ( Graph
-                , emptyGraph
-                , addEdge
-                , mkGraph
-                , toposort
-                ) where
+module Model.TopoSort ( Graph
+                      , emptyGraph
+                      , addEdge
+                      , mkGraph
+                      , toposort
+                      , dfs
+                      ) where
 
+import Control.Monad(when)
+import Control.Monad.State.Strict(evalStateT, gets, modify, StateT)
+import Control.Monad.Trans(lift)
+import Control.Monad.Writer(execWriter, tell, Writer)
 import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
+import Data.IntSet(IntSet)
+import qualified Data.IntSet as IS
 import Data.List(delete)
 import Data.Maybe(fromMaybe)
 
@@ -38,6 +45,17 @@ go (n:ns) succs preds = let
       (good, cycle) = go (np ++ ns) succs preds'
     in (n:good, cycle)
 
+-- |Returns the visited vertices of the graph in a DFS departing from
+-- the given vertex.
+dfs :: Graph -> Int -> [Int]
+dfs g n = execWriter (evalStateT (go n) IS.empty)
+    where go :: Int -> StateT IntSet (Writer [Int]) ()
+          go n = do
+              seen <- gets (IS.member n)
+              when (not seen) $ do
+                  lift $ tell [n]
+                  modify (IS.insert n)
+                  mapM_ go (succs g IM.! n)
 
 emptyGraph = Graph [] IM.empty IM.empty
 

@@ -2,6 +2,7 @@
 
 module Model.Field ( Field
                    , FieldType(..)
+                   , FieldPos
                    -- *Classes
                    , ToField(..)
                    -- *Constants
@@ -29,6 +30,8 @@ data Field = AInt Int
            | AnError FieldType String
            | Empty
              deriving (Show, Eq)
+
+type FieldPos = Int
 
 class ToField t where
     toField :: t -> Field

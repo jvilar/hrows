@@ -18,9 +18,11 @@ update :: Model -> (UpdateCommand, Int) -> PresenterM Model
 update model (UpdateField c v, pos) = do
     let f = row pos model' !! c
         model' = changeField pos c v model
-    sendGUIM $ ShowFieldState c $ if isError f
-                                  then ErrorFieldState
-                                  else NormalFieldState
+    sendGUIM $ ShowFields [ FieldInfo { indexFI = c
+                                      , textFI = toString f
+                                      , isFormulaFI = isFormula c model'
+                                      , isErrorFI = isError f
+                                      } ]
     return model'
 update _ (ChangeModel model, _) = do
     sendGUIM $ ShowNames (cnames model)
@@ -34,14 +36,14 @@ update model (DeleteRow, pos) = do
     sendInputM $ MoveHere pos
     return $ deleteRow pos model
 update model (NewFields l, pos) = do
-    sendInputM $ MoveHere pos
     let model' = newFields (map (first Just) l) model
     sendGUIM $ ShowNames (cnames model')
+    sendInputM $ MoveHere pos
     return model'
 update model (DeleteFields fs, pos) = do
-    sendInputM $ MoveHere pos
     let model' = deleteFields fs model
     sendGUIM $ ShowNames (cnames model')
+    sendInputM $ MoveHere pos
     return model'
 update model (ChangeFieldType t f, pos) = do
     sendInputM $ MoveHere pos

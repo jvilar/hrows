@@ -24,8 +24,7 @@ import Presenter.Input
 updateGUI :: GUICommand -> GUIControl -> IO ()
 updateGUI (ChangeTitle title) = changeTitle title
 updateGUI (ShowPosition pos size) = updatePosition pos size
-updateGUI (ShowRow row) = updateRow row
-updateGUI (ShowFieldState c s) = showFieldState c s
+updateGUI (ShowFields fis) = showFields fis
 updateGUI (ShowNames names) = updateNames names
 updateGUI (ShowIteration iter) = showIteration iter
 updateGUI DisableTextViews = disableTextViews
@@ -49,33 +48,30 @@ enumerate = zip [0..]
 red :: Color
 red = Color 65535 20000 20000
 
+gray :: Color
+gray = Color 53000 53000 53000
+
 white :: Color
 white = Color 65535 65535 65535
 
-updateRow :: [(String, FieldState)] -> GUIControl -> IO ()
-updateRow row control = do
+showFields :: [FieldInfo] -> GUIControl -> IO ()
+showFields fis control = do
   let grid = fieldsGrid control
 
-  adjustTextFields (length row) control
-
-  forM_ (enumerate row) $ \(c, (field, s)) -> do
-                             textView <- recoverColumnView c control
-                             changeBackground s textView
-                             set textView [ textViewEditable := True
-                                          , widgetCanFocus := True
-                                          , widgetState := StateNormal
-                                          ]
-                             buffer <- textViewGetBuffer textView
-                             textBufferSetText buffer field
+  forM_ fis $ \fi -> do
+                       textView <- recoverColumnView (indexFI fi) control
+                       set textView [ textViewEditable := not $ isFormulaFI fi
+                                    , widgetCanFocus := not $ isFormulaFI fi
+                                    , widgetState := StateNormal
+                                    ]
+                       widgetModifyBg textView StateNormal $ if isErrorFI fi
+                                                             then red
+                                                             else if isFormulaFI fi
+                                                                  then gray
+                                                                  else white
+                       buffer <- textViewGetBuffer textView
+                       textBufferSetText buffer $ textFI fi
   widgetShowAll grid
-
-showFieldState :: Int -> FieldState -> GUIControl -> IO ()
-showFieldState c s control = recoverColumnView c control >>= changeBackground s
-
-changeBackground :: FieldState -> TextView -> IO ()
-changeBackground s textView = widgetModifyBg textView StateNormal $ case s of
-                                                                        NormalFieldState -> white
-                                                                        ErrorFieldState -> red
 
 recoverColumnView :: Int -> GUIControl -> IO TextView
 recoverColumnView c control = do
@@ -91,6 +87,7 @@ disableTextViews control = do
                                              , widgetCanFocus := False
                                              , widgetState := StateInsensitive
                                              ]
+                                widgetModifyBg textView StateInsensitive gray
 
 updateNames :: [String] -> GUIControl -> IO ()
 updateNames names control = do

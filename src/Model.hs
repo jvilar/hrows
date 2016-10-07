@@ -3,7 +3,6 @@ module Model (
               Model
              , Row
              , RowPos
-             , ColPos
              -- *Functions
              -- **Construction
              , emptyRow
@@ -18,9 +17,10 @@ module Model (
              , fnames
              , row
              , rows
-             , ncols
+             , nfields
              , size
              , formulas
+             , isFormula
              -- **Updating
              , changeField
              , newFields
@@ -47,13 +47,10 @@ import Model.Row
 -- |The position of a `Row`.
 type RowPos = Int
 
--- |The position of a `Column`.
-type ColPos = Int
-
 -- |Holds the rows.
 data Model = Model { _rows :: IntMap Row
                    , _rowInfo :: [RowInfo]
-                   , _ncols :: Int
+                   , _nfields :: Int
                    , _size :: Int
                    } deriving Show
 
@@ -80,7 +77,7 @@ types = map _type . _rowInfo
 empty :: Model
 empty = Model { _rows = IM.empty
               , _rowInfo = []
-              , _ncols = 0
+              , _nfields = 0
               , _size = 0
               }
 
@@ -100,7 +97,7 @@ addEmptyRow :: Model -> Model
 addEmptyRow m = addRow m (map _defaultValue $ _rowInfo m)
 
 -- |Deletes a 'Row' from a 'Model'.
-deleteRow :: Int -> Model -> Model
+deleteRow :: RowPos -> Model -> Model
 deleteRow pos m = m { _rows = IM.mapKeys f (_rows m)
                     , _size = _size m - 1
                     }
@@ -112,7 +109,7 @@ fromRows :: [Row] -> Model
 fromRows rs = let
     infos = foldl' combine [] rs
     combine xs r = xs ++ map inferInfo (drop (length xs) r)
-    m = empty { _ncols = length infos
+    m = empty { _nfields = length infos
               , _rowInfo = infos
               }
     in foldl' addRow m rs
@@ -124,7 +121,7 @@ setNames l m = m { _rowInfo = zipWith (\i n -> i { _name = Just n }) (_rowInfo m
 -- |Returns one row of the `Model`.
 row :: RowPos -> Model -> Row
 row n m | IM.null (_rows m) = emptyRow
-        | otherwise = take (ncols m) $ fillEmpty (_rows m IM.! n)
+        | otherwise = take (nfields m) $ fillEmpty (_rows m IM.! n)
 
 -- |Number of rows of the `Model`.
 size :: Model -> Int
@@ -134,10 +131,13 @@ size = _size
 formulas :: Model -> [Maybe String]
 formulas = map _formula . _rowInfo
 
+-- |True if the field is a formula
+isFormula :: FieldPos -> Model -> Bool
+isFormula c = isJust . _formula . (!! c) .  _rowInfo
 
--- |Number of columns of each row.
-ncols :: Model -> Int
-ncols = _ncols
+-- |Number of fields of each row.
+nfields :: Model -> Int
+nfields = _nfields
 
 -- |Returns the names of the rows.
 names :: Model -> Maybe [String]
@@ -146,7 +146,7 @@ names = sequence . map _name . _rowInfo
 -- |Returns the names of the model with a default format.
 fnames :: Model -> [String]
 fnames model = fromMaybe
-                   (map (("Campo " ++).show) [1 .. ncols model])
+                   (map (("Campo " ++).show) [1 .. nfields model])
                    (names model)
 
 -- |Returns the rows of the model.
@@ -154,15 +154,15 @@ rows :: Model -> [Row]
 rows = IM.elems . _rows
 
 -- |Changes one field.
-changeField :: RowPos -> ColPos -> Field -> Model -> Model
+changeField :: RowPos -> FieldPos -> Field -> Model -> Model
 changeField r c field m = let
     field' = convert (_type $ _rowInfo m !! c) field
-    in m { _rows = IM.adjust (adjustCol c field') r (_rows m) }
+    in m { _rows = IM.adjust (adjustField c field') r (_rows m) }
 
-adjustCol :: ColPos -> Field -> Row -> Row
-adjustCol 0 x (_:xs) = x:xs
-adjustCol n x [] = replicate n (toField ()) ++ [x]
-adjustCol n x (y:ys) = y : adjustCol (n-1) x ys
+adjustField :: FieldPos -> Field -> Row -> Row
+adjustField 0 x (_:xs) = x:xs
+adjustField n x [] = replicate n (toField ()) ++ [x]
+adjustField n x (y:ys) = y : adjustField (n-1) x ys
 
 -- |Adds new fields to the model.
 newFields :: [(Maybe String, FieldType)] -> Model -> Model
@@ -174,10 +174,10 @@ newFields l m = let
                         , _defaultValue = defaultValue t
                         , _expression = Nothing
                         , _formula = Nothing
-                        } | (n, t) <- zip (drop (_ncols m) names) (map snd l) ]
+                        } | (n, t) <- zip (drop (_nfields m) names) (map snd l) ]
     in m { _rows = IM.map (++ map (defaultValue . snd) l) (_rows m)
          , _rowInfo = oldInfo ++ newInfo
-         , _ncols = _ncols m + length l
+         , _nfields = _nfields m + length l
          }
 
 adjustNames :: Model -> [Maybe String] -> [Maybe String]
@@ -188,7 +188,7 @@ adjustNames m newNames = zipWith (flip maybe Just . Just) defNames ((map _name $
 deleteFields :: [Int] -> Model -> Model
 deleteFields fs m = m { _rows = IM.map (del fs) (_rows m)
                       , _rowInfo = del fs $ _rowInfo m
-                      , _ncols = _ncols m - length fs
+                      , _nfields = _nfields m - length fs
                       }
 
 del :: [Int] -> [a] -> [a]
@@ -202,7 +202,7 @@ del pos l = go ps l
           ps = head spos : zipWith (\n m -> n - m - 1) (tail spos) spos
 
 -- |Changes the type of the field.
-changeFieldType :: FieldType -> Int -> Model -> Model
+changeFieldType :: FieldType -> FieldPos -> Model -> Model
 changeFieldType t n m | t /= types m !! n =
                           m { _rows = IM.map (change $ convert t) (_rows m)
                             , _rowInfo = newInfo
@@ -214,7 +214,7 @@ changeFieldType t n m | t /= types m !! n =
               in h ++ f x : t
 
 -- |Changes the formula of the field.
-changeFieldFormula :: Maybe String -> Int -> Model -> Model
+changeFieldFormula :: Maybe String -> FieldPos -> Model -> Model
 changeFieldFormula mf n m = m { _rowInfo = newInfo
                               }
     where newInfo = change (\i -> i { _expression = c, _formula = mf }) $ _rowInfo m

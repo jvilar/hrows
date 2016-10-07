@@ -188,11 +188,15 @@ prepareFieldMenu = do
                      fieldMenuAction "changeToIntMenuItem" (ChangeFieldType TypeInt)
                      fieldMenuAction "changeToFloatMenuItem" (ChangeFieldType TypeDouble)
 
+gray :: Color
+gray = Color 53000 53000 53000
+
 prepareChangeFieldFormulaDialog :: BuildMonad ()
 prepareChangeFieldFormulaDialog = do
     control <- getControl
     let btn = changeFieldFormulaButton control
         entry = changeFieldFormulaEntry control
+    ioVoid $ widgetModifyBg entry StateInsensitive gray
     ioVoid $ btn `on` toggled $ toggleButtonGetActive btn >>=
                                  widgetSetSensitive entry
 

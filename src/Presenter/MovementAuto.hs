@@ -4,6 +4,7 @@ module Presenter.MovementAuto (
 ) where
 
 import Control.Auto(Auto, accumM_)
+import Data.Maybe(isJust)
 
 import GUI.Command
 import Model
@@ -26,13 +27,14 @@ move _ (MoveEnd, model) = checkedMove (const $ size model - 1) 0 model
 
 checkedMove :: (Int -> Int) -> Int -> Model -> PresenterM Int
 checkedMove f pos model | 0 <= pos' && pos' < s = do
-                              let r = map strStatus $ row pos' model
-                                  strStatus f = (toString f,
-                                                 if isError f
-                                                 then ErrorFieldState
-                                                 else NormalFieldState)
+                              let r = zipWith3 combine (row pos' model) (formulas model) [0..]
+                                  combine field mformula index = FieldInfo { indexFI = index
+                                                                           , textFI = toString field
+                                                                           , isFormulaFI = isJust mformula
+                                                                           , isErrorFI = isError field
+                                                                           }
                               sendGUIM $ ShowPosition (pos' + 1) s
-                              sendGUIM $ ShowRow r
+                              sendGUIM $ ShowFields r
                               return pos'
                         | pos' == 0 && s == 0 = do
                               sendGUIM $ ShowPosition 0 0

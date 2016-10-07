@@ -1,6 +1,6 @@
 module GUI.Command(
                   GUICommand(..)
-                  , FieldState(..)
+                  , FieldInfo(..)
                   , module GUI.Iteration
                   ) where
 
@@ -9,13 +9,14 @@ import GUI.Iteration
 
 data GUICommand = ChangeTitle String
                 | ShowPosition Int Int
-                | ShowRow [(String, FieldState)]
+                | ShowFields [FieldInfo]
                 | ShowNames [String]
                 | ShowIteration Iteration
-                | ShowFieldState Int FieldState
                 | DisableTextViews
                 deriving Show
 
-data FieldState = NormalFieldState
-                | ErrorFieldState
-                deriving Show
+data FieldInfo = FieldInfo { indexFI :: Int
+                           , textFI :: String
+                           , isFormulaFI :: Bool
+                           , isErrorFI :: Bool
+                           } deriving Show

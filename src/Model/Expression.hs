@@ -3,6 +3,7 @@ module Model.Expression ( Expression (..)
                         , UnaryOp
                         , evaluate
                         , eliminateNames
+                        , getPositions
                         , module Model.Field
                         ) where
 
@@ -70,3 +71,18 @@ eliminateNames fnames exp = runReader (transform noNames exp) fnames
                  Just i -> Position i
           noNames n = return n
 
+getPositions :: Expression -> [Int]
+getPositions (Position n) = [n]
+getPositions (NamedPosition name) = error $ "Expresión con variable: " ++ name
+getPositions (Constant f) = []
+getPositions (Unary _ exp) = getPositions exp
+getPositions (Binary _ exp1 exp2) = merge (getPositions exp1) (getPositions exp2)
+getPositions (Error _) = []
+
+merge :: [Int] -> [Int] -> [Int]
+merge [] l = l
+merge l@(_:_) [] = l
+merge (x:xs) (y:ys) = case compare x y of
+                          LT -> x : merge xs (y:ys)
+                          EQ -> x : merge xs ys
+                          GT -> y : merge (x:xs) ys
