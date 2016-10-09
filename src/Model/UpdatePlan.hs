@@ -18,7 +18,7 @@ import Model.Parser
 import Model.Row
 
 data UpdatePlan = UpdatePlan { expressions :: [Maybe Expression]
-                             , isParameterOf :: IntMap [FieldPos]
+                             , influences :: IntMap [FieldPos]
                              , updateOrder :: [FieldPos]
                              , cycled :: [FieldPos]
                              } deriving Show
@@ -38,7 +38,7 @@ mkUpdatePlan exps = let
     updateEdges l (i, vars) = [(v, i) | v <- vars, v `IS.member` isExp ] ++ l
     (order, cycles) = toposort $ mkGraph edges
     in UpdatePlan { expressions = exps
-                  , isParameterOf = closureUpdates pars
+                  , influences = closureUpdates pars
                   , updateOrder = order
                   , cycled = cycles
                   }
@@ -49,26 +49,25 @@ closureUpdates isParameterOf = let
     edges = foldl' updateEdges [] ks
     updateEdges l i = [(i, f) | f <- isParameterOf IM.! i] ++ l
     graph = mkGraph edges
-    (order, cycles) = toposort $ graph
-    orderMap = IM.fromList (zip order [1..])
+    order = fst . toposort $ graph
+    orderMap = IM.fromList (zip order [(1::Int) ..])
     initial = IM.fromList (zip ks $ repeat [])
     updateClosure n cl = let
-          deps = dfs graph n
+          deps = tail $ dfs graph n
         in IM.insert n (sortOn (orderMap IM.!) deps) cl
     in foldr updateClosure initial order
-
 
 updateAll :: UpdatePlan -> Row -> Row
 updateAll up r = foldr (changeRow $ mkError "Formula con dependencias circulares")
                  (foldl' (evaluateField up) r (updateOrder up)) (cycled up)
 
--- |Updates a 'Row' after a 'Field' has changed. Returns the new 'Row'
--- and a list of the positions of the fields that changed, excluding
+-- |Changes a 'Field' and Updates a 'Row'. Returns the new 'Row'
+-- and a list of the positions of the fields that changed, including
 -- the one responsible of the change.
 updateField :: UpdatePlan -> Field -> FieldPos -> Row -> (Row, [FieldPos])
 updateField up f n r = let
-    deps = isParameterOf up IM.! n
-    in (foldl' (evaluateField up) r deps, deps)
+    deps = influences up IM.! n
+    in (foldl' (evaluateField up) (changeRow f n r) deps, deps)
 
 changeRow :: Field -> FieldPos -> Row -> Row
 changeRow f n r = let

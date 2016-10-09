@@ -6,7 +6,7 @@ module Model.TopoSort ( Graph
                       , dfs
                       ) where
 
-import Control.Monad(when)
+import Control.Monad(unless)
 import Control.Monad.State.Strict(evalStateT, gets, modify, StateT)
 import Control.Monad.Trans(lift)
 import Control.Monad.Writer(execWriter, tell, Writer)
@@ -37,7 +37,7 @@ missingOrEmpty m = filter cond
 go :: [Int] -> IntMap [Int] -> IntMap [Int] -> ([Int], [Int])
 go [] _ preds = ([], IM.keys preds)
 go (n:ns) succs preds = let
-      sn = fromMaybe [] $ IM.lookup n succs
+      sn = succs IM.! n
       np = filter ((==1).length.(preds IM.!)) sn
       preds' = foldr (IM.update $ update n) preds sn
       update n [_] = Nothing
@@ -52,20 +52,23 @@ dfs g n = execWriter (evalStateT (go n) IS.empty)
     where go :: Int -> StateT IntSet (Writer [Int]) ()
           go n = do
               seen <- gets (IS.member n)
-              when (not seen) $ do
+              unless seen $ do
                   lift $ tell [n]
                   modify (IS.insert n)
                   mapM_ go (succs g IM.! n)
 
+emptyGraph :: Graph
 emptyGraph = Graph [] IM.empty IM.empty
 
 addEdge :: (Int, Int) -> Graph -> Graph
 addEdge (u, v) g = g { vertices = addL u . addL v $ vertices g
-                     , succs = IM.alter (add v) u (succs g)
-                     , preds = IM.alter (add u) v (preds g)
+                     , succs = IM.alter (add v) u $
+                               IM.alter addEmpty v (succs g)
+                     , preds = IM.alter (add u) v $
+                               IM.alter addEmpty u (preds g)
                      }
-                   where add x Nothing = Just [x]
-                         add x (Just l) = Just (addL x l)
+                   where add x = Just . maybe [x] (addL x)
+                         addEmpty = Just . fromMaybe []
                          addL x l | x `elem` l = l
                                   | otherwise = x : l
 
