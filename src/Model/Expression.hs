@@ -1,13 +1,14 @@
 module Model.Expression ( Expression (..)
                         , BinaryOp
                         , UnaryOp
+                        , addCast
                         , evaluate
                         , eliminateNames
                         , getPositions
                         , module Model.Field
                         ) where
 
-import Control.Monad.Reader(Reader, ask, asks, runReader)
+import Control.Monad.Reader(Reader, ask, runReader)
 import Data.List(elemIndex)
 import Model.Field
 import Model.Row
@@ -17,6 +18,7 @@ data Expression = Position Int
                 | Constant Field
                 | Unary UnaryOp Expression
                 | Binary BinaryOp Expression Expression
+                | Cast FieldType Expression
                 | Error String
 
 instance Show Expression where
@@ -25,6 +27,7 @@ instance Show Expression where
     show (Constant f) = "Constant " ++ show f
     show (Unary _ e) = "Unary op (" ++ show e ++ ")"
     show (Binary _ e1 e2) = "Binary op (" ++ show e1 ++ ") (" ++ show e2 ++ ")"
+    show (Cast ft e) = "Cast " ++ show ft ++ " (" ++ show e ++ ")"
     show (Error s) = "Error " ++ show s
 
 type UnaryOp = Field -> Field
@@ -34,12 +37,15 @@ type BinaryOp = Field -> Field -> Field
 
 transform :: Monad m => (Expression -> m Expression) -> Expression -> m Expression
 transform t (Unary op e) = do
-    e' <- t e
+    e' <- transform t e
     t (Unary op e')
 transform t (Binary op e1 e2) = do
-    e1' <- t e1
-    e2' <- t e2
+    e1' <- transform t e1
+    e2' <- transform t e2
     t (Binary op e1' e2')
+transform t (Cast ft e) = do
+    e' <- transform t e
+    t (Cast ft e')
 transform t n = t n
 
 evaluate :: Row -> Expression -> Field
@@ -52,6 +58,7 @@ eval (NamedPosition name) = return . mkError $ "Expresión con variable: " ++ na
 eval (Constant f) = return f
 eval (Unary op exp) = op <$> eval exp
 eval (Binary op exp1 exp2) = op <$> eval exp1 <*> eval exp2
+eval (Cast ft exp) = convert ft <$> eval exp
 eval (Error m) = return $ mkError m
 
 evalIndex :: Int -> Eval Field
@@ -77,6 +84,7 @@ getPositions (NamedPosition name) = error $ "Expresión con variable: " ++ name
 getPositions (Constant f) = []
 getPositions (Unary _ exp) = getPositions exp
 getPositions (Binary _ exp1 exp2) = merge (getPositions exp1) (getPositions exp2)
+getPositions (Cast _ exp) = getPositions exp
 getPositions (Error _) = []
 
 merge :: [Int] -> [Int] -> [Int]
@@ -86,3 +94,9 @@ merge (x:xs) (y:ys) = case compare x y of
                           LT -> x : merge xs (y:ys)
                           EQ -> x : merge xs ys
                           GT -> y : merge (x:xs) ys
+
+addCast :: FieldType -> Expression -> Expression
+addCast ft exp@(Cast ft' e) | ft == ft' = exp
+                            | otherwise = Cast ft e
+addCast ft exp = Cast ft exp
+                                          

@@ -16,7 +16,7 @@ data GUICommand = ChangeTitle String
                 deriving Show
 
 data FieldInfo = FieldInfo { indexFI :: Int
-                           , textFI :: String
+                           , textFI :: Maybe String
                            , isFormulaFI :: Bool
                            , isErrorFI :: Bool
                            } deriving Show

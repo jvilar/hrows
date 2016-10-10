@@ -28,7 +28,7 @@ data Graph = Graph { vertices :: [Int]
 toposort :: Graph -> ([Int], [Int])
 toposort g = let
     noPreds = missingOrEmpty (preds g) (vertices g)
-    in go noPreds (succs g) (preds g)
+    in go noPreds (succs g) (foldr IM.delete (preds g) noPreds)
 
 missingOrEmpty :: IntMap [Int] -> [Int] -> [Int]
 missingOrEmpty m = filter cond

@@ -17,7 +17,6 @@ import Graphics.UI.Gtk.General.Enums(Align(..))
 
 import GUI.Command
 import GUI.Control
-import GUI.Iteration
 import Model.Field
 import Presenter.Input
 
@@ -70,7 +69,8 @@ showFields fis control = do
                                                                   then gray
                                                                   else white
                        buffer <- textViewGetBuffer textView
-                       textBufferSetText buffer $ textFI fi
+                       forM_ (textFI fi) $
+                            textBufferSetText buffer
   widgetShowAll grid
 
 recoverColumnView :: Int -> GUIControl -> IO TextView

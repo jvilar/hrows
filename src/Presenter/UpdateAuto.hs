@@ -15,14 +15,20 @@ updateAuto :: PresenterAuto (UpdateCommand, Int) Model
 updateAuto = accumM_ update empty
 
 update :: Model -> (UpdateCommand, Int) -> PresenterM Model
-update model (UpdateField c v, pos) = do
-    let f = row pos model' !! c
-        model' = changeField pos c v model
-    sendGUIM $ ShowFields [ FieldInfo { indexFI = c
-                                      , textFI = toString f
-                                      , isFormulaFI = isFormula c model'
-                                      , isErrorFI = isError f
-                                      } ]
+update model (UpdateField fpos v, pos) = do
+    let r = row pos model'
+        (model', changed) = changeField pos fpos v model
+    sendGUIM . ShowFields $ do
+                             c <- changed
+                             let f = r !! c
+                                 text = if c /= pos
+                                        then Just $ toString f
+                                        else Nothing
+                             return $ FieldInfo { indexFI = c
+                                                , textFI = text
+                                                , isFormulaFI = isFormula c model'
+                                                , isErrorFI = isError f
+                                                }
     return model'
 update _ (ChangeModel model, _) = do
     sendGUIM $ ShowNames (cnames model)

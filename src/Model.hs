@@ -42,7 +42,7 @@ import Model.Expression
 import Model.Field
 import Model.Parser
 import Model.Row
-
+import Model.UpdatePlan
 
 -- |The position of a `Row`.
 type RowPos = Int
@@ -50,6 +50,7 @@ type RowPos = Int
 -- |Holds the rows.
 data Model = Model { _rows :: IntMap Row
                    , _rowInfo :: [RowInfo]
+                   , _updatePlan :: UpdatePlan
                    , _nfields :: Int
                    , _size :: Int
                    } deriving Show
@@ -77,6 +78,7 @@ types = map _type . _rowInfo
 empty :: Model
 empty = Model { _rows = IM.empty
               , _rowInfo = []
+              , _updatePlan = mkUpdatePlan []
               , _nfields = 0
               , _size = 0
               }
@@ -87,7 +89,7 @@ fillEmpty = (++ repeat (toField()))
 -- |Adds a `Row` to a `Model`.
 addRow :: Model -> Row -> Model
 addRow m r = let
-               r' = zipWith convert (types m) (fillEmpty r)
+               r' = updateAll (_updatePlan m) $ zipWith convert (types m) (fillEmpty r)
              in m { _rows = IM.insert (_size m) r' (_rows m)
                   , _size = _size m + 1
                   }
@@ -109,9 +111,9 @@ fromRows :: [Row] -> Model
 fromRows rs = let
     infos = foldl' combine [] rs
     combine xs r = xs ++ map inferInfo (drop (length xs) r)
-    m = empty { _nfields = length infos
-              , _rowInfo = infos
-              }
+    m = addPlan $ empty { _nfields = length infos
+                        , _rowInfo = infos
+                        }
     in foldl' addRow m rs
 
 -- |Sets the names of the fields.
@@ -141,7 +143,7 @@ nfields = _nfields
 
 -- |Returns the names of the rows.
 names :: Model -> Maybe [String]
-names = sequence . map _name . _rowInfo
+names = mapM _name . _rowInfo
 
 -- |Returns the names of the model with a default format.
 fnames :: Model -> [String]
@@ -153,16 +155,12 @@ fnames model = fromMaybe
 rows :: Model -> [Row]
 rows = IM.elems . _rows
 
--- |Changes one field.
-changeField :: RowPos -> FieldPos -> Field -> Model -> Model
+-- |Changes one field. Returns the new model and the fields changed.
+changeField :: RowPos -> FieldPos -> Field -> Model -> (Model, [FieldPos])
 changeField r c field m = let
-    field' = convert (_type $ _rowInfo m !! c) field
-    in m { _rows = IM.adjust (adjustField c field') r (_rows m) }
-
-adjustField :: FieldPos -> Field -> Row -> Row
-adjustField 0 x (_:xs) = x:xs
-adjustField n x [] = replicate n (toField ()) ++ [x]
-adjustField n x (y:ys) = y : adjustField (n-1) x ys
+      field' = convert (_type $ _rowInfo m !! c) field
+      (row', poss) = updateField (_updatePlan m) field' c (_rows m IM.! r)
+    in (m { _rows = IM.insert r row' (_rows m) }, poss)
 
 -- |Adds new fields to the model.
 newFields :: [(Maybe String, FieldType)] -> Model -> Model
@@ -175,21 +173,29 @@ newFields l m = let
                         , _expression = Nothing
                         , _formula = Nothing
                         } | (n, t) <- zip (drop (_nfields m) names) (map snd l) ]
-    in m { _rows = IM.map (++ map (defaultValue . snd) l) (_rows m)
-         , _rowInfo = oldInfo ++ newInfo
-         , _nfields = _nfields m + length l
-         }
+    rinfo = oldInfo ++ newInfo
+    in addPlan $ m { _rows = IM.map (++ map (defaultValue . snd) l) (_rows m)
+                   , _rowInfo = rinfo
+                   , _nfields = _nfields m + length l
+                   }
+
+addPlan :: Model -> Model
+addPlan m = let
+    exps = map mParse $ _rowInfo m
+    mParse ri = eliminateNames (fnames m) . addCast (_type ri) . parse <$> _formula ri
+    up = mkUpdatePlan exps
+  in m { _updatePlan = up, _rows = IM.map (updateAll up) (_rows m) }
 
 adjustNames :: Model -> [Maybe String] -> [Maybe String]
-adjustNames m newNames = zipWith (flip maybe Just . Just) defNames ((map _name $ _rowInfo m) ++ newNames)
-    where defNames = ["Campo " ++ show n | n <- [1 ..]]
+adjustNames m newNames = zipWith (flip maybe Just . Just) defNames (map _name (_rowInfo m) ++ newNames)
+    where defNames = ["Campo " ++ show n | n <- [(1 :: Int) ..]]
 
 -- |Deletes the given fields from the model.
 deleteFields :: [Int] -> Model -> Model
-deleteFields fs m = m { _rows = IM.map (del fs) (_rows m)
-                      , _rowInfo = del fs $ _rowInfo m
-                      , _nfields = _nfields m - length fs
-                      }
+deleteFields fs m = addPlan $ m { _rows = IM.map (del fs) (_rows m)
+                                , _rowInfo = del fs $ _rowInfo m
+                                , _nfields = _nfields m - length fs
+                                }
 
 del :: [Int] -> [a] -> [a]
 del [] l = l
@@ -204,9 +210,9 @@ del pos l = go ps l
 -- |Changes the type of the field.
 changeFieldType :: FieldType -> FieldPos -> Model -> Model
 changeFieldType t n m | t /= types m !! n =
-                          m { _rows = IM.map (change $ convert t) (_rows m)
-                            , _rowInfo = newInfo
-                            }
+                          addPlan $ m { _rows = IM.map (change $ convert t) (_rows m)
+                                      , _rowInfo = newInfo
+                                      }
                       | otherwise = m
     where newInfo = change (\i -> i { _type = t, _defaultValue = defaultValue t }) $ _rowInfo m
           change f xs = let
@@ -215,10 +221,9 @@ changeFieldType t n m | t /= types m !! n =
 
 -- |Changes the formula of the field.
 changeFieldFormula :: Maybe String -> FieldPos -> Model -> Model
-changeFieldFormula mf n m = m { _rowInfo = newInfo
-                              }
+changeFieldFormula mf n m = addPlan $ m { _rowInfo = newInfo }
     where newInfo = change (\i -> i { _expression = c, _formula = mf }) $ _rowInfo m
-          c = parse <$> mf
+          c = addCast (types m !! n) . eliminateNames (fnames m) . parse <$> mf
           change f xs = let
               (h, x:t) = splitAt n xs
               in h ++ f x : t

@@ -35,11 +35,11 @@ mkUpdatePlan exps = let
 
     edges = foldl' updateEdges [] dependencies
     isExp = IS.fromList [ i | (i, e) <- enumerate exps, isJust e ]
-    updateEdges l (i, vars) = [(v, i) | v <- vars, v `IS.member` isExp ] ++ l
+    updateEdges l (i, vars) = [(v, i) | v <- vars] ++ l
     (order, cycles) = toposort $ mkGraph edges
     in UpdatePlan { expressions = exps
                   , influences = closureUpdates pars
-                  , updateOrder = order
+                  , updateOrder = filter (`IS.member` isExp) order
                   , cycled = cycles
                   }
 
@@ -67,7 +67,7 @@ updateAll up r = foldr (changeRow $ mkError "Formula con dependencias circulares
 updateField :: UpdatePlan -> Field -> FieldPos -> Row -> (Row, [FieldPos])
 updateField up f n r = let
     deps = influences up IM.! n
-    in (foldl' (evaluateField up) (changeRow f n r) deps, deps)
+    in (foldl' (evaluateField up) (changeRow f n r) deps, n:deps)
 
 changeRow :: Field -> FieldPos -> Row -> Row
 changeRow f n r = let

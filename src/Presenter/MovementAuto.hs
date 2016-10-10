@@ -29,7 +29,7 @@ checkedMove :: (Int -> Int) -> Int -> Model -> PresenterM Int
 checkedMove f pos model | 0 <= pos' && pos' < s = do
                               let r = zipWith3 combine (row pos' model) (formulas model) [0..]
                                   combine field mformula index = FieldInfo { indexFI = index
-                                                                           , textFI = toString field
+                                                                           , textFI = Just $ toString field
                                                                            , isFormulaFI = isJust mformula
                                                                            , isErrorFI = isError field
                                                                            }
