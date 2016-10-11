@@ -169,9 +169,12 @@ rows = IM.elems . _rows
 -- |Changes one field. Returns the new model and the fields changed.
 changeField :: RowPos -> FieldPos -> Field -> Model -> (Model, [FieldPos])
 changeField r c field m = let
+      row = _rows m IM.! r
       field' = convert (_type $ _rowInfo m !! c) field
-      (row', poss) = updateField (_updatePlan m) field' c (_rows m IM.! r)
-    in (m { _rows = IM.insert r row' (_rows m) }, poss)
+      (row', poss) = updateField (_updatePlan m) field' c row
+    in if row !! c /= field'
+       then (m { _rows = IM.insert r row' (_rows m) }, poss)
+       else (m, [])
 
 -- |Adds new fields to the model.
 newFields :: [(Maybe String, FieldType)] -> Model -> Model
