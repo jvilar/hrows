@@ -25,7 +25,7 @@ current = lift $ gets head
 advance :: Parser ()
 advance = lift $ modify tail
 
-parse :: String -> Expression
+parse :: Formula -> Expression
 parse s = case evalState (runExceptT (expression <* eof)) $ tokenize s of
               Left err -> Error err
               Right e -> e

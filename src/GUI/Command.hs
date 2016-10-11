@@ -6,6 +6,8 @@ module GUI.Command(
 
 
 import GUI.Iteration
+import Model.Expression
+import Model.Field
 
 data GUICommand = ChangeTitle String
                 | ShowPosition Int Int
@@ -17,6 +19,7 @@ data GUICommand = ChangeTitle String
 
 data FieldInfo = FieldInfo { indexFI :: Int
                            , textFI :: Maybe String
-                           , isFormulaFI :: Bool
+                           , formulaFI :: Maybe Formula
+                           , typeFI :: FieldType
                            , isErrorFI :: Bool
                            } deriving Show

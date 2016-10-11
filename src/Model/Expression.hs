@@ -1,4 +1,5 @@
 module Model.Expression ( Expression (..)
+                        , Formula
                         , BinaryOp
                         , UnaryOp
                         , addCast
@@ -13,6 +14,10 @@ import Data.List(elemIndex)
 import Model.Field
 import Model.Row
 
+-- |The Formula is the expression as written by the user.
+type Formula = String
+
+-- |The Expression is the internal representation of the Formula.
 data Expression = Position Int
                 | NamedPosition String
                 | Constant Field

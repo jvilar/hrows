@@ -10,6 +10,7 @@ module Model.Field ( Field
                    -- *Functions
                    , typeOf
                    , toString
+                   , typeLabel
                    , defaultValue
                    , mkError
                    , isError

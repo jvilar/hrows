@@ -20,7 +20,10 @@ module Model (
              , nfields
              , size
              , formulas
+             , types
              , isFormula
+             , fieldFormula
+             , fieldType
              -- **Updating
              , changeField
              , newFields
@@ -60,7 +63,7 @@ data RowInfo = RowInfo { _name :: Maybe String
                        , _type :: FieldType
                        , _defaultValue :: Field
                        , _expression :: Maybe Expression
-                       , _formula :: Maybe String
+                       , _formula :: Maybe Formula
                        } deriving Show
 
 inferInfo :: Field -> RowInfo
@@ -130,12 +133,20 @@ size :: Model -> Int
 size = _size
 
 -- |The formulas of the fields
-formulas :: Model -> [Maybe String]
+formulas :: Model -> [Maybe Formula]
 formulas = map _formula . _rowInfo
 
 -- |True if the field is a formula
 isFormula :: FieldPos -> Model -> Bool
 isFormula c = isJust . _formula . (!! c) .  _rowInfo
+
+-- |The formula of a field
+fieldFormula :: FieldPos -> Model -> Maybe Formula
+fieldFormula c = (!! c) . formulas
+
+-- |The type of a field
+fieldType :: FieldPos -> Model -> FieldType
+fieldType c = (!! c) . types
 
 -- |Number of fields of each row.
 nfields :: Model -> Int
@@ -220,7 +231,7 @@ changeFieldType t n m | t /= types m !! n =
               in h ++ f x : t
 
 -- |Changes the formula of the field.
-changeFieldFormula :: Maybe String -> FieldPos -> Model -> Model
+changeFieldFormula :: Maybe Formula -> FieldPos -> Model -> Model
 changeFieldFormula mf n m = addPlan $ m { _rowInfo = newInfo }
     where newInfo = change (\i -> i { _expression = c, _formula = mf }) $ _rowInfo m
           c = addCast (types m !! n) . eliminateNames (fnames m) . parse <$> mf

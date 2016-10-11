@@ -11,7 +11,7 @@ import Control.Concurrent.Chan(Chan, writeChan)
 import Control.Monad(filterM, forM, forM_, unless, when)
 import Control.Monad.IO.Class(liftIO)
 import Data.IORef(readIORef, writeIORef)
-import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust)
+import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
 
@@ -59,13 +59,15 @@ showFields fis control = do
 
   forM_ fis $ \fi -> do
                        textView <- recoverColumnView (indexFI fi) control
-                       set textView [ textViewEditable := not $ isFormulaFI fi
-                                    , widgetCanFocus := not $ isFormulaFI fi
+                       let tooltip = fromMaybe (typeLabel $ typeFI fi) $ formulaFI fi
+                       set textView [ textViewEditable := isNothing $ formulaFI fi
+                                    , widgetCanFocus := isNothing $ formulaFI fi
                                     , widgetState := StateNormal
+                                    , widgetTooltipText := Just tooltip
                                     ]
                        widgetModifyBg textView StateNormal $ if isErrorFI fi
                                                              then red
-                                                             else if isFormulaFI fi
+                                                             else if isJust $ formulaFI fi
                                                                   then gray
                                                                   else white
                        buffer <- textViewGetBuffer textView

@@ -21,12 +21,13 @@ update model (UpdateField fpos v, pos) = do
     sendGUIM . ShowFields $ do
                              c <- changed
                              let f = r !! c
-                                 text = if c /= pos
+                                 text = if c /= fpos
                                         then Just $ toString f
                                         else Nothing
                              return $ FieldInfo { indexFI = c
                                                 , textFI = text
-                                                , isFormulaFI = isFormula c model'
+                                                , formulaFI = fieldFormula c model'
+                                                , typeFI = fieldType c model'
                                                 , isErrorFI = isError f
                                                 }
     return model'
