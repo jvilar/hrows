@@ -57,6 +57,7 @@ base = do
     case t of
         IntT n -> advance >> (return . Constant $ toField n)
         DoubleT d -> advance >> (return . Constant $ toField d)
+        StringT s -> advance >> (return . Constant $ toField s)
         PositionT n -> advance >> (return $ Position n)
         NameT s -> advance >> (return $ NamedPosition s)
         OpenT -> advance >> (expression <* close)

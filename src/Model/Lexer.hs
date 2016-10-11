@@ -11,6 +11,7 @@ import Data.Char(isAlpha, isAlphaNum, isDigit, isSpace)
 
 data Token = IntT Int
            | DoubleT Double
+           | StringT String
            | PositionT Int
            | NameT String
            | AddT
@@ -108,6 +109,7 @@ tokenizer = do
         (\c -> do
                 select [ (isDigit c, number)
                        , (isAlpha c, shortNamed)
+                       , (c == '"' , string)
                        , (c == '$' , position)
                        , (c == '@' , named)
                        , (c == '+' , emit AddT)
@@ -151,6 +153,13 @@ afterE conv =  with peek
                                  emitl conv)
                          (emitl $ DoubleT . read)
                )
+
+string :: Tokenizer ()
+string = do
+           many (/= '"')
+           ifChar (== '"')
+             (emitl $ StringT . tail . init)
+             (emitl ErrorT)
 
 position :: Tokenizer ()
 position = many1 isDigit
