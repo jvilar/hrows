@@ -95,6 +95,7 @@ convert t f | typeOf f == t = f
             | otherwise = doConvert f t
 
 doConvert :: Field -> FieldType -> Field
+doConvert (AnError _ m) t = AnError t m
 doConvert f TypeInt = case reads str of
                         [(n, "")] -> AInt n
                         _ -> AnError TypeInt str
