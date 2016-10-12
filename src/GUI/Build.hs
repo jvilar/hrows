@@ -186,7 +186,9 @@ prepareFieldMenu = do
                      fieldMenuAction "formulaMenuItem" ChangeFieldFormulaDialog
                      fieldMenuAction "changeToStringMenuItem" (ChangeFieldType TypeString)
                      fieldMenuAction "changeToIntMenuItem" (ChangeFieldType TypeInt)
+                     fieldMenuAction "changeToInt0MenuItem" (ChangeFieldType TypeInt0)
                      fieldMenuAction "changeToFloatMenuItem" (ChangeFieldType TypeDouble)
+                     fieldMenuAction "changeToFloat0MenuItem" (ChangeFieldType TypeDouble0)
 
 gray :: Color
 gray = Color 53000 53000 53000
