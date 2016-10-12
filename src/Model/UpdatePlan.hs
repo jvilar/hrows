@@ -59,7 +59,7 @@ closureUpdates isParameterOf = let
     in foldr updateClosure initial order
 
 updateAll :: UpdatePlan -> Row -> Row
-updateAll up r = foldr (changeRow $ mkError "Formula con dependencias circulares")
+updateAll up r = foldr (changeRow $ mkError "Fórmula con dependencias circulares")
                  (foldl' (evaluateField up) r (updateOrder up)) (cycled up)
 
 -- |Changes a 'Field' and Updates a 'Row'. Returns the new 'Row'

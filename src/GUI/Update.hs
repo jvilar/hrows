@@ -7,7 +7,7 @@ module GUI.Update (
             , updateGUI
 ) where
 
-import Control.Concurrent.Chan(Chan, writeChan)
+import Control.Concurrent.Chan(writeChan)
 import Control.Monad(filterM, forM, forM_, unless, when)
 import Control.Monad.IO.Class(liftIO)
 import Data.IORef(readIORef, writeIORef)
@@ -44,14 +44,17 @@ updatePosition pos size control = do
 enumerate :: [a] -> [(Int, a)]
 enumerate = zip [0..]
 
-red :: Color
-red = Color 65535 20000 20000
+errorColor :: Color
+errorColor = Color 65535 36864 2560
 
-gray :: Color
-gray = Color 53000 53000 53000
+formulaColor :: Color
+formulaColor = Color 53000 53000 53000
 
-white :: Color
-white = Color 65535 65535 65535
+emptyColor :: Color
+emptyColor = Color 53000 53000 53000
+
+normalColor :: Color
+normalColor = Color 65535 65535 65535
 
 showFields :: [FieldInfo] -> GUIControl -> IO ()
 showFields fis control = do
@@ -66,10 +69,10 @@ showFields fis control = do
                                     , widgetTooltipText := Just tooltip
                                     ]
                        widgetModifyBg textView StateNormal $ if isErrorFI fi
-                                                             then red
+                                                             then errorColor
                                                              else if isJust $ formulaFI fi
-                                                                  then gray
-                                                                  else white
+                                                                  then formulaColor
+                                                                  else normalColor
                        buffer <- textViewGetBuffer textView
                        forM_ (textFI fi) $
                             textBufferSetText buffer
@@ -89,7 +92,7 @@ disableTextViews control = do
                                              , widgetCanFocus := False
                                              , widgetState := StateInsensitive
                                              ]
-                                widgetModifyBg textView StateInsensitive gray
+                                widgetModifyBg textView StateInsensitive emptyColor
 
 updateNames :: [String] -> GUIControl -> IO ()
 updateNames names control = do
@@ -160,7 +163,7 @@ displayMessage :: Message -> GUIControl -> IO ()
 displayMessage (ErrorMessage m) = noResponseMessage m MessageError
 displayMessage (WarningMessage m) = noResponseMessage m MessageWarning
 displayMessage (InformationMessage m) = noResponseMessage m MessageWarning
-displayMessage (QuestionMessage m) = undefined
+displayMessage (QuestionMessage _) = undefined
 
 noResponseMessage :: String -> MessageType -> GUIControl -> IO ()
 noResponseMessage m mtype control = do
@@ -311,7 +314,13 @@ getFieldFormula fieldId fieldName mFormula control = do
     toggleButtonSetActive btn $ isJust mFormula
     entrySetText entry $ fromMaybe "" mFormula
     widgetSetSensitive entry $ isJust mFormula
-    labelSetText lbl fieldName
+    entry `on` keyPressEvent $ do
+      name <- eventKeyName
+      mods <- eventModifier
+      if null mods && name == "Return"
+      then liftIO (dialogResponse dlg ResponseOk) >> return True
+      else return False
+    labelSetText lbl $ fieldName ++ " = "
 
     widgetShowAll dlg
     r <- dialogRun dlg
