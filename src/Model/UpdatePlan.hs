@@ -37,9 +37,10 @@ mkUpdatePlan exps = let
     isExp = IS.fromList [ i | (i, e) <- enumerate exps, isJust e ]
     updateEdges l (i, vars) = [(v, i) | v <- vars] ++ l
     (order, cycles) = toposort $ mkGraph edges
+    goodOrder = filter (`IS.member` isExp) order ++ [ i | (i, []) <- dependencies, i `IS.member` isExp ]
     in UpdatePlan { expressions = exps
                   , influences = closureUpdates pars
-                  , updateOrder = filter (`IS.member` isExp) order
+                  , updateOrder = goodOrder
                   , cycled = cycles
                   }
 

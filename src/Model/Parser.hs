@@ -2,7 +2,7 @@ module Model.Parser ( parse
                     ) where
 
 import Control.Monad.Except(ExceptT, runExceptT, throwError)
-import Control.Monad.State.Strict(evalState, get, gets, State, modify, put)
+import Control.Monad.State.Strict(evalState, gets, State, modify)
 import Control.Monad.Trans(lift)
 import Data.List(foldl')
 
@@ -41,7 +41,7 @@ eof = do
 expression :: Parser Expression
 expression = combine
              <$> term
-             <*> many (isAdditive) ((,) <$> additive <*> term)
+             <*> many isAdditive ((,) <$> additive <*> term)
 
 combine :: Expression -> [(BinaryOp, Expression)] -> Expression
 combine = foldl' (\t1 (op, t2) -> Binary op t1 t2)
@@ -49,7 +49,7 @@ combine = foldl' (\t1 (op, t2) -> Binary op t1 t2)
 term :: Parser Expression
 term = combine
        <$> base
-       <*> many (isMultiplicative) ((,) <$> multiplicative <*> base)
+       <*> many isMultiplicative ((,) <$> multiplicative <*> base)
 
 base :: Parser Expression
 base = do
@@ -58,8 +58,8 @@ base = do
         IntT n -> advance >> (return . Constant $ toField n)
         DoubleT d -> advance >> (return . Constant $ toField d)
         StringT s -> advance >> (return . Constant $ toField s)
-        PositionT n -> advance >> (return $ Position n)
-        NameT s -> advance >> (return $ NamedPosition s)
+        PositionT n -> advance >> return (Position n)
+        NameT s -> advance >> return (NamedPosition s)
         OpenT -> advance >> (expression <* close)
         _ -> throwError $ "Error en " ++ show t ++ ", esperaba un comienzo de expresión"
 
