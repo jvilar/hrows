@@ -107,7 +107,7 @@ getControls _ = Nothing
 
 processSourceCommands :: PresenterAuto Input SourceInfo
 processSourceCommands = emitJusts getSources >>> holdWith_ si0 . perBlip (sourceAuto si0)
-                        where si0 = mkSourceInfo Nothing ()
+                        where si0 = emptySourceInfo
 
 getSources :: Input -> Maybe SourceCommand
 getSources (InputSource cmd) = Just cmd

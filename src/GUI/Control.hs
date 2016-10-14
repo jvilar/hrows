@@ -28,6 +28,10 @@ data GUIControl = GUIControl { mainWindow :: Window
                              , changeFieldFormulaEntry :: Entry
                              , changeFieldFormulaLabel :: Label
                              , changeFieldFormulaButton :: CheckButton
+                             , confFileSaveCheckButton :: CheckButton
+                             , saveAsDialog :: FileChooserDialog
+                             , confFileLoadCheckButton :: CheckButton
+                             , loadFileDialog :: FileChooserDialog
                              }
 
 sendInput :: IsInput cmd => GUIControl -> cmd -> IO ()

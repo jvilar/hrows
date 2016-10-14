@@ -7,11 +7,13 @@ module Model (
              -- **Construction
              , emptyRow
              , empty
+             , emptyConf
              , addRow
              , addEmptyRow
              , deleteRow
              , setNames
              , fromRows
+             , fromRowsConf
              -- **Querying
              , names
              , fnames
@@ -19,6 +21,7 @@ module Model (
              , rows
              , nfields
              , size
+             , getConf
              , formulas
              , types
              , isFormula
@@ -42,6 +45,7 @@ import Data.Maybe(fromMaybe, isJust)
 
 import Model.Expression
 import Model.Field
+import Model.ModelConf
 import Model.Parser
 import Model.Row
 import Model.UpdatePlan
@@ -59,19 +63,35 @@ data Model = Model { _rows :: IntMap Row
 
 -- |The information about a Field
 data FieldInfo = FieldInfo { _name :: Maybe String
-                       , _type :: FieldType
-                       , _defaultValue :: Field
-                       , _expression :: Maybe Expression
-                       , _formula :: Maybe Formula
-                       } deriving Show
+                           , _type :: FieldType
+                           , _defaultValue :: Field
+                           , _expression :: Maybe Expression
+                           , _formula :: Maybe Formula
+                           } deriving Show
+
+-- |Transforms the `FieldConf` into `FieldInfo`.
+fromConf :: FieldConf -> FieldInfo
+fromConf cnf = FieldInfo { _name = nameFC cnf
+                         , _type = typeFC cnf
+                         , _defaultValue = defaultValue $ typeFC cnf
+                         , _expression = Nothing
+                         , _formula = formulaFC cnf
+                         }
+
+-- |Transforms the `FieldInfo` into `FieldConf`.
+toConf :: FieldInfo -> FieldConf
+toConf inf = FieldConf { nameFC = _name inf
+                       , typeFC = _type inf
+                       , formulaFC = _formula inf
+                       }
 
 inferInfo :: Field -> FieldInfo
 inferInfo f = FieldInfo { _name = Nothing
-                      , _type = typeOf f
-                      , _defaultValue = defaultValue $ typeOf f
-                      , _expression = Nothing
-                      , _formula = Nothing
-                      }
+                        , _type = typeOf f
+                        , _defaultValue = defaultValue $ typeOf f
+                        , _expression = Nothing
+                        , _formula = Nothing
+                        }
 
 types :: Model -> [FieldType]
 types = map _type . _fieldInfo
@@ -84,6 +104,18 @@ empty = Model { _rows = IM.empty
               , _nfields = 0
               , _size = 0
               }
+
+-- |Get the current configuration.
+getConf :: Model -> ModelConf
+getConf = ModelConf . map toConf . _fieldInfo
+
+-- |An empty `Model` that has a configuration.
+emptyConf :: ModelConf -> Model
+emptyConf (ModelConf fcs) = addPlan $ Model { _rows = IM.empty
+                                            , _fieldInfo = map fromConf fcs
+                                            , _nfields = length fcs
+                                            , _size = 0
+                                            }
 
 fillEmpty :: Row -> Row
 fillEmpty = (++ repeat (toField()))
@@ -117,6 +149,10 @@ fromRows rs = let
                         , _fieldInfo = infos
                         }
     in foldl' addRow m rs
+
+-- |Creates a model from a list of `Row`s and a `ModelConf`
+fromRowsConf :: ModelConf -> [Row] -> Model
+fromRowsConf conf = foldl' addRow (emptyConf conf)
 
 -- |Sets the names of the fields.
 setNames :: [String] -> Model -> Model

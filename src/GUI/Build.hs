@@ -104,6 +104,10 @@ prepareControl iChan builder = do
   cfEntry <- getObject castToEntry "changeFieldFormulaEntry"
   cfLabel <- getObject castToLabel "changeFieldFormulaLabel"
   cfButton <- getObject castToCheckButton "changeFieldFormulaCheckButton"
+  confSButton <- getObject castToCheckButton "confFileSaveCheckButton"
+  sDialog <- getObject castToFileChooserDialog "saveAsDialog"
+  confLButton <- getObject castToCheckButton "confFileLoadCheckButton"
+  lDialog <- getObject castToFileChooserDialog "loadFileDialog"
   return GUIControl { mainWindow = window
                     , positionLabel = lbl
                     , fieldsGrid = grid
@@ -119,6 +123,10 @@ prepareControl iChan builder = do
                     , changeFieldFormulaEntry = cfEntry
                     , changeFieldFormulaLabel = cfLabel
                     , changeFieldFormulaButton = cfButton
+                    , confFileSaveCheckButton = confSButton
+                    , saveAsDialog = sDialog
+                    , confFileLoadCheckButton = confLButton
+                    , loadFileDialog = lDialog
                     }
 
 globalKeys = [ (("Page_Down", []), toInput MoveNext)

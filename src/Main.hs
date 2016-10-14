@@ -21,6 +21,7 @@ import Presenter
 
 data Options = Options { _help :: Bool
                        , _inputFileName :: Maybe FilePath
+                       , _confFileName :: Maybe FilePath
                        , _inputSeparator :: Char
                        , _outputSeparator :: Char
                        }
@@ -30,6 +31,7 @@ makeLenses ''Options
 defaultOptions :: Options
 defaultOptions = Options  { _help = False
                           , _inputFileName = Nothing
+                          , _confFileName = Nothing
                           , _inputSeparator = '\t'
                           , _outputSeparator = '\t'
                           }
@@ -55,11 +57,12 @@ getOptions = do
                case a of
                    [] -> myError "No filename given"
                    [f] -> return $ set inputFileName (Just f) opt
+                   [f, c] -> return $ set inputFileName (Just f) $ set confFileName (Just c) opt
                    _ -> myError "Too many filenames"
 
 helpMessage :: String
 helpMessage = usageInfo header options
-              where header = "Usage: hrows [Options] <file>"
+              where header = "Usage: hrows [Options] <file> [<conf>]"
 
 myError :: String -> IO a
 myError m = do
@@ -74,7 +77,7 @@ main = do
   let ltinfo = ListatabInfo (opts ^. inputSeparator)
                             (opts ^. outputSeparator)
                             Comment
-      sinfo =  mkSourceInfo (opts ^. inputFileName) ltinfo
+      sinfo =  mkSourceInfo (opts ^. inputFileName) (opts ^. confFileName) ltinfo
 
   inputChan <- newChan
   control <- makeGUI inputChan

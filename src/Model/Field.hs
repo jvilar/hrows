@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, OverloadedStrings, RankNTypes, TypeSynonymInstances #-}
+{-# LANGUAGE DeriveGeneric, FlexibleInstances, OverloadedStrings, RankNTypes, TypeSynonymInstances #-}
 
 module Model.Field ( Field
                    , FieldType(..)
@@ -17,9 +17,11 @@ module Model.Field ( Field
                    , convert
                    ) where
 
+import Data.Aeson
 import Data.Maybe(fromJust)
 import Data.Text(Text)
 import qualified Data.Text as T
+import GHC.Generics
 
 -- |A field can store an Int, a Double or a String or it may be
 -- empty. The special constructor AnError stores an erroneous string
@@ -79,7 +81,12 @@ data FieldType = TypeInt
                | TypeDouble0
                | TypeString
                | TypeEmpty
-               deriving (Show, Eq)
+               deriving (Show, Eq, Generic)
+
+instance ToJSON FieldType where
+    toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON FieldType
 
 typeOf :: Field -> FieldType
 typeOf (AInt _ _) = TypeInt
