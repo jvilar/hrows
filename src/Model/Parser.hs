@@ -58,7 +58,7 @@ base = do
         IntT n -> advance >> (return . Constant $ toField n)
         DoubleT d -> advance >> (return . Constant $ toField d)
         StringT s -> advance >> (return . Constant $ toField s)
-        PositionT n -> advance >> return (Position n)
+        PositionT n -> advance >> return (Position $ n - 1)
         NameT s -> advance >> return (NamedPosition s)
         OpenT -> advance >> (expression <* close)
         _ -> throwError $ "Error en " ++ show t ++ ", esperaba un comienzo de expresión"
