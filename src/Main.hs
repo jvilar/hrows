@@ -7,7 +7,9 @@ import Control.Concurrent(forkIO)
 import Control.Concurrent.Chan(newChan, writeList2Chan)
 import Control.Lens (makeLenses, (^.), set, Getting)
 import Control.Monad(forM_, unless, void, when)
+import Data.Maybe(fromJust, isJust)
 import Graphics.UI.Gtk (mainGUI, postGUIAsync)
+import System.Directory (doesFileExist)
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
@@ -74,10 +76,18 @@ myError m = do
 main :: IO ()
 main = do
   opts <- getOptions
+  cnf <- if isJust $ opts ^. confFileName
+         then return $ opts ^. confFileName
+         else do
+                let def = defaultConfFileName . fromJust $ opts ^. inputFileName
+                ex <- doesFileExist def
+                return $ if ex
+                         then Just def
+                         else Nothing
   let ltinfo = ListatabInfo (opts ^. inputSeparator)
                             (opts ^. outputSeparator)
                             Comment
-      sinfo =  mkSourceInfo (opts ^. inputFileName) (opts ^. confFileName) ltinfo
+      sinfo =  mkSourceInfo (opts ^. inputFileName) cnf ltinfo
 
   inputChan <- newChan
   control <- makeGUI inputChan

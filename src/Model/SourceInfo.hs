@@ -3,12 +3,14 @@ module Model.SourceInfo ( SourceInfo(..)
                         , FormatInfoClass(..)
                         , changeFileName
                         , changeConfFileName
+                        , defaultConfFileName
                         , changeFormatInfo
                         , mkSourceInfo
                         , emptySourceInfo
                         , module Model.ListatabInfo
                         ) where
 
+import System.FilePath((-<.>))
 
 import Model.ListatabInfo
 
@@ -32,6 +34,10 @@ changeConfFileName mp s = s { siConfFile = mp }
 
 changeFormatInfo :: FormatInfo -> SourceInfo -> SourceInfo
 changeFormatInfo f s = s { siFormat = f }
+
+-- |The default configuration file from a file name.
+defaultConfFileName :: FilePath -> FilePath
+defaultConfFileName = (-<.> "conf")
 
 mkSourceInfo :: FormatInfoClass i => Maybe FilePath -> Maybe FilePath -> i -> SourceInfo
 mkSourceInfo p o = SourceInfo p o . toFormatInfo

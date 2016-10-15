@@ -8,7 +8,6 @@ import Control.Exception(try)
 import Control.Monad(when)
 import Control.Monad.Trans(liftIO)
 import Data.Maybe(isJust)
-import System.FilePath((-<.>))
 
 import GUI.Command
 import HRowsException
@@ -40,7 +39,7 @@ applyCommand (LoadFileFromName n loadConf) model info = do
     let info' = changeFileName n $
                 changeConfFileName (
                     if loadConf
-                    then Just (confFromName n)
+                    then Just (defaultConfFileName n)
                     else Nothing
                   ) info
     applyCommand LoadFile model info'
@@ -50,7 +49,7 @@ applyCommand WriteFile model info = applyCommand (WriteFileFromName fp (isJust $
 applyCommand (WriteFileFromName fp saveConf) model info = do
         let ListatabFormat ltinfo = siFormat info
             conf = if saveConf
-                   then Just $ confFromName fp
+                   then Just $ (defaultConfFileName fp)
                    else Nothing
         r <- liftIO $ try $ toListatab ltinfo fp conf model
         case r of
@@ -59,6 +58,3 @@ applyCommand (WriteFileFromName fp saveConf) model info = do
                           when (Just fp /= siFilePath info) $
                               sendInputM $ SetSource (changeFileName fp info)
             Left (HRowsException m) -> message $ ErrorMessage m
-
-confFromName :: FilePath -> FilePath
-confFromName = (-<.> "conf")
