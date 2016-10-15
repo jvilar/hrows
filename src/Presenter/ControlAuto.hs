@@ -2,18 +2,19 @@ module Presenter.ControlAuto (
                controlAuto
                ) where
 
-import Control.Auto(Auto, arrM)
+import Control.Auto(arrM)
 import Control.Monad.Trans(liftIO)
 import System.Exit(exitSuccess)
 
+import Model
 import GUI.Command
 import Presenter.Auto
 import Presenter.Control
 
-controlAuto :: PresenterAuto ControlCommand ()
+controlAuto :: PresenterAuto (ControlCommand, ModelChanged) ()
 controlAuto = arrM processCommand
 
-processCommand :: ControlCommand -> PresenterM ()
-processCommand ExitProgram = sendGUIM $ ShowIteration ConfirmExit
-processCommand DoExit = liftIO exitSuccess
+processCommand :: (ControlCommand, ModelChanged) -> PresenterM ()
+processCommand (ExitProgram, c) = sendGUIM $ ShowIteration (ConfirmExit c)
+processCommand (DoExit, _) = liftIO exitSuccess
 

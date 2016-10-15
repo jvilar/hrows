@@ -156,7 +156,7 @@ showIteration AskWriteFile = askWriteFile
 showIteration AskCreateField = askCreateField
 showIteration (AskDeleteFields fs) = askDeleteField fs
 showIteration (DisplayMessage m) = displayMessage m
-showIteration ConfirmExit = confirmExit
+showIteration (ConfirmExit changed) = confirmExit changed
 showIteration (GetFieldFormula fid flabel ms) = getFieldFormula fid flabel ms
 
 displayMessage :: Message -> GUIControl -> IO ()
@@ -195,13 +195,17 @@ askFile dlg btn input control = do
                 chk <- toggleButtonGetActive (btn control)
                 sendInput control $ input (fromJust file) chk
 
-confirmExit :: GUIControl -> IO ()
-confirmExit control = do
+confirmExit :: Bool -> GUIControl -> IO ()
+confirmExit changed control = do
+  let msg :: String
+      msg = if changed
+            then "Ha habido cambios, ¿quieres salir?"
+            else "¿Seguro que quieres salir?"
   dlg <- messageDialogNew (Just $ mainWindow control)
                           [DialogModal]
                           MessageQuestion
                           ButtonsYesNo
-                          ("¿Seguro que quieres salir?" :: String)
+                          msg
   r <- dialogRun dlg
   when (r == ResponseYes) $ do
                         sendInput control DoExit

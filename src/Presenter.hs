@@ -58,7 +58,7 @@ processInput = proc inp -> do
              si <- processSourceCommands -< inp
              processFileCommands -< (inp, model, si)
              processDialogCommands -< (inp, model)
-             processControlCommands -< inp
+             processControlCommands -< (inp, changed model)
              arrM (liftIO . putStrLn) -< "pos': " ++ show pos
 
 processUpdateCommands :: PresenterAuto (Input, Int) Model
@@ -98,8 +98,10 @@ getDialogs :: Input -> Maybe DialogCommand
 getDialogs (InputDialog cmd) = Just cmd
 getDialogs _ = Nothing
 
-processControlCommands :: PresenterAuto Input ()
-processControlCommands = emitJusts getControls >>> perBlip controlAuto >>> arr (const ())
+processControlCommands :: PresenterAuto (Input, ModelChanged) ()
+processControlCommands = proc (inp, changed) -> do
+                           bcontrol <- emitJusts getControls -< inp
+                           holdWith_ () . perBlip controlAuto -< (, changed) <$> bcontrol
 
 getControls :: Input -> Maybe ControlCommand
 getControls (InputControl cmd) = Just cmd
