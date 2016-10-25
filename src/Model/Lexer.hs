@@ -4,10 +4,11 @@ module Model.Lexer ( Token (..)
 
 import Control.Arrow(first)
 import Control.Monad(void, when)
-import Control.Monad.State.Strict(evalStateT, get, StateT, modify, put)
-import Control.Monad.Trans(lift)
+import Control.Monad.State.Strict(evalStateT, get, gets, StateT, modify, put)
 import Control.Monad.Writer(execWriter, tell, Writer)
 import Data.Char(isAlpha, isAlphaNum, isDigit, isSpace)
+
+import Prelude hiding (lex)
 
 data Token = IntT Int
            | DoubleT Double
@@ -34,7 +35,7 @@ type Tokenizer = StateT (Lexeme, Input) (Writer [Token])
 
 peek :: Tokenizer (Maybe Char)
 peek = do
-    (_, inp) <- get
+    inp <- gets snd
     return $ case inp of
         [] -> Nothing
         c:_ -> Just c
@@ -55,14 +56,14 @@ next = do
 
 emit :: Token -> Tokenizer ()
 emit t = do
-    lift $ tell [t]
-    (_, inp) <- get
+    tell [t]
+    inp <- gets snd
     put ([], inp)
 
 emitl :: (Lexeme -> Token) -> Tokenizer ()
 emitl f = do
     (lex, inp) <- get
-    lift $ tell [f $ reverse lex]
+    tell [f $ reverse lex]
     put ([], inp)
 
 omit :: Tokenizer ()
@@ -103,7 +104,7 @@ needChar :: (Char -> Bool) -> Tokenizer() -> Tokenizer()
 needChar cond onSuccess = ifChar cond onSuccess (emitl ErrorT)
 
 tokenizer :: Tokenizer ()
-tokenizer = do
+tokenizer =
     with next
         (emit EOFT)
         (\c -> do
