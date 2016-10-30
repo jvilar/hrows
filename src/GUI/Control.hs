@@ -32,6 +32,7 @@ data GUIControl = GUIControl { mainWindow :: Window
                              , saveAsDialog :: FileChooserDialog
                              , confFileLoadCheckButton :: CheckButton
                              , loadFileDialog :: FileChooserDialog
+                             , targetList :: TargetList
                              }
 
 sendInput :: IsInput cmd => GUIControl -> cmd -> IO ()

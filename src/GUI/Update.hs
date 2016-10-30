@@ -100,8 +100,9 @@ updateNames names control = do
   adjustTextFields (length names) control
 
   forM_ (enumerate names) $ \(r, name) -> do
-                             Just lbl <- gridGetChildAt grid 0 r
-                             labelSetText (castToLabel lbl) name
+                             Just ebox <- gridGetChildAt grid 0 r
+                             containerForeach (castToEventBox ebox) $ \lbl ->
+                                 labelSetText (castToLabel lbl) name
   widgetShowAll grid
 
 adjustTextFields :: Int -> GUIControl -> IO ()
@@ -114,37 +115,66 @@ adjustTextFields nfields control = do
     GT -> deleteFields grid [nfields .. current - 1]
   writeIORef (numberOfFields control) nfields
 
-addFields :: Grid -> [Int] -> GUIControl -> IO ()
+addFields :: Grid -> [FieldPos] -> GUIControl -> IO ()
 addFields grid fields control = forM_ fields $ \f -> do
-                 lbl <- labelNew $ Just ("" :: String)
-                 widgetSetHAlign lbl AlignStart
+                 lbl <- createFieldLabel f control
                  gridAttach grid lbl 0 f 1 1
-                 textView <- textViewNew
-                 set textView [ textViewWrapMode := WrapWord
-                              , textViewAcceptsTab := False
-                              , textViewEditable := False
-                              , widgetState := StateInsensitive
-                              , widgetCanFocus := False
-                              , widgetHExpand := True
-                              ]
-                 buffer <- textViewGetBuffer textView
-                 textView `on` keyReleaseEvent $ liftIO $ do
-                     begin <- textBufferGetStartIter buffer
-                     end <- textBufferGetEndIter buffer
-                     text <- textBufferGetText buffer begin end False
-                     writeChan (inputChan control) (toInput $ UpdateField f (toField (text::String)))
-                     return False
-                 textView `on` buttonPressEvent $ do
-                     button <- eventButton
-                     if button == RightButton
-                     then liftIO $ do
-                       writeIORef (currentField control) f
-                       menuPopup (fieldMenu control) Nothing
-                       return True
-                     else return False
+                 textView <- createFieldTextView f control
                  gridAttach grid textView 1 f 1 1
 
-deleteFields :: Grid -> [Int] -> IO ()
+createFieldLabel :: FieldPos -> GUIControl -> IO EventBox
+createFieldLabel f control = do
+         lbl <- labelNew $ Just ("" :: String)
+         widgetSetHAlign lbl AlignStart
+         ebox <- eventBoxNew
+         dragSourceSet ebox [Button1] [ActionMove]
+         dragSourceSetTargetList ebox (targetList control)
+         dragDestSet ebox [DestDefaultAll] [ActionMove]
+         dragDestSetTargetList ebox (targetList control)
+         ebox `on` dragDataGet $ \_ _ _ -> do
+                               ok <- selectionDataSetText (show f)
+                               unless ok (liftIO $ dndError control)
+         ebox `on` dragDataReceived $ \_ _ _ _ -> do
+                               t <- selectionDataGetText
+                               liftIO $ case (t :: Maybe String) of
+                                          Nothing -> dndError control
+                                          Just v -> let
+                                                      from = read v
+                                                    in writeChan (inputChan control) . toInput $ MoveField from f
+         containerAdd ebox lbl
+         return ebox
+
+dndError :: GUIControl -> IO ()
+dndError control = writeChan (inputChan control) . toInput $ MessageDialog (ErrorMessage "Algo está mal en el dnd")
+
+createFieldTextView :: FieldPos -> GUIControl -> IO TextView
+createFieldTextView f control = do
+         textView <- textViewNew
+         set textView [ textViewWrapMode := WrapWord
+                      , textViewAcceptsTab := False
+                      , textViewEditable := False
+                      , widgetState := StateInsensitive
+                      , widgetCanFocus := False
+                      , widgetHExpand := True
+                      ]
+         buffer <- textViewGetBuffer textView
+         textView `on` keyReleaseEvent $ liftIO $ do
+             begin <- textBufferGetStartIter buffer
+             end <- textBufferGetEndIter buffer
+             text <- textBufferGetText buffer begin end False
+             writeChan (inputChan control) (toInput $ UpdateField f (toField (text::String)))
+             return False
+         textView `on` buttonPressEvent $ do
+             button <- eventButton
+             if button == RightButton
+             then liftIO $ do
+               writeIORef (currentField control) f
+               menuPopup (fieldMenu control) Nothing
+               return True
+             else return False
+         return textView
+
+deleteFields :: Grid -> [FieldPos] -> IO ()
 deleteFields grid fields = forM_ fields $ \f ->
                          forM_ [0, 1] $ \c -> do
                              Just w <- gridGetChildAt grid c f

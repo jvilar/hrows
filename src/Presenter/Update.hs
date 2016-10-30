@@ -5,13 +5,14 @@ module Presenter.Update (
 
 import Model
 
-data UpdateCommand = UpdateField Int Field
+data UpdateCommand = UpdateField FieldPos Field
                    | ChangeModel Model
                    | DoNothing
                    | NewRow
                    | DeleteRow
                    | NewFields [(String, FieldType)]
-                   | DeleteFields [Int]
-                   | ChangeFieldType FieldType Int
-                   | ChangeFieldFormula (Maybe String) Int
+                   | DeleteFields [FieldPos]
+                   | MoveField FieldPos FieldPos
+                   | ChangeFieldType FieldType FieldPos
+                   | ChangeFieldFormula (Maybe Formula) FieldPos
                      deriving Show

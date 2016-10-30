@@ -4,6 +4,7 @@ module Presenter.UpdateAuto (
 
 import Control.Arrow(first)
 import Control.Auto(Auto, accumM_)
+import Control.Monad.Trans(liftIO)
 import Data.Maybe(fromMaybe)
 
 import GUI.Command
@@ -49,6 +50,11 @@ update model (NewFields l, pos) = do
     return model'
 update model (DeleteFields fs, pos) = do
     let model' = deleteFields fs model
+    sendGUIM $ ShowNames (cnames model')
+    sendInputM $ MoveHere pos
+    return model'
+update model (MoveField f t, pos) = do
+    let model' = moveField f t model
     sendGUIM $ ShowNames (cnames model')
     sendInputM $ MoveHere pos
     return model'

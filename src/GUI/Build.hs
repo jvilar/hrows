@@ -108,6 +108,8 @@ prepareControl iChan builder = do
   sDialog <- getObject castToFileChooserDialog "saveAsDialog"
   confLButton <- getObject castToCheckButton "confFileLoadCheckButton"
   lDialog <- getObject castToFileChooserDialog "loadFileDialog"
+  tlist <- targetListNew
+  targetListAddTextTargets tlist 0
   return GUIControl { mainWindow = window
                     , positionLabel = lbl
                     , fieldsGrid = grid
@@ -127,6 +129,7 @@ prepareControl iChan builder = do
                     , saveAsDialog = sDialog
                     , confFileLoadCheckButton = confLButton
                     , loadFileDialog = lDialog
+                    , targetList = tlist
                     }
 
 globalKeys = [ (("Page_Down", []), toInput MoveNext)

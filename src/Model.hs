@@ -33,6 +33,7 @@ module Model (
              , changeField
              , newFields
              , deleteFields
+             , moveField
              , changeFieldType
              , changeFieldFormula
              -- *Rexported
@@ -258,7 +259,7 @@ adjustNames m newNames = zipWith (flip maybe Just . Just) defNames (map _name (_
     where defNames = ["Campo " ++ show n | n <- [(1 :: Int) ..]]
 
 -- |Deletes the given fields from the model.
-deleteFields :: [Int] -> Model -> Model
+deleteFields :: [FieldPos] -> Model -> Model
 deleteFields fs m = addPlan m { _rows = IM.map (del fs) (_rows m)
                               , _fieldInfo = del fs $ _fieldInfo m
                               , _nfields = _nfields m - length fs
@@ -268,11 +269,32 @@ del :: [Int] -> [a] -> [a]
 del [] l = l
 del pos l = go ps l
     where go [] l = l
-          go (n:ps) l = let
+          go (n:ns) l = let
               (i, _:t) = splitAt n l
-              in i ++ go ps t
+              in i ++ go ns t
           spos = sort $ filter (< length l) pos
           ps = head spos : zipWith (\n m -> n - m - 1) (tail spos) spos
+
+-- |Move a field to the position just next to the other
+moveField :: FieldPos -> FieldPos -> Model -> Model
+moveField from to m | from == to = m
+                    | from < to = addPlan m { _rows = IM.map mvf (_rows m)
+                                            , _fieldInfo = mvf $ _fieldInfo m
+                                            }
+                    | from > to = addPlan m { _rows = IM.map mvb (_rows m)
+                                            , _fieldInfo = mvb $ _fieldInfo m
+                                            }
+    where
+      -- move forward, ie from < to
+      mvf l = let
+          (left, f:right) = splitAt from l
+          (before, after) = splitAt (to - from) right
+        in left ++ before ++ f:after
+      -- move backward, ie from > to
+      mvb l = let
+          (left, right) = splitAt (to + 1) l
+          (before, f: after) = splitAt (from - to - 1) right
+        in left ++ f:before ++ after
 
 -- |Changes the type of the field.
 changeFieldType :: FieldType -> FieldPos -> Model -> Model
