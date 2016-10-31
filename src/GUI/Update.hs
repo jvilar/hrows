@@ -168,12 +168,10 @@ createFieldTextView f control = do
              return False
          textView `on` buttonPressEvent $ do
              button <- eventButton
-             if button == RightButton
-             then liftIO $ do
+             when (button == RightButton) $ liftIO $ do
                writeIORef (currentField control) f
                menuPopup (fieldMenu control) Nothing
-               return True
-             else return False
+             return True
          return textView
 
 deleteFields :: Grid -> [FieldPos] -> IO ()

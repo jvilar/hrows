@@ -59,7 +59,6 @@ processInput = proc inp -> do
              processFileCommands -< (inp, model, si)
              processDialogCommands -< (inp, model)
              processControlCommands -< (inp, changed model)
-             arrM (liftIO . putStrLn) -< "pos': " ++ show pos
 
 processUpdateCommands :: PresenterAuto (Input, Int) Model
 processUpdateCommands = proc (inp, pos) -> do
