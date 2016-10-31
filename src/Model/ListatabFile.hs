@@ -64,11 +64,9 @@ analyze separator mconf = do
           flip sepBy (char separator)
             (toField <$> many (noneOf (separator : "\n")))
   return $ case mconf of
-                  Nothing -> let
-                               m = fromRows rs
-                             in case h of
-                                  Nothing -> m
-                                  Just h' -> setNames h' m
+                  Nothing -> case h of
+                                 Nothing -> fromRows rs
+                                 Just names -> fromRowsNames names rs
                   Just cnf -> fromRowsConf cnf rs
 
 -- |Writes a model to a listatab file.

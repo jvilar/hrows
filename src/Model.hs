@@ -14,6 +14,7 @@ module Model (
              , deleteRow
              , setNames
              , fromRows
+             , fromRowsNames
              , fromRowsConf
              -- **Querying
              , changed
@@ -157,7 +158,7 @@ deleteRow pos m = m { _rows = IM.mapKeys f (_rows m)
                   where f n | n <= pos = n
                             | otherwise = n - 1
 
--- |Creates a model from a list of `Row`s.
+-- |Creates a `Model` from a list of `Row`s.
 fromRows :: [Row] -> Model
 fromRows rs = let
     infos = foldl' combine [] rs
@@ -166,6 +167,10 @@ fromRows rs = let
                       , _fieldInfo = infos
                       }
     in (foldl' addRow m rs) { _changed = False }
+
+-- |Creates a `Model` from a list of `Row`s and a list of names.
+fromRowsNames :: [String] -> [Row] -> Model
+fromRowsNames l rs = (setNames l $ fromRows rs) { _changed = False }
 
 -- |Creates a model from a list of `Row`s and a `ModelConf`
 fromRowsConf :: ModelConf -> [Row] -> Model
