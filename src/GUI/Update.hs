@@ -140,7 +140,9 @@ createFieldLabel f control = do
                                           Nothing -> dndError control
                                           Just v -> let
                                                       from = read v
-                                                    in writeChan (inputChan control) . toInput $ MoveField from f
+                                                    in if from /= f
+                                                       then writeChan (inputChan control) . toInput $ MoveField from f
+                                                       else return ()
          containerAdd ebox lbl
          return ebox
 
