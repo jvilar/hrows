@@ -104,4 +104,4 @@ addCast :: FieldType -> Expression -> Expression
 addCast ft exp@(Cast ft' e) | ft == ft' = exp
                             | otherwise = Cast ft e
 addCast ft exp = Cast ft exp
-                                          
+

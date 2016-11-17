@@ -60,8 +60,12 @@ base = do
         StringT s -> advance >> (return . Constant $ toField s)
         PositionT n -> advance >> return (Position $ n - 1)
         NameT s -> advance >> return (NamedPosition s)
+        CastT ft -> advance >> parenthesized >>= return . Cast ft
         OpenT -> advance >> (expression <* close)
         _ -> throwError $ "Error en " ++ show t ++ ", esperaba un comienzo de expresión"
+
+parenthesized :: Parser Expression
+parenthesized = open >> expression <* close
 
 isAdditive :: Parser Bool
 isAdditive = do
@@ -71,13 +75,15 @@ isAdditive = do
                  SubT -> True
                  _ -> False
 
-additive :: Parser BinaryOp
-additive = do
+match :: [(Token, a)] -> String -> Parser a
+match l message = do
     t <- current
-    case t of
-        AddT -> advance >> return (+)
-        SubT -> advance >> return (-)
-        _ -> throwError $ "Error en " ++ show t ++ ", esperaba suma o resta"
+    case lookup t l of
+        Nothing -> throwError $ "Error en " ++ show t ++ ", esperaba " ++ message
+        Just a -> advance >> return a
+
+additive :: Parser BinaryOp
+additive = match [(AddT, (+)), (SubT, (-))] "una suma o resta"
 
 isMultiplicative :: Parser Bool
 isMultiplicative = do
@@ -88,16 +94,10 @@ isMultiplicative = do
                  _ -> False
 
 multiplicative :: Parser BinaryOp
-multiplicative = do
-    t <- current
-    case t of
-        MultT -> advance >> return (*)
-        DivT -> advance >> return (/)
-        _ -> throwError $ "Error en " ++ show t ++ ", esperaba producto o división"
+multiplicative = match [(MultT, (*)), (DivT, (/))] "un producto o una división"
+
+open :: Parser ()
+open = match [(OpenT, ())] "un paréntesis abierto"
 
 close :: Parser ()
-close = do
-    t <- current
-    case t of
-        CloseT -> advance
-        _ -> throwError $ "Error en " ++ show t ++ ", esperaba un paréntesis cerrado"
+close = match [(CloseT, ())] "un paréntesis cerrado"

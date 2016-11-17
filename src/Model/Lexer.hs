@@ -8,6 +8,8 @@ import Control.Monad.State.Strict(evalStateT, get, gets, StateT, modify, put)
 import Control.Monad.Writer(execWriter, tell, Writer)
 import Data.Char(isAlpha, isAlphaNum, isDigit, isSpace)
 
+import Model.Field
+
 import Prelude hiding (lex)
 
 data Token = IntT Int
@@ -21,9 +23,10 @@ data Token = IntT Int
            | DivT
            | OpenT
            | CloseT
+           | CastT FieldType
            | EOFT
            | ErrorT String
-           deriving Show
+           deriving (Show, Eq)
 
 tokenize :: String -> [Token]
 tokenize inp = execWriter $ evalStateT tokenizer ([], inp)
@@ -53,6 +56,9 @@ next = do
         c:cs -> do
             put (c:lex, cs)
             return $ Just c
+
+lexeme :: Tokenizer Lexeme
+lexeme = gets $ reverse . fst
 
 emit :: Token -> Tokenizer ()
 emit t = do
@@ -176,7 +182,18 @@ named = needChar (== '{')
           )
         )
 
+reservedWords :: [(String, Token)]
+reservedWords = [("str", CastT TypeString)
+                ,("int", CastT TypeInt)
+                ,("int0", CastT TypeInt0)
+                ,("float", CastT TypeDouble)
+                ,("float0", CastT TypeDouble0)
+                ]
+
 shortNamed :: Tokenizer ()
 shortNamed = do
     many isAlphaNum
-    emitl NameT
+    l <- lexeme
+    case lookup l reservedWords of
+        Nothing -> emitl NameT
+        Just t -> emit t
