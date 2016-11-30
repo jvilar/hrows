@@ -25,6 +25,7 @@ move pos (MoveHere pos', model) = checkedMove (const $ adjust pos') pos model
                                               | otherwise = size model - 1
 move _ (MoveBegin, model) = checkedMove (const 0) 0 model
 move _ (MoveEnd, model) = checkedMove (const $ size model - 1) 0 model
+move pos (MoveToValue fpos value, model) = checkedMove (const $ nextPos fpos value pos model) pos model
 
 checkedMove :: (Int -> Int) -> Int -> Model -> PresenterM Int
 checkedMove f pos model | 0 <= pos' && pos' < s = do

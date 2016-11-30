@@ -11,7 +11,9 @@ import Control.Concurrent.Chan(writeChan)
 import Control.Monad(filterM, forM, forM_, unless, when)
 import Control.Monad.IO.Class(liftIO)
 import Data.IORef(readIORef, writeIORef)
+import Data.List(elemIndex)
 import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
+import qualified Data.Text as T
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
 
@@ -168,10 +170,12 @@ createFieldTextView f control = do
              return False
          textView `on` buttonPressEvent $ do
              button <- eventButton
-             when (button == RightButton) $ liftIO $ do
-               writeIORef (currentField control) f
-               menuPopup (fieldMenu control) Nothing
-             return True
+             if button == RightButton
+             then liftIO $ do
+                      writeIORef (currentField control) f
+                      menuPopup (fieldMenu control) Nothing
+                      return True
+             else return False
          return textView
 
 deleteFields :: Grid -> [FieldPos] -> IO ()
@@ -187,7 +191,8 @@ showIteration AskCreateField = askCreateField
 showIteration (AskDeleteFields fs) = askDeleteField fs
 showIteration (DisplayMessage m) = displayMessage m
 showIteration (ConfirmExit changed) = confirmExit changed
-showIteration (GetFieldFormula fid flabel ms) = getFieldFormula fid flabel ms
+showIteration (GetFieldFormula fpos flabel ms) = getFieldFormula fpos flabel ms
+showIteration (SearchField fpos initial l) = searchField fpos initial l
 
 displayMessage :: Message -> GUIControl -> IO ()
 displayMessage (ErrorMessage m) = noResponseMessage m MessageError
@@ -336,8 +341,8 @@ askDeleteField names control = do
     widgetDestroy dlg
 
 
-getFieldFormula :: Int -> String -> Maybe String -> GUIControl -> IO ()
-getFieldFormula fieldId fieldName mFormula control = do
+getFieldFormula :: FieldPos -> String -> Maybe String -> GUIControl -> IO ()
+getFieldFormula fieldPos fieldName mFormula control = do
     let dlg = changeFieldFormulaDialog control
         btn = changeFieldFormulaButton control
         entry = changeFieldFormulaEntry control
@@ -366,7 +371,28 @@ getFieldFormula fieldId fieldName mFormula control = do
         f <- entryGetText entry
         sendInput control $ ChangeFieldFormula (if active
                                                 then Just f
-                                                else Nothing) fieldId
+                                                else Nothing) fieldPos
+
+searchField :: FieldPos -> String -> [String] -> GUIControl -> IO ()
+searchField fieldPos initial values control = do
+    let dlg = searchFieldDialog control
+        combo = searchFieldCombo control
+
+    set dlg [ windowTransientFor := mainWindow control
+            , windowModal := True
+            ]
+
+    modelText <- comboBoxGetModelText combo
+    listStoreClear modelText
+    forM values $ comboBoxAppendText combo . T.pack
+    comboBoxSetActive combo . fromJust $ elemIndex initial values
+
+    widgetShowAll dlg
+    r <- dialogRun dlg
+    widgetHide dlg
+    when (r == ResponseOk) $ do
+        mt <- comboBoxGetActiveText combo
+        when (isJust mt) $ sendInput control $ MoveToValue fieldPos (T.unpack $ fromJust mt)
 
 unimplemented :: String -> GUIControl -> IO ()
 unimplemented func control = sendInput control . MessageDialog . ErrorMessage $ "Función " ++ func ++ " no implementada"

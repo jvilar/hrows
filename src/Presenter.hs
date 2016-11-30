@@ -57,10 +57,10 @@ processInput = proc inp -> do
                pos <- processMoveCommands -< (inp, model)
              si <- processSourceCommands -< inp
              processFileCommands -< (inp, model, si)
-             processDialogCommands -< (inp, model)
+             processDialogCommands -< (inp, model, pos)
              processControlCommands -< (inp, changed model)
 
-processUpdateCommands :: PresenterAuto (Input, Int) Model
+processUpdateCommands :: PresenterAuto (Input, RowPos) Model
 processUpdateCommands = proc (inp, pos) -> do
                 bupdates <- emitJusts getUpdates -< inp
                 holdWith_ empty . perBlip updateAuto -< (,pos) <$> bupdates
@@ -88,10 +88,10 @@ getMoves :: Input -> Maybe MoveCommand
 getMoves (InputMove cmd) = Just cmd
 getMoves _ = Nothing
 
-processDialogCommands :: PresenterAuto (Input, Model) ()
-processDialogCommands = proc (inp, model) -> do
+processDialogCommands :: PresenterAuto (Input, Model, RowPos) ()
+processDialogCommands = proc (inp, model, pos) -> do
                           bdialogs <- emitJusts getDialogs -< inp
-                          holdWith_ () . perBlip dialogAuto -< (, model) <$> bdialogs
+                          holdWith_ () . perBlip dialogAuto -< (, model, pos) <$> bdialogs
 
 getDialogs :: Input -> Maybe DialogCommand
 getDialogs (InputDialog cmd) = Just cmd

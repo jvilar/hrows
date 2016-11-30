@@ -30,6 +30,8 @@ module Model (
              , isFormula
              , fieldFormula
              , fieldType
+             , fieldValues
+             , nextPos
              -- **Updating
              , changeField
              , newFields
@@ -205,7 +207,26 @@ fieldFormula c = (!! c) . formulas
 
 -- |The type of a field
 fieldType :: FieldPos -> Model -> FieldType
-fieldType c = (!! c) . types
+fieldType f = (!! f) . types
+
+-- |The values of a field
+fieldValues :: FieldPos -> Model -> [String]
+fieldValues f = unique . sort . IM.foldr (\r l -> toString (r !! f) : l) [] . _rows
+                where unique [] = []
+                      unique [x] = [x]
+                      unique (x:r@(y:l)) | x == y = unique r
+                                         | otherwise = x : unique r
+
+-- |The position of the next appearance of a value
+nextPos :: FieldPos -> String -> RowPos -> Model -> RowPos
+nextPos fpos s pos model = let
+    v = convert (fieldType fpos model) $ toField s
+    step i n (p, q) | n !! fpos /= v = (p, q)
+                    | i < pos = (Just $ maybe i (min i) p, q)
+                    | i > pos = (p, Just $ maybe i (min i) q)
+                    | otherwise = (p, q)
+    (p, q) = IM.foldrWithKey step (Nothing, Nothing) $ _rows model
+    in fromMaybe (fromMaybe pos p) q
 
 -- |Number of fields of each row.
 nfields :: Model -> Int

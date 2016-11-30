@@ -8,5 +8,6 @@ data MoveCommand = MoveNext
                  | MovePrevious
                  | MoveHere Int
                  | MoveBegin
-                 | MoveEnd deriving Show
+                 | MoveEnd
+                 | MoveToValue Int String deriving Show
 

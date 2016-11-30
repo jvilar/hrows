@@ -11,4 +11,5 @@ data DialogCommand = LoadFileDialog
                    | DeleteFieldsDialog
                    | MessageDialog Message
                    | ChangeFieldFormulaDialog Int
+                   | SearchFieldDialog Int
                      deriving Show

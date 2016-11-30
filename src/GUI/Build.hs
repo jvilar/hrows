@@ -110,6 +110,11 @@ prepareControl iChan builder = do
   lDialog <- getObject castToFileChooserDialog "loadFileDialog"
   tlist <- targetListNew
   targetListAddTextTargets tlist 0
+
+  sfDialog <- getObject castToDialog "searchFieldDialog"
+  sfCombo <- getObject castToComboBox "searchFieldCombo"
+  comboBoxSetModelText sfCombo
+
   return GUIControl { mainWindow = window
                     , positionLabel = lbl
                     , fieldsGrid = grid
@@ -130,6 +135,8 @@ prepareControl iChan builder = do
                     , confFileLoadCheckButton = confLButton
                     , loadFileDialog = lDialog
                     , targetList = tlist
+                    , searchFieldDialog = sfDialog
+                    , searchFieldCombo = sfCombo
                     }
 
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
@@ -193,6 +200,7 @@ prepareFileMenu  = mapM_ (uncurry menuItemInput)
 
 prepareFieldMenu :: BuildMonad ()
 prepareFieldMenu = do
+                     fieldMenuAction "searchFieldMenuItem" SearchFieldDialog
                      fieldMenuAction "deleteFieldMenuItem" (DeleteFields . (:[]))
                      fieldMenuAction "formulaMenuItem" ChangeFieldFormulaDialog
                      fieldMenuAction "changeToStringMenuItem" (ChangeFieldType TypeString)
