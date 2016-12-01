@@ -365,7 +365,7 @@ getFieldFormula fieldPos fieldName mFormula control = do
     widgetShowAll dlg
     r <- dialogRun dlg
     widgetHide dlg
-    putStrLn $ "Response: " ++ show r
+    -- putStrLn $ "Response: " ++ show r
     when (r == ResponseOk) $ do
         active <- toggleButtonGetActive btn
         f <- entryGetText entry

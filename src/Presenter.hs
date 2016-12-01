@@ -38,7 +38,7 @@ updater = proc inputs -> do
     rec
         dauto <- delay_ processInput -< auto
         (cmds, auto) <- arrM (uncurry pr) -< (dauto, inputs)
-    arrM putStrLn -< "GUI commands: " ++ show cmds
+--    arrM putStrLn -< "GUI commands: " ++ show cmds
     id -< cmds
 
 pr :: PresenterAuto Input () -> [Input] -> IO ([GUICommand], PresenterAuto Input ())
@@ -51,7 +51,7 @@ pr auto (i:is) = do
 
 processInput :: PresenterAuto Input ()
 processInput = proc inp -> do
-             arrM (liftIO . putStrLn) -< "inp: " ++ show inp
+--             arrM (liftIO . putStrLn) -< "inp: " ++ show inp
              rec
                model <- processUpdateCommands -< (inp, pos)
                pos <- processMoveCommands -< (inp, model)
