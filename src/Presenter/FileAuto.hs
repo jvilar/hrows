@@ -55,6 +55,7 @@ applyCommand (WriteFileFromName fp saveConf) model info = do
         case r of
             Right _ -> do
                           message $ InformationMessage "Fichero escrito correctamente."
+                          sendInputM $ ChangeModel (setUnchanged model)
                           when (Just fp /= siFilePath info) $
                               sendInputM $ SetSource (changeFileName fp info)
             Left (HRowsException m) -> message $ ErrorMessage m

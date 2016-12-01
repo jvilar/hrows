@@ -33,6 +33,7 @@ module Model (
              , fieldValues
              , nextPos
              -- **Updating
+             , setUnchanged
              , changeField
              , newFields
              , deleteFields
@@ -245,6 +246,10 @@ fnames model = fromMaybe
 -- |Returns the rows of the model.
 rows :: Model -> [Row]
 rows = IM.elems . _rows
+
+-- |Marks the model as unchanged
+setUnchanged :: Model -> Model
+setUnchanged model = model { _changed = False }
 
 -- |Changes one field. Returns the new model and the fields changed.
 changeField :: RowPos -> FieldPos -> Field -> Model -> (Model, [FieldPos])
