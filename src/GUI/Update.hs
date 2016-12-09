@@ -188,7 +188,8 @@ showIteration :: Iteration -> GUIControl -> IO ()
 showIteration AskReadFile = askReadFile
 showIteration AskWriteFile = askWriteFile
 showIteration AskCreateField = askCreateField
-showIteration (AskDeleteFields fs) = askDeleteField fs
+showIteration (AskDeleteFields fs) = askDeleteFields fs
+showIteration (AskRenameFields fs) = askRenameFields fs
 showIteration (DisplayMessage m) = displayMessage m
 showIteration (ConfirmExit changed) = confirmExit changed
 showIteration (GetFieldFormula fpos flabel ms) = getFieldFormula fpos flabel ms
@@ -311,8 +312,8 @@ addComboBox grid options left top = do
     gridAttach grid cbox left top 1 1
     return cbox
 
-askDeleteField :: [String] -> GUIControl -> IO ()
-askDeleteField names control = do
+askDeleteFields :: [String] -> GUIControl -> IO ()
+askDeleteFields names control = do
     dlg <- dialogNew
     set dlg [ windowTransientFor := mainWindow control
             , windowModal := True
@@ -338,6 +339,39 @@ askDeleteField names control = do
     when (r == ResponseOk) $ do
         fields <- map fst <$> filterM (toggleButtonGetActive . snd) (enumerate cbuttons)
         unless (null fields) $ sendInput control $ DeleteFields fields
+    widgetDestroy dlg
+
+askRenameFields :: [String] -> GUIControl -> IO ()
+askRenameFields names control = do
+    dlg <- dialogNew
+    set dlg [ windowTransientFor := mainWindow control
+            , windowModal := True
+            ]
+    dialogAddButton dlg
+                    ("Cambiar" :: String)
+                    ResponseOk
+    dialogAddButton dlg
+                    ("Cancelar" :: String)
+                    ResponseCancel
+    content <- castToContainer <$> dialogGetContentArea dlg
+    labelNew (Just ("Cambiar Nombres Campos" :: String)) >>= containerAdd content
+
+    grid <- gridNew
+    centries <- forM (enumerate names) $ \(row, name) -> do
+        addLabel grid name 0 row
+        entry <- addEntry grid 1 row
+        entrySetText entry name
+        return entry
+
+    actionArea <- castToContainer <$> dialogGetActionArea dlg
+    containerAdd actionArea grid
+
+    widgetShowAll dlg
+    r <- dialogRun dlg
+
+    when (r == ResponseOk) $ do
+        names <- mapM entryGetText centries
+        sendInput control $ RenameFields names
     widgetDestroy dlg
 
 

@@ -32,37 +32,37 @@ update model (UpdateField fpos v, pos) = do
                                                 , isErrorFI = isError f
                                                 }
     return model'
-update _ (ChangeModel model, _) = do
-    sendGUIM $ ShowNames (cnames model)
-    sendInputM MoveBegin
-    return model
+update _ (ChangeModel model, _) =
+    completeRefresh 0 model
 update model (DoNothing, _) = return model
 update model (NewRow, _) = do
     sendInputM MoveEnd
     return $ addEmptyRow model
-update model (DeleteRow, pos) = do
-    sendInputM $ MoveHere pos
-    return $ deleteRow pos model
-update model (NewFields l, pos) = do
-    let model' = newFields (map (first Just) l) model
-    sendGUIM $ ShowNames (cnames model')
-    sendInputM $ MoveHere pos
-    return model'
-update model (DeleteFields fs, pos) = do
-    let model' = deleteFields fs model
-    sendGUIM $ ShowNames (cnames model')
-    sendInputM $ MoveHere pos
-    return model'
+update model (DeleteRow, pos) =
+    partialRefresh pos $ deleteRow pos model
+update model (NewFields l, pos) =
+    completeRefresh pos $ newFields (map (first Just) l) model
+update model (DeleteFields fs, pos) =
+    completeRefresh pos $ deleteFields fs model
+update model (RenameFields names, pos) =
+    completeRefresh pos $ renameFields names model
 update model (MoveField f t, pos) = do
-    let model' = moveField f t model
-    sendGUIM $ ShowNames (cnames model')
-    sendInputM $ MoveHere pos
-    return model'
-update model (ChangeFieldType t f, pos) = do
-    sendInputM $ MoveHere pos
-    return $ changeFieldType t f model
-update model (ChangeFieldFormula mf f, pos) = do
-    sendInputM $ MoveHere pos
-    return $ changeFieldFormula mf f model
+    completeRefresh pos $ moveField f t model
+update model (ChangeFieldType t f, pos) =
+    partialRefresh pos $ changeFieldType t f model
+update model (ChangeFieldFormula mf f, pos) =
+    partialRefresh pos $ changeFieldFormula mf f model
+
 cnames :: Model -> [String]
 cnames = map (++ ": ") . fnames
+
+partialRefresh :: Int -> Model -> PresenterM Model
+partialRefresh pos model = do
+    sendInputM $ MoveHere pos
+    return model
+
+completeRefresh :: Int -> Model -> PresenterM Model
+completeRefresh pos model = do
+    sendGUIM $ ShowNames (cnames model)
+    sendInputM $ MoveHere pos
+    return model

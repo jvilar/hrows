@@ -9,6 +9,7 @@ data DialogCommand = LoadFileDialog
                    | SaveAsFileDialog
                    | CreateFieldsDialog
                    | DeleteFieldsDialog
+                   | ChangeNamesDialog
                    | MessageDialog Message
                    | ChangeFieldFormulaDialog Int
                    | SearchFieldDialog Int

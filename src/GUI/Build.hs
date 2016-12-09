@@ -196,6 +196,7 @@ prepareFileMenu  = mapM_ (uncurry menuItemInput)
                              ,("quitMenuItem", toInput ExitProgram)
                              ,("createFieldsMenuItem", toInput CreateFieldsDialog)
                              ,("deleteFieldsMenuItem", toInput DeleteFieldsDialog)
+                             ,("changeNamesMenuItem", toInput ChangeNamesDialog)
                              ]
 
 prepareFieldMenu :: BuildMonad ()

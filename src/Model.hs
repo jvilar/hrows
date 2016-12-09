@@ -37,6 +37,7 @@ module Model (
              , changeField
              , newFields
              , deleteFields
+             , renameFields
              , moveField
              , changeFieldType
              , changeFieldFormula
@@ -305,6 +306,11 @@ del pos l = go ps l
               in i ++ go ns t
           spos = sort $ filter (< length l) pos
           ps = head spos : zipWith (\n m -> n - m - 1) (tail spos) spos
+
+-- |Changes the names of the fields to those given.
+renameFields :: [String] -> Model -> Model
+renameFields names m = addPlan m { _fieldInfo = zipWith (\fi n -> fi { _name = Just n })
+                                     (_fieldInfo m) names }
 
 -- |Move a field to the position just next to the other
 moveField :: FieldPos -> FieldPos -> Model -> Model

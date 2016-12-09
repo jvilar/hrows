@@ -13,6 +13,7 @@ data Iteration = NoIteration -- ^No need to iterate.
                | AskWriteFile -- ^Ask for a file name to write.
                | AskCreateField -- ^Ask for fields to create.
                | AskDeleteFields [String] -- ^Ask for fields to delete.
+               | AskRenameFields [String] -- ^Ask for fields to rename.
                | DisplayMessage Message -- ^Display a message.
                | ConfirmExit Bool -- ^Confirm exit program.
                | GetFieldFormula Int String (Maybe String) -- ^Introduce the formula for a field

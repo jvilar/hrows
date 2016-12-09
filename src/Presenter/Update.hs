@@ -12,6 +12,7 @@ data UpdateCommand = UpdateField FieldPos Field
                    | DeleteRow
                    | NewFields [(String, FieldType)]
                    | DeleteFields [FieldPos]
+                   | RenameFields [String]
                    | MoveField FieldPos FieldPos
                    | ChangeFieldType FieldType FieldPos
                    | ChangeFieldFormula (Maybe Formula) FieldPos
