@@ -2,6 +2,7 @@ module Model.Expression ( Expression (..)
                         , Formula
                         , BinaryOp
                         , UnaryOp
+                        , Priority
                         , addCast
                         , evaluate
                         , eliminateNames
@@ -17,12 +18,15 @@ import Model.Row
 -- |The Formula is the expression as written by the user.
 type Formula = String
 
+-- |The priority of an operator
+type Priority = Int
+
 -- |The Expression is the internal representation of the Formula.
 data Expression = Position Int
                 | NamedPosition String
                 | Constant Field
-                | Unary UnaryOp Expression
-                | Binary BinaryOp Expression Expression
+                | Unary String UnaryOp Expression
+                | Binary Priority String BinaryOp Expression Expression
                 | Cast FieldType Expression
                 | Error String
 
@@ -30,8 +34,8 @@ instance Show Expression where
     show (Position n) = "Position " ++ show n
     show (NamedPosition s) = "NamedPosition " ++ show s
     show (Constant f) = "Constant " ++ show f
-    show (Unary _ e) = "Unary op (" ++ show e ++ ")"
-    show (Binary _ e1 e2) = "Binary op (" ++ show e1 ++ ") (" ++ show e2 ++ ")"
+    show (Unary str _ e) = "Unary " ++ str ++ " (" ++ show e ++ ")"
+    show (Binary _ str _ e1 e2) = "Binary " ++ str ++ " (" ++ show e1 ++ ") (" ++ show e2 ++ ")"
     show (Cast ft e) = "Cast " ++ show ft ++ " (" ++ show e ++ ")"
     show (Error s) = "Error " ++ show s
 
@@ -41,13 +45,13 @@ type BinaryOp = Field -> Field -> Field
 
 
 transform :: Monad m => (Expression -> m Expression) -> Expression -> m Expression
-transform t (Unary op e) = do
+transform t (Unary str op e) = do
     e' <- transform t e
-    t (Unary op e')
-transform t (Binary op e1 e2) = do
+    t (Unary str op e')
+transform t (Binary pr str op e1 e2) = do
     e1' <- transform t e1
     e2' <- transform t e2
-    t (Binary op e1' e2')
+    t (Binary pr str op e1' e2')
 transform t (Cast ft e) = do
     e' <- transform t e
     t (Cast ft e')
@@ -61,8 +65,8 @@ eval :: Expression -> Eval Field
 eval (Position n) = evalIndex n
 eval (NamedPosition name) = return . mkError $ "Expresión con variable: " ++ name
 eval (Constant f) = return f
-eval (Unary op exp) = op <$> eval exp
-eval (Binary op exp1 exp2) = op <$> eval exp1 <*> eval exp2
+eval (Unary _ op exp) = op <$> eval exp
+eval (Binary _ _ op exp1 exp2) = op <$> eval exp1 <*> eval exp2
 eval (Cast ft exp) = convert ft <$> eval exp
 eval (Error m) = return $ mkError m
 
@@ -87,8 +91,8 @@ getPositions :: Expression -> [Int]
 getPositions (Position n) = [n]
 getPositions (NamedPosition name) = error $ "Expresión con variable: " ++ name
 getPositions (Constant f) = []
-getPositions (Unary _ exp) = getPositions exp
-getPositions (Binary _ exp1 exp2) = merge (getPositions exp1) (getPositions exp2)
+getPositions (Unary _ _ exp) = getPositions exp
+getPositions (Binary _ _ _ exp1 exp2) = merge (getPositions exp1) (getPositions exp2)
 getPositions (Cast _ exp) = getPositions exp
 getPositions (Error _) = []
 
