@@ -43,11 +43,8 @@ expression = combine
              <$> term
              <*> many isAdditive ((,) <$> additive <*> term)
 
-data BinaryOpInfo = BinaryOpInfo BinaryOp Priority String
-data UnaryOpInfo = UnaryOpInfo UnaryOp String
-
 combine :: Expression -> [(BinaryOpInfo, Expression)] -> Expression
-combine = foldl' (\t1 (BinaryOpInfo op p str, t2) -> Binary p str op t1 t2)
+combine = foldl' (\t1 (info, t2) -> Binary info t1 t2)
 
 term :: Parser Expression
 term = combine
@@ -86,7 +83,9 @@ match l message = do
         Just a -> advance >> return a
 
 additive :: Parser BinaryOpInfo
-additive = match [(AddT, BinaryOpInfo (+) 4 "+"), (SubT, BinaryOpInfo (-) 4 "-")] "una suma o resta"
+additive = match [ (AddT, BinaryOpInfo (+) "+" 4 TrueAssoc)
+                 , (SubT, BinaryOpInfo (-) "-" 4 LeftAssoc)
+                 ] "una suma o resta"
 
 isMultiplicative :: Parser Bool
 isMultiplicative = do
@@ -97,7 +96,9 @@ isMultiplicative = do
                  _ -> False
 
 multiplicative :: Parser BinaryOpInfo
-multiplicative = match [(MultT, BinaryOpInfo (*) 5 "*"), (DivT, BinaryOpInfo (/) 5 "/")] "un producto o una división"
+multiplicative = match [ (MultT, BinaryOpInfo (*) "*" 5 TrueAssoc)
+                       , (DivT, BinaryOpInfo (/) "/" 5 LeftAssoc)
+                       ] "un producto o una división"
 
 open :: Parser ()
 open = match [(OpenT, ())] "un paréntesis abierto"

@@ -11,6 +11,7 @@ module Model.Field ( Field
                    , typeOf
                    , toString
                    , typeLabel
+                   , typeOperator
                    , defaultValue
                    , mkError
                    , isError
@@ -65,7 +66,19 @@ typeLabels = [ (TypeString, "Cadena")
              ]
 
 typeLabel :: FieldType -> String
-typeLabel t = T.unpack . fromJust $ lookup  t typeLabels
+typeLabel = T.unpack . fromJust . flip lookup typeLabels
+
+-- |The operators used for casting in formulas.
+typeOperators :: [(FieldType, String)]
+typeOperators = [ (TypeString, "str")
+                , (TypeInt, "int")
+                , (TypeInt0, "int0")
+                , (TypeDouble, "float")
+                , (TypeDouble0, "float0")
+                ]
+
+typeOperator :: FieldType -> String
+typeOperator = fromJust . flip lookup typeOperators
 
 -- |The string associated to a `Field`.
 toString :: Field -> String

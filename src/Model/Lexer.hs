@@ -183,12 +183,7 @@ named = needChar (== '{')
         )
 
 reservedWords :: [(String, Token)]
-reservedWords = [("str", CastT TypeString)
-                ,("int", CastT TypeInt)
-                ,("int0", CastT TypeInt0)
-                ,("float", CastT TypeDouble)
-                ,("float0", CastT TypeDouble0)
-                ]
+reservedWords = [(typeOperator t, CastT t) | t <- [TypeString, TypeInt, TypeInt0, TypeDouble, TypeDouble0]]
 
 shortNamed :: Tokenizer ()
 shortNamed = do
