@@ -49,7 +49,7 @@ module Model (
 import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
 import Data.List(foldl', sort)
-import Data.Maybe(fromMaybe, isJust)
+import Data.Maybe(fromJust, fromMaybe, isJust, isNothing)
 
 import Model.Expression
 import Model.Field
@@ -282,7 +282,7 @@ newFields l m = let
 addPlan :: Model -> Model
 addPlan m = let
     exps = map mParse $ _fieldInfo m
-    mParse ri = eliminateNames (fnames m) . addCast (_type ri) . parse <$> _formula ri
+    mParse fi = eliminateNames (fnames m) . addCast (_type fi) . parse <$> _formula fi
     up = mkUpdatePlan exps
   in m { _updatePlan = up, _rows = IM.map (updateAll up) (_rows m), _changed = True }
 
@@ -314,13 +314,26 @@ renameFields names m = addPlan m { _fieldInfo = zipWith (\fi n -> fi { _name = J
 
 -- |Move a field to the position just next to the other
 moveField :: FieldPos -> FieldPos -> Model -> Model
-moveField from to m | from == to = m
-                    | from < to = addPlan m { _rows = IM.map mvf (_rows m)
-                                            , _fieldInfo = mvf $ _fieldInfo m
-                                            }
-                    | from > to = addPlan m { _rows = IM.map mvb (_rows m)
-                                            , _fieldInfo = mvb $ _fieldInfo m
-                                            }
+moveField from to m = let
+    perm = case compare from to of
+               EQ -> id
+               LT -> mvf
+               GT -> mvb
+    newPos = perm [0 .. _nfields m - 1]
+    updateFInfo fi = let
+                       e = _expression fi
+                       (e', changed) = translatePositions newPos $ fromJust e
+                     in if isNothing e || not changed
+                        then fi
+                        else fi { _expression = Just e'
+                                , _formula = Just $ toFormula e'
+                                }
+
+    in if from == to
+       then m
+       else addPlan m { _rows = IM.map perm (_rows m)
+                      , _fieldInfo = mvf . map updateFInfo $ _fieldInfo m
+                      }
     where
       -- move forward, ie from < to
       mvf l = let

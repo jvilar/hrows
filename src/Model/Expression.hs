@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Model.Expression ( Expression (..)
                         , Formula
                         , BinaryOp
@@ -9,14 +11,21 @@ module Model.Expression ( Expression (..)
                         , addCast
                         , evaluate
                         , eliminateNames
+                        , translatePositions
+                        , translateNames
                         , getPositions
                         , toFormula
                         , module Model.Field
                         ) where
 
+import Control.Arrow(second)
+import Control.Monad(when)
 import Control.Monad.Reader(Reader, ask, runReader)
+import Control.Monad.Writer(tell, runWriter)
 import Data.Char(isAlphaNum)
 import Data.List(elemIndex)
+import Data.Maybe(fromMaybe)
+import Data.Monoid(Any(..))
 import Model.Field
 import Model.Row
 
@@ -28,6 +37,9 @@ type Priority = Int
 
 -- |The associativity of a binary operator
 data Associativity = LeftAssoc | RightAssoc | TrueAssoc | NoAssoc
+
+data WithNames
+data WithNoNames
 
 -- |The Expression is the internal representation of the Formula.
 data Expression = Position Int
@@ -61,18 +73,23 @@ data BinaryOpInfo = BinaryOpInfo { opB :: BinaryOp
 instance Show BinaryOpInfo where
     show = formulaB
 
-transform :: Monad m => (Expression -> m Expression) -> Expression -> m Expression
-transform t (Unary info e) = do
-    e' <- transform t e
-    t (Unary info e')
-transform t (Binary info e1 e2) = do
-    e1' <- transform t e1
-    e2' <- transform t e2
+transform :: (Expression -> Expression) -> Expression -> Expression
+transform t (Unary info e) = t (Unary info $ transform t e)
+transform t (Binary info e1 e2) = let
+                                    e1' = transform t e1
+                                    e2' = transform t e2
+                                  in t (Binary info e1' e2')
+transform t (Cast ft e) = t (Cast ft $ t e)
+transform t e = t e
+
+transformM :: Monad m =>  (Expression -> m Expression) -> Expression -> m Expression
+transformM t (Unary info e) = transformM t e >>= t . Unary info
+transformM t (Binary info e1 e2) = do
+    e1' <- transformM t e1
+    e2' <- transformM t e2
     t (Binary info e1' e2')
-transform t (Cast ft e) = do
-    e' <- transform t e
-    t (Cast ft e')
-transform t n = t n
+transformM t (Cast ft e) = transformM t e >>= t . Cast ft
+transformM t e = t e
 
 evaluate :: Row -> Expression -> Field
 evaluate r exp = runReader (eval exp) r
@@ -117,14 +134,30 @@ evalIndex n = do
              else mkError $ "Índice erróneo " ++ show (n + 1)
 
 eliminateNames :: [String] -> Expression -> Expression
-eliminateNames fnames exp = runReader (transform noNames exp) fnames
-    where noNames :: Expression -> Reader [String] Expression
-          noNames (NamedPosition name) = do
-              fnames <- ask
-              return $ case elemIndex name fnames of
-                 Nothing -> Error $ "Mal nombre de campo: " ++ name
-                 Just i -> Position i
-          noNames n = return n
+eliminateNames fnames = transform noNames
+    where noNames (NamedPosition name) = case elemIndex name fnames of
+                                             Nothing -> Error $ "Mal nombre de campo: " ++ name
+                                             Just i -> Position i
+          noNames n = n
+
+type Changed = Bool
+
+-- |Changes the absolute references according to the list of new positions.
+-- Returns True if any position changed.
+translatePositions :: [Int] -> Expression -> (Expression, Changed)
+translatePositions newPos = second getAny . runWriter . transformM tPos
+    where tPos (Position n) = do
+              let n' = newPos !! n
+              when (n' /= n) $ tell (Any True)
+              return $ Position n'
+          tPos e = return e
+
+translateNames :: [(String, String)] -> Expression -> Expression
+translateNames newNames = transform tNames
+    where tNames (NamedPosition name) = NamedPosition $ fromMaybe
+                                               name
+                                               (lookup name newNames)
+          tNames e = e
 
 getPositions :: Expression -> [Int]
 getPositions (Position n) = [n]
