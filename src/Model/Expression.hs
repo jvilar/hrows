@@ -79,7 +79,7 @@ transform t (Binary info e1 e2) = let
                                     e1' = transform t e1
                                     e2' = transform t e2
                                   in t (Binary info e1' e2')
-transform t (Cast ft e) = t (Cast ft $ t e)
+transform t (Cast ft e) = t (Cast ft $ transform t e)
 transform t e = t e
 
 transformM :: Monad m =>  (Expression -> m Expression) -> Expression -> m Expression
