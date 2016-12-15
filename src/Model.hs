@@ -328,9 +328,13 @@ moveField :: FieldPos -> FieldPos -> Model -> Model
 moveField from to m = let
     perm = case compare from to of
                EQ -> id
-               LT -> mvf
-               GT -> mvb
-    newPos = perm [0 .. _nfields m - 1]
+               LT -> mvf from to
+               GT -> mvb from to
+    iperm = case compare from to of
+               EQ -> id
+               LT -> mvb to from
+               GT -> mvf to from
+    newPos = traceShowId $ iperm [0 .. _nfields m - 1]
     updateFInfo fi = let
                        e = _expression fi
                        (e', changed) = translatePositions newPos $ fromJust e
@@ -343,18 +347,18 @@ moveField from to m = let
     in if from == to
        then m
        else addPlan m { _rows = IM.map perm (_rows m)
-                      , _fieldInfo = mvf . map updateFInfo $ _fieldInfo m
+                      , _fieldInfo = perm . map updateFInfo $ _fieldInfo m
                       }
     where
       -- move forward, ie from < to
-      mvf l = let
+      mvf from to l = let
           (left, f:right) = splitAt from l
           (before, after) = splitAt (to - from) right
         in left ++ before ++ f:after
       -- move backward, ie from > to
-      mvb l = let
-          (left, right) = splitAt (to + 1) l
-          (before, f: after) = splitAt (from - to - 1) right
+      mvb from to l = let
+          (left, right) = splitAt to l
+          (before, f: after) = splitAt (from - to) right
         in left ++ f:before ++ after
 
 -- |Changes the type of the field.
