@@ -12,7 +12,6 @@ module Model (
              , addRow
              , addEmptyRow
              , deleteRow
-             , setNames
              , fromRows
              , fromRowsNames
              , fromRowsConf
@@ -49,7 +48,8 @@ module Model (
 import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
 import Data.List(foldl', sort)
-import Data.Maybe(fromJust, fromMaybe, isJust, isNothing)
+import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
+import Debug.Trace
 
 import Model.Expression
 import Model.Field
@@ -86,7 +86,7 @@ fromConf :: FieldConf -> FieldInfo
 fromConf cnf = FieldInfo { _name = nameFC cnf
                          , _type = typeFC cnf
                          , _defaultValue = defaultValue $ typeFC cnf
-                         , _expression = Nothing
+                         , _expression = parse <$> formulaFC cnf
                          , _formula = formulaFC cnf
                          }
 
@@ -281,8 +281,8 @@ newFields l m = let
 
 addPlan :: Model -> Model
 addPlan m = let
-    exps = map mParse $ _fieldInfo m
-    mParse fi = eliminateNames (fnames m) . addCast (_type fi) . parse <$> _formula fi
+    exps = map prepare $ _fieldInfo m
+    prepare fi = eliminateNames (fnames m) . addCast (_type fi) <$> _expression fi
     up = mkUpdatePlan exps
   in m { _updatePlan = up, _rows = IM.map (updateAll up) (_rows m), _changed = True }
 
@@ -309,8 +309,19 @@ del pos l = go ps l
 
 -- |Changes the names of the fields to those given.
 renameFields :: [String] -> Model -> Model
-renameFields names m = addPlan m { _fieldInfo = zipWith (\fi n -> fi { _name = Just n })
-                                     (_fieldInfo m) names }
+renameFields names m = addPlan m { _fieldInfo = zipWith updateFInfo (_fieldInfo m) names }
+    where translations = catMaybes $ zipWith (\n1 n2 -> (,) <$> n1 <*> Just n2)
+                                             (map _name $ _fieldInfo m)
+                                             names
+          updateFInfo fi n = let
+                               e = _expression fi
+                               (e', changed) = translateNames translations $ fromJust e
+                             in if isNothing e || not changed
+                                then fi { _name = Just n }
+                                else fi { _name = Just n
+                                        , _expression = Just e'
+                                        , _formula = Just $ toFormula e'
+                                        }
 
 -- |Move a field to the position just next to the other
 moveField :: FieldPos -> FieldPos -> Model -> Model
@@ -361,8 +372,7 @@ changeFieldType t n m | t /= types m !! n =
 -- |Changes the formula of the field.
 changeFieldFormula :: Maybe Formula -> FieldPos -> Model -> Model
 changeFieldFormula mf n m = addPlan m { _fieldInfo = newInfo, _changed = True }
-    where newInfo = change (\i -> i { _expression = c, _formula = mf }) $ _fieldInfo m
-          c = addCast (types m !! n) . eliminateNames (fnames m) . parse <$> mf
+    where newInfo = change (\fi -> fi { _expression = parse <$> mf, _formula = mf }) $ _fieldInfo m
           change f xs = let
               (h, x:t) = splitAt n xs
               in h ++ f x : t

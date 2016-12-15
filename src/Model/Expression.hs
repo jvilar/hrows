@@ -152,12 +152,13 @@ translatePositions newPos = second getAny . runWriter . transformM tPos
               return $ Position n'
           tPos e = return e
 
-translateNames :: [(String, String)] -> Expression -> Expression
-translateNames newNames = transform tNames
-    where tNames (NamedPosition name) = NamedPosition $ fromMaybe
-                                               name
-                                               (lookup name newNames)
-          tNames e = e
+translateNames :: [(String, String)] -> Expression -> (Expression, Changed)
+translateNames newNames = second getAny . runWriter . transformM tNames
+    where tNames (NamedPosition name) = do
+              let name' = fromMaybe name (lookup name newNames)
+              when (name' /= name) $ tell (Any True)
+              return $ NamedPosition name'
+          tNames e = return e
 
 getPositions :: Expression -> [Int]
 getPositions (Position n) = [n]
