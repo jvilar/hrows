@@ -7,7 +7,8 @@ module Model.ListatabFile (
 import Control.Exception (displayException, IOException, try, throwIO)
 import Control.Monad (mapM_)
 import qualified Data.ByteString.Lazy as BS
-import Data.Aeson(decode, encode)
+import Data.Aeson(decode)
+import Data.Aeson.Encode.Pretty(encodePretty)
 import Data.List(intercalate)
 import System.IO (Handle, hClose, hPutStrLn, openFile, readFile, IOMode(ReadMode, WriteMode))
 import Text.Megaparsec hiding (try)
@@ -87,7 +88,7 @@ toListatab info fp mconf model = do
     case mconf of
         Nothing -> return ()
         Just conf -> do
-            r <- try (BS.writeFile conf . encode $ getConf model)
+            r <- try (BS.writeFile conf . encodePretty $ getConf model)
             case r of
                 Right () -> return ()
                 Left e -> exception e
