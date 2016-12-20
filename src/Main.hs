@@ -3,8 +3,8 @@
 module Main where
 
 import Control.Auto.Run(runOnChanM)
-import Control.Concurrent(forkIO)
-import Control.Concurrent.Chan(newChan, writeList2Chan)
+import Control.Concurrent(forkIO, threadDelay)
+import Control.Concurrent.Chan(Chan, newChan, writeChan, writeList2Chan)
 import Control.Lens (makeLenses, (^.), set, Getting)
 import Control.Monad(forM_, unless, void, when)
 import Data.Maybe(fromJust, isJust)
@@ -19,6 +19,7 @@ import System.Console.JMVOptions
 import GUI.Build
 import GUI.Update
 import Model
+import Model.DefaultFileNames
 import Presenter
 
 data Options = Options { _help :: Bool
@@ -72,6 +73,12 @@ myError m = do
               hPutStrLn stderr $ n ++ " error: " ++ m
               exitFailure
 
+-- |Thread to write a backup every minute
+backupLoop :: Chan Input -> IO ()
+backupLoop inputChan = do
+    threadDelay $ 60 * 1000000
+    writeChan inputChan $ toInput WriteBackup
+    backupLoop inputChan
 
 main :: IO ()
 main = do
@@ -95,6 +102,7 @@ main = do
                             (updateScreen control)
                             inputChan
                             presenter
+  forkIO $ backupLoop inputChan
   writeList2Chan inputChan [ toInput MoveBegin
                            , toInput $ SetSource sinfo
                            , toInput LoadFile]

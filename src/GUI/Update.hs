@@ -19,6 +19,7 @@ import Graphics.UI.Gtk.General.Enums(Align(..))
 
 import GUI.Command
 import GUI.Control
+import Model.DefaultFileNames
 import Model.Field
 import Presenter.Input
 
@@ -220,7 +221,7 @@ askWriteFile = askFile saveAsDialog confFileSaveCheckButton WriteFileFromName
 
 askFile :: IsInput t => (GUIControl -> FileChooserDialog)
                      -> (GUIControl -> CheckButton)
-                     -> (String -> Bool -> t)
+                     -> (FilePath -> Maybe FilePath -> t)
                      -> GUIControl -> IO ()
 askFile dlg btn input control = do
     r <- dialogRun (dlg control)
@@ -229,7 +230,11 @@ askFile dlg btn input control = do
             file <- fileChooserGetFilename (dlg control)
             when (isJust file) $ do
                 chk <- toggleButtonGetActive (btn control)
-                sendInput control $ input (fromJust file) chk
+                let fp = fromJust file
+                    conf = if chk
+                           then defaultConfFileName <$> file
+                           else Nothing
+                sendInput control $ input fp conf
 
 confirmExit :: Bool -> GUIControl -> IO ()
 confirmExit changed control = do

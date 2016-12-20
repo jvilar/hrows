@@ -15,8 +15,9 @@ import Model.ListatabFile
 import Model.SourceInfo
 
 data FileCommand = LoadFile
-                 | LoadFileFromName FilePath Bool
+                 | LoadFileFromName FilePath (Maybe FilePath)
                  | WriteFile
-                 | WriteFileFromName FilePath Bool
+                 | WriteFileFromName FilePath (Maybe FilePath)
+                 | WriteBackup
                  deriving Show
 

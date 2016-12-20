@@ -334,7 +334,7 @@ moveField from to m = let
                EQ -> id
                LT -> mvb to from
                GT -> mvf to from
-    newPos = traceShowId $ iperm [0 .. _nfields m - 1]
+    newPos = iperm [0 .. _nfields m - 1]
     updateFInfo fi = let
                        e = _expression fi
                        (e', changed) = translatePositions newPos $ fromJust e

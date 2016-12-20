@@ -5,13 +5,14 @@ module Presenter.FileAuto (
 
 import Control.Auto(Auto, arrM)
 import Control.Exception(try)
-import Control.Monad(when)
+import Control.Monad(void, when)
 import Control.Monad.Trans(liftIO)
-import Data.Maybe(isJust)
+import Data.Maybe(fromJust, isJust)
 
 import GUI.Command
 import HRowsException
 import Model
+import Model.DefaultFileNames
 import Model.ListatabFile
 import Model.SourceInfo
 import Presenter.Input
@@ -35,22 +36,15 @@ applyCommand LoadFile _ info@(SourceInfo (Just fp) conffp (ListatabFormat format
             sendInputM $ ChangeModel model
             sendInputM $ SetSource info
         Left (HRowsException mess) -> message $ ErrorMessage mess
-applyCommand (LoadFileFromName n loadConf) model info = do
+applyCommand (LoadFileFromName n conf) model info = do
     let info' = changeFileName n $
-                changeConfFileName (
-                    if loadConf
-                    then Just (defaultConfFileName n)
-                    else Nothing
-                  ) info
+                changeConfFileName conf info
     applyCommand LoadFile model info'
-applyCommand WriteFile model info = applyCommand (WriteFileFromName fp (isJust $ siConfFile info)) model info
+applyCommand WriteFile model info = applyCommand (WriteFileFromName fp (siConfFile info)) model info
         where ListatabFormat ltinfo = siFormat info
               Just fp = siFilePath info
-applyCommand (WriteFileFromName fp saveConf) model info = do
+applyCommand (WriteFileFromName fp conf) model info = do
         let ListatabFormat ltinfo = siFormat info
-            conf = if saveConf
-                   then Just $ (defaultConfFileName fp)
-                   else Nothing
         r <- liftIO $ try $ toListatab ltinfo fp conf model
         case r of
             Right _ -> do
@@ -59,3 +53,12 @@ applyCommand (WriteFileFromName fp saveConf) model info = do
                           when (Just fp /= siFilePath info) $
                               sendInputM $ SetSource (changeFileName fp info)
             Left (HRowsException m) -> message $ ErrorMessage m
+applyCommand WriteBackup model info = do
+    let ListatabFormat ltinfo = siFormat info
+        fp = defaultBackupFileName <$> siFilePath info
+        conf = defaultBackupFileName <$> siConfFile info
+    when (isJust fp) $ do
+        r <- liftIO $ try $ toListatab ltinfo (fromJust fp) conf model
+        case r of
+            Right _ -> return ()
+            Left (HRowsException m) -> message $ ErrorMessage ("Error al hacer la copia de seguridad: " ++ m)
