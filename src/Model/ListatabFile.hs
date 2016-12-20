@@ -9,7 +9,7 @@ import Control.Monad (mapM_)
 import qualified Data.ByteString.Lazy as BS
 import Data.Aeson(decode, encode)
 import Data.List(intercalate)
-import System.IO (Handle, hPutStrLn, openFile, readFile, IOMode(ReadMode, WriteMode))
+import System.IO (Handle, hClose, hPutStrLn, openFile, readFile, IOMode(ReadMode, WriteMode))
 import Text.Megaparsec hiding (try)
 
 import HRowsException
@@ -82,6 +82,7 @@ toListatab info fp mconf model = do
                                    FirstLine -> hPutStrLn h $ intercalate [ltOutputSeparator info] ns
                                    Comment -> hPutStrLn h $ "#<" ++ intercalate "><" ns ++ ">"
                      mapM_ (writeRow (ltOutputSeparator info) h) $ rows model
+                     hClose h
         Left e -> exception e
     case mconf of
         Nothing -> return ()

@@ -240,15 +240,27 @@ confirmExit :: Bool -> GUIControl -> IO ()
 confirmExit changed control = do
   let msg :: String
       msg = if changed
-            then "Ha habido cambios, ¿quieres salir?"
+            then "Ha habido cambios, ¿cómo quieres salir?"
             else "¿Seguro que quieres salir?"
   dlg <- messageDialogNew (Just $ mainWindow control)
                           [DialogModal]
                           MessageQuestion
-                          ButtonsYesNo
+                          (if changed
+                           then ButtonsNone
+                           else ButtonsYesNo)
                           msg
+  when changed $ do
+      dialogAddButton dlg ("Grabar y salir" :: String) (ResponseUser 1)
+      dialogAddButton dlg ("Salir sin grabar" :: String) ResponseYes
+      dialogAddButton dlg ("No salir" :: String) ResponseNo
+      return ()
+
   r <- dialogRun dlg
   when (r == ResponseYes) $ do
+                        sendInput control DoExit
+                        mainQuit
+  when (r == ResponseUser 1) $ do
+                        sendInput control WriteFile
                         sendInput control DoExit
                         mainQuit
   widgetDestroy dlg
