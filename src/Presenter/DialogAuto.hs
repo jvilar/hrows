@@ -18,6 +18,7 @@ dialogAuto = arrM $ \(input, model, pos) -> sendGUIM $ case input of
                                              CreateFieldsDialog -> ShowIteration AskCreateField
                                              DeleteFieldsDialog -> ShowIteration (AskDeleteFields $ fnames model)
                                              ChangeNamesDialog -> ShowIteration (AskRenameFields $ fnames model)
+                                             SortRowsDialog -> ShowIteration (AskSortRows $ fnames model)
                                              MessageDialog m -> ShowIteration (DisplayMessage m)
                                              ChangeFieldFormulaDialog f -> ShowIteration $ GetFieldFormula f (fnames model !! f) (formulas model !! f)
                                              SearchFieldDialog f -> ShowIteration $ SearchField f (toString $ row pos model !! f) (fieldValues f model)

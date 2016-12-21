@@ -40,6 +40,8 @@ update model (NewRow, _) = do
     return $ addEmptyRow model
 update model (DeleteRow, pos) =
     partialRefresh pos $ deleteRow pos model
+update model (SortRows f dir, _) = do
+    partialRefresh 0 $ sortRows f dir model
 update model (NewFields l, pos) =
     completeRefresh pos $ newFields (map (first Just) l) model
 update model (DeleteFields fs, pos) =

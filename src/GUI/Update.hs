@@ -19,8 +19,8 @@ import Graphics.UI.Gtk.General.Enums(Align(..))
 
 import GUI.Command
 import GUI.Control
+import Model hiding (deleteFields)
 import Model.DefaultFileNames
-import Model.Field
 import Presenter.Input
 
 updateGUI :: GUICommand -> GUIControl -> IO ()
@@ -191,6 +191,7 @@ showIteration AskWriteFile = askWriteFile
 showIteration AskCreateField = askCreateField
 showIteration (AskDeleteFields fs) = askDeleteFields fs
 showIteration (AskRenameFields fs) = askRenameFields fs
+showIteration (AskSortRows fs) = askSortRows fs
 showIteration (DisplayMessage m) = displayMessage m
 showIteration (ConfirmExit changed) = confirmExit changed
 showIteration (GetFieldFormula fpos flabel ms) = getFieldFormula fpos flabel ms
@@ -309,6 +310,18 @@ addLabel grid text left top = do
     lbl <- labelNew $ Just text
     gridAttach grid lbl left top 1 1
 
+addRadioButton :: Grid -> String -> Int -> Int -> IO RadioButton
+addRadioButton grid label left top = do
+    btn <- radioButtonNewWithLabel label
+    gridAttach grid btn left top 1 1
+    return btn
+
+addRadioButtonFromWidget :: Grid -> RadioButton -> String -> Int -> Int -> IO RadioButton
+addRadioButtonFromWidget grid other label left top = do
+    btn <- radioButtonNewWithLabelFromWidget other label
+    gridAttach grid btn left top 1 1
+    return btn
+
 addCheckButton :: Grid -> String -> Int -> Int -> IO CheckButton
 addCheckButton grid label left top = do
     btn <- checkButtonNewWithLabel label
@@ -389,6 +402,45 @@ askRenameFields names control = do
     when (r == ResponseOk) $ do
         names <- mapM entryGetText centries
         sendInput control $ RenameFields names
+    widgetDestroy dlg
+
+askSortRows :: [String] -> GUIControl -> IO ()
+askSortRows names control = do
+    dlg <- dialogNew
+    set dlg [ windowTransientFor := mainWindow control
+            , windowModal := True
+            ]
+    dialogAddButton dlg
+                    ("Ascendente" :: String)
+                    (ResponseUser 1)
+    dialogAddButton dlg
+                    ("Descendente" :: String)
+                    (ResponseUser 2)
+    dialogAddButton dlg
+                    ("Cancelar" :: String)
+                    ResponseCancel
+    content <- castToContainer <$> dialogGetContentArea dlg
+    labelNew (Just ("Ordenar" :: String)) >>= containerAdd content
+
+    grid <- gridNew
+
+    btn <- addRadioButton grid (head names) 0 0
+    toggleButtonSetActive btn True
+    cbuttons <- (btn :) <$> (forM (enumerate $ tail names) $ \(row, name) ->
+        addRadioButtonFromWidget grid btn name 0 (row + 1))
+
+    actionArea <- castToContainer <$> dialogGetActionArea dlg
+    containerAdd actionArea grid
+
+    widgetShowAll dlg
+    r <- dialogRun dlg
+
+    unless (r == ResponseCancel) $ do
+        fp <- fst . head . filter snd . enumerate <$> mapM toggleButtonGetActive cbuttons
+        let order = case r of
+                        ResponseUser 1 -> Ascending
+                        ResponseUser 2 -> Descending
+        sendInput control $ SortRows fp order
     widgetDestroy dlg
 
 

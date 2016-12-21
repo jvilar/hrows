@@ -39,6 +39,7 @@ makeGUI iChan = do
                 prepareQuitButton
                 prepareFileMenu
                 prepareFieldMenu
+                prepareRecordMenu
                 prepareChangeFieldFormulaDialog
              ) (builder, control)
   return control
@@ -209,6 +210,14 @@ prepareFieldMenu = do
                      fieldMenuAction "changeToInt0MenuItem" (ChangeFieldType TypeInt0)
                      fieldMenuAction "changeToFloatMenuItem" (ChangeFieldType TypeDouble)
                      fieldMenuAction "changeToFloat0MenuItem" (ChangeFieldType TypeDouble0)
+
+prepareRecordMenu :: BuildMonad ()
+prepareRecordMenu = mapM_ (uncurry menuItemInput)
+                              [("newRowMenuItem", toInput NewRow)
+                              ,("deleteRowMenuItem", toInput DeleteRow)
+                              ,("sortRowsMenuItem", toInput SortRowsDialog)
+                              ]
+
 
 gray :: Color
 gray = Color 53000 53000 53000

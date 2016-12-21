@@ -4,6 +4,7 @@ module Model (
              , ModelChanged
              , Row
              , RowPos
+             , SortDirection(..)
              -- *Functions
              -- **Construction
              , emptyRow
@@ -32,6 +33,7 @@ module Model (
              , fieldValues
              , nextPos
              -- **Updating
+             , sortRows
              , setUnchanged
              , changeField
              , newFields
@@ -47,8 +49,9 @@ module Model (
 
 import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
-import Data.List(foldl', sort)
+import Data.List(foldl', sort, sortOn)
 import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
+import Data.Ord(Down(..))
 import Debug.Trace
 
 import Model.Expression
@@ -247,6 +250,20 @@ fnames model = fromMaybe
 -- |Returns the rows of the model.
 rows :: Model -> [Row]
 rows = IM.elems . _rows
+
+-- |The direction of a sort
+data SortDirection = Ascending | Descending deriving Show
+
+-- |Sort the rows of the model according to the field
+sortRows :: FieldPos -> SortDirection -> Model -> Model
+sortRows fp dir m = m { _changed = True
+                      , _rows = rows'
+                      }
+                    where rs = IM.elems $ _rows m
+                          sorted = case dir of
+                                      Ascending -> sortOn (!! fp) rs
+                                      Descending -> sortOn (Down . (!! fp)) rs
+                          rows' = IM.fromAscList $ zip [0..] sorted
 
 -- |Marks the model as unchanged
 setUnchanged :: Model -> Model
