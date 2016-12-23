@@ -14,6 +14,7 @@ loop = do
     i <- readline "% "
     case i of
         Nothing -> return ()
+	Just "exit" -> return ()
         Just formula -> do
             addHistory formula
             let expression = parse formula
