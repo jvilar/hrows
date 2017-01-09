@@ -3,7 +3,8 @@ module Presenter.Control (
                 ControlCommand(..)
                ) where
 
-data ControlCommand = ExitProgram
+data ControlCommand = ExitRequested
+                    | ExitProgram
                     | DoExit
                       deriving Show
 

@@ -4,10 +4,11 @@ module Presenter.FileAuto (
 ) where
 
 import Control.Auto(Auto, arrM)
-import Control.Exception(try)
-import Control.Monad(void, when)
+import Control.Exception(SomeException(..), try)
+import Control.Monad(unless, void, when)
 import Control.Monad.Trans(liftIO)
 import Data.Maybe(fromJust, isJust)
+import System.Directory(removeFile)
 
 import GUI.Command
 import HRowsException
@@ -57,8 +58,18 @@ applyCommand WriteBackup model info = do
     let ListatabFormat ltinfo = siFormat info
         fp = defaultBackupFileName <$> siFilePath info
         conf = defaultBackupFileName <$> siConfFile info
-    when (isJust fp) $ do
+    when (isJust fp && changed model) $ do
         r <- liftIO $ try $ toListatab ltinfo (fromJust fp) conf model
         case r of
             Right _ -> return ()
             Left (HRowsException m) -> message $ ErrorMessage ("Error al hacer la copia de seguridad: " ++ m)
+applyCommand RemoveBackup model info = do
+    let fp = defaultBackupFileName <$> siFilePath info
+        conf = defaultBackupFileName <$> siConfFile info
+    unless (changed model) $ do
+        r <- liftIO $ try $ do
+                 maybe (return ()) removeFile fp
+                 maybe (return ()) removeFile conf
+        return $ case r of
+                     Right _ -> ()
+                     Left (SomeException _) -> ()

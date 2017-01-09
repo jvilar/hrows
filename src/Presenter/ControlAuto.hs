@@ -10,11 +10,15 @@ import Model
 import GUI.Command
 import Presenter.Auto
 import Presenter.Control
+import Presenter.File
 
 controlAuto :: PresenterAuto (ControlCommand, ModelChanged) ()
 controlAuto = arrM processCommand
 
 processCommand :: (ControlCommand, ModelChanged) -> PresenterM ()
-processCommand (ExitProgram, c) = sendGUIM $ ShowIteration (ConfirmExit c)
+processCommand (ExitRequested, c) = sendGUIM $ ShowIteration (ConfirmExit c)
+processCommand (ExitProgram, _) = do
+                                    sendInputM RemoveBackup
+                                    sendInputM DoExit
 processCommand (DoExit, _) = liftIO exitSuccess
 

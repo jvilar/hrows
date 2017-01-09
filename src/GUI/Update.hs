@@ -258,11 +258,11 @@ confirmExit changed control = do
 
   r <- dialogRun dlg
   when (r == ResponseYes) $ do
-                        sendInput control DoExit
+                        sendInput control ExitProgram
                         mainQuit
   when (r == ResponseUser 1) $ do
                         sendInput control WriteFile
-                        sendInput control DoExit
+                        sendInput control ExitProgram
                         mainQuit
   widgetDestroy dlg
 

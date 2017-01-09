@@ -142,7 +142,7 @@ prepareControl iChan builder = do
 
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
              , (("Page_Up", []), toInput MovePrevious)
-             , (("q", [Control]), toInput ExitProgram)
+             , (("q", [Control]), toInput ExitRequested)
              , (("Return", []), toInput DoNothing)
              ]
 
@@ -152,7 +152,7 @@ prepareMainWindow = do
   control <- getControl
   liftIO $ do
       void (window `on` deleteEvent $ do
-        liftIO $ sendInput control ExitProgram
+        liftIO $ sendInput control ExitRequested
         return False)
       void (window `on` keyPressEvent $ do
           name <- eventKeyName
@@ -187,14 +187,14 @@ prepareRecordButtons = buttons
                        ]
 
 prepareQuitButton :: BuildMonad ()
-prepareQuitButton = buttonAction "quitButton" ExitProgram
+prepareQuitButton = buttonAction "quitButton" ExitRequested
 
 prepareFileMenu :: BuildMonad ()
 prepareFileMenu  = mapM_ (uncurry menuItemInput)
                              [("openMenuItem", toInput LoadFileDialog)
                              ,("saveMenuItem",  toInput WriteFile)
                              ,("saveAsMenuItem", toInput SaveAsFileDialog)
-                             ,("quitMenuItem", toInput ExitProgram)
+                             ,("quitMenuItem", toInput ExitRequested)
                              ,("createFieldsMenuItem", toInput CreateFieldsDialog)
                              ,("deleteFieldsMenuItem", toInput DeleteFieldsDialog)
                              ,("changeNamesMenuItem", toInput ChangeNamesDialog)
