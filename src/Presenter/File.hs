@@ -19,6 +19,6 @@ data FileCommand = LoadFile
                  | WriteFile
                  | WriteFileFromName FilePath (Maybe FilePath)
                  | WriteBackup
-                 | RemoveBackup
+                 | BackupOnExit
                  deriving Show
 
