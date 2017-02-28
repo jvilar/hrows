@@ -152,13 +152,6 @@ createFieldLabel f control = do
 dndError :: GUIControl -> IO ()
 dndError control = writeChan (inputChan control) . toInput $ MessageDialog (ErrorMessage "Algo está mal en el dnd")
 
-storeBuffer :: TextBuffer -> FieldPos -> GUIControl -> IO ()
-storeBuffer buffer f control = do
-    begin <- textBufferGetStartIter buffer
-    end <- textBufferGetEndIter buffer
-    text <- textBufferGetText buffer begin end False
-    writeChan (inputChan control) (toInput $ UpdateField f (toField (text::String)))
-
 createFieldTextView :: FieldPos -> GUIControl -> IO TextView
 createFieldTextView f control = do
          textView <- textViewNew
@@ -170,8 +163,12 @@ createFieldTextView f control = do
                       , widgetHExpand := True
                       ]
          buffer <- textViewGetBuffer textView
-         textView `on` keyReleaseEvent $ liftIO $ storeBuffer buffer f control >> return False
-         textView `on` pasteClipboard $ liftIO $ storeBuffer buffer f control
+         buffer `on` bufferChanged $ liftIO $ do
+             begin <- textBufferGetStartIter buffer
+             end <- textBufferGetEndIter buffer
+             text <- textBufferGetText buffer begin end False
+             writeChan (inputChan control) (toInput $ UpdateField f (toField (text::String)))
+
          textView `on` buttonPressEvent $ do
              button <- eventButton
              if button == RightButton
@@ -179,11 +176,6 @@ createFieldTextView f control = do
                       writeIORef (currentField control) f
                       menuPopup (fieldMenu control) Nothing
                       return True
-             else return False
-         textView `on` buttonReleaseEvent $ do
-             button <- eventButton
-             if button == MiddleButton
-             then liftIO $ storeBuffer buffer f control >> return True
              else return False
          return textView
 
