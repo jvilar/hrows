@@ -17,6 +17,8 @@ dialogAuto = arrM $ \(input, model, pos) -> sendGUIM $ case input of
                                              SaveAsFileDialog -> ShowIteration AskWriteFile
                                              CreateFieldsDialog -> ShowIteration AskCreateField
                                              DeleteFieldsDialog -> ShowIteration (AskDeleteFields $ fnames model)
+                                             ImportFieldsFromDialog -> ShowIteration AskImportFieldsFrom
+                                             ChooseImportFieldsDialog m -> ShowIteration (AskImportFieldsOptions (fnames m) (fnames model) m)
                                              ChangeNamesDialog -> ShowIteration (AskRenameFields $ fnames model)
                                              SortRowsDialog -> ShowIteration (AskSortRows $ fnames model)
                                              MessageDialog m -> ShowIteration (DisplayMessage m)

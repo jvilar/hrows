@@ -7,6 +7,7 @@ import Control.Concurrent(forkIO, threadDelay)
 import Control.Concurrent.Chan(Chan, newChan, writeChan, writeList2Chan)
 import Control.Lens (makeLenses, (^.), set, Getting)
 import Control.Monad(forM_, unless, void, when)
+import Data.Default(Default(..))
 import Data.Maybe(fromJust, isJust)
 import Graphics.UI.Gtk (mainGUI, postGUIAsync)
 import System.Directory (doesFileExist)
@@ -20,6 +21,7 @@ import GUI.Build
 import GUI.Update
 import Model
 import Model.DefaultFileNames
+import Model.SourceInfo
 import Presenter
 
 data Options = Options { _help :: Bool
@@ -31,21 +33,21 @@ data Options = Options { _help :: Bool
 
 makeLenses ''Options
 
-defaultOptions :: Options
-defaultOptions = Options  { _help = False
-                          , _inputFileName = Nothing
-                          , _confFileName = Nothing
-                          , _inputSeparator = '\t'
-                          , _outputSeparator = '\t'
-                          }
+instance Default Options where
+    def = Options  { _help = False
+                   , _inputFileName = Nothing
+                   , _confFileName = Nothing
+                   , _inputSeparator = ltInputSeparator def
+                   , _outputSeparator = ltOutputSeparator def
+                   }
 
-def :: Show a => Getting a Options a -> String
-def field = "Default: " ++ show (defaultOptions ^. field) ++ "."
+defValue :: Show a => Getting a Options a -> String
+defValue field = "Default: " ++ show (def ^. field) ++ "."
 
 options :: [OptDescr (Options -> Options)]
 options = processOptions $ do
               'h' ~: s "help" ==> NoArg (set help True) ~: s "This help."
-              's' ~: s "separator" ==> ReqArg ((\c -> set inputSeparator c . set outputSeparator c) . head) "SEP" ~: s "Separator for input of listatab files. " ++ def inputSeparator
+              's' ~: s "separator" ==> ReqArg ((\c -> set inputSeparator c . set outputSeparator c) . head) "SEP" ~: s "Separator for input of listatab files. " ++ defValue inputSeparator
               'S' ~: s "oSeparator" ==> ReqArg (set outputSeparator . head) "SEP" ~: s "Separator for output listatab files. Default: use the one passed to separator."
           where s :: String -> String
                 s = id
@@ -54,7 +56,7 @@ getOptions :: IO Options
 getOptions = do
                args <- getArgs
                let (o, a, e) =  getOpt Permute options args
-               let opt = foldl (flip id) defaultOptions o
+               let opt = foldl (flip id) def o
                when (opt ^. help) $ putStrLn helpMessage >> exitSuccess
                unless (null e) $ myError $ concat e ++ helpMessage
                case a of
@@ -91,9 +93,9 @@ main = do
                 return $ if ex
                          then Just def
                          else Nothing
-  let ltinfo = ListatabInfo (opts ^. inputSeparator)
-                            (opts ^. outputSeparator)
-                            Comment
+  let ltinfo = def { ltInputSeparator = opts ^. inputSeparator,
+                     ltOutputSeparator = opts ^. outputSeparator
+                   }
       sinfo =  mkSourceInfo (opts ^. inputFileName) cnf ltinfo
 
   inputChan <- newChan

@@ -8,11 +8,13 @@ module GUI.Update (
 ) where
 
 import Control.Concurrent.Chan(writeChan)
-import Control.Monad(filterM, forM, forM_, unless, when)
+import Control.Monad(filterM, forM, forM_, guard, unless, when)
 import Control.Monad.IO.Class(liftIO)
+import Data.Either(lefts, rights)
 import Data.IORef(readIORef, writeIORef)
 import Data.List(elemIndex)
 import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
+import Data.Text(Text)
 import qualified Data.Text as T
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
@@ -190,12 +192,15 @@ showIteration AskReadFile = askReadFile
 showIteration AskWriteFile = askWriteFile
 showIteration AskCreateField = askCreateField
 showIteration (AskDeleteFields fs) = askDeleteFields fs
+showIteration AskImportFieldsFrom = askImportFieldsFrom
+showIteration (AskImportFieldsOptions ifs cfs m) = askImportFieldsOptions ifs cfs m
 showIteration (AskRenameFields fs) = askRenameFields fs
 showIteration (AskSortRows fs) = askSortRows fs
 showIteration (DisplayMessage m) = displayMessage m
 showIteration (ConfirmExit changed) = confirmExit changed
 showIteration (GetFieldFormula fpos flabel ms) = getFieldFormula fpos flabel ms
 showIteration (SearchField fpos initial l) = searchField fpos initial l
+showIteration it = unimplemented $ show it
 
 displayMessage :: Message -> GUIControl -> IO ()
 displayMessage (ErrorMessage m) = noResponseMessage m MessageError
@@ -219,16 +224,19 @@ askReadFile = askFile loadFileDialog confFileLoadCheckButton LoadFileFromName
 askWriteFile :: GUIControl -> IO ()
 askWriteFile = askFile saveAsDialog confFileSaveCheckButton WriteFileFromName
 
-
 askFile :: IsInput t => (GUIControl -> FileChooserDialog)
                      -> (GUIControl -> CheckButton)
                      -> (FilePath -> Maybe FilePath -> t)
                      -> GUIControl -> IO ()
 askFile dlg btn input control = do
-    r <- dialogRun (dlg control)
-    widgetHide (dlg control)
+    let dialog = dlg control
+    set dialog [ windowTransientFor := mainWindow control
+               , windowModal := True
+               ]
+    r <- dialogRun dialog
+    widgetHide dialog
     when (r == ResponseOk) $ do
-            file <- fileChooserGetFilename (dlg control)
+            file <- fileChooserGetFilename dialog
             when (isJust file) $ do
                 chk <- toggleButtonGetActive (btn control)
                 let fp = fromJust file
@@ -236,6 +244,74 @@ askFile dlg btn input control = do
                            then defaultConfFileName <$> file
                            else Nothing
                 sendInput control $ input fp conf
+
+askImportFieldsFrom :: GUIControl -> IO ()
+askImportFieldsFrom control = do
+    let dialog = importFieldsFromFileDialog control
+    set dialog [ windowTransientFor := mainWindow control
+               , windowModal := True
+               ]
+    r <- dialogRun dialog
+    widgetHide dialog
+    when (r == ResponseOk) $ do
+        file <- fileChooserGetFilename dialog
+        separator <- translateChar <$> entryGetText (importFieldsInputSeparator control)
+        when (isJust file) $ sendInput control $ ImportFieldsFromFileName (fromJust file) separator
+
+askImportFieldsOptions :: [String] -> [String] -> Model -> GUIControl -> IO ()
+askImportFieldsOptions ifs cfs m control = do
+    let dialog = importFieldsOptionsDialog control
+    let grid = importFieldsOptionsRows control
+
+    gridSetRowSpacing grid 3
+    gridSetColumnSpacing grid 9
+    children <- containerGetChildren grid
+    forM_ children widgetDestroy
+
+    let ifst = "" : map T.pack ifs
+        options = ["", "<-", "=="] :: [Text]
+    forM_ (enumerate cfs) $ \(row, current) -> do
+        lbl <- addLabel grid current 0 row
+        widgetSetHAlign lbl AlignStart
+        btn <- addButton grid "" 1 row
+        btn `on` buttonActivated $ do
+            l <- buttonGetLabel btn
+            let Just n = elemIndex l options
+                n' = (n+1) `mod` (length options)
+            buttonSetLabel btn (options !! n')
+        addComboBox grid ifst 2 row
+
+    widgetShowAll dialog
+    r <- dialogRun dialog
+    set dialog [ windowTransientFor := mainWindow control
+               , windowModal := True
+               , windowTypeHint := WindowTypeHintDialog
+               , windowWindowPosition := WinPosCenterOnParent
+               ]
+    widgetHide dialog
+
+    when (r == ResponseOk) $ do
+        l <- catMaybes <$> (forM (enumerate cfs) $ \(row, _) -> do
+            Just b <- gridGetChildAt grid 1 row
+            let btn = castToButton b
+            option <- buttonGetLabel btn
+            Just cb <- gridGetChildAt grid 2 row
+            let cbox = castToComboBox cb
+            i <- comboBoxGetActive cbox
+            return $ if i== 0 || option == ("" :: Text)
+                     then Nothing
+                     else Just $ case option of
+                                     "<-" -> Left (row, i)
+                                     "==" -> Right (row, i)
+           )
+        let keys = rights l
+            values = lefts l
+        sendInput control $ ImportFieldsFromModel m keys values
+
+translateChar :: String -> Char
+translateChar "\\t" = '\t'
+translateChar ('\\':[c]) = c
+translateChar (c:_) = c
 
 confirmExit :: Bool -> GUIControl -> IO ()
 confirmExit changed control = do
@@ -284,7 +360,7 @@ askCreateField control = do
     grid <- gridNew
     addLabel grid "Nombre" 0 0
     addLabel grid "Tipo" 1 0
-    entries <- forM [1..5] $ \row -> (,)
+    entries <- forM [1..10] $ \row -> (,)
                                     <$> addEntry grid 0 row
                                     <*> addComboBox grid (map snd typeLabels) 1 row
 
@@ -305,10 +381,17 @@ askCreateField control = do
         unless (null fields) $ sendInput control $ NewFields fields
     widgetDestroy dlg
 
-addLabel :: Grid -> String -> Int -> Int -> IO ()
+addLabel :: Grid -> String -> Int -> Int -> IO Label
 addLabel grid text left top = do
     lbl <- labelNew $ Just text
     gridAttach grid lbl left top 1 1
+    return lbl
+
+addButton :: Grid -> String -> Int -> Int -> IO Button
+addButton grid label left top = do
+    btn <- buttonNewWithLabel label
+    gridAttach grid btn left top 1 1
+    return btn
 
 addRadioButton :: Grid -> String -> Int -> Int -> IO RadioButton
 addRadioButton grid label left top = do
@@ -325,6 +408,12 @@ addRadioButtonFromWidget grid other label left top = do
 addCheckButton :: Grid -> String -> Int -> Int -> IO CheckButton
 addCheckButton grid label left top = do
     btn <- checkButtonNewWithLabel label
+    gridAttach grid btn left top 1 1
+    return btn
+
+addSimpleCheckButton :: Grid -> Int -> Int -> IO CheckButton
+addSimpleCheckButton grid left top = do
+    btn <- checkButtonNew
     gridAttach grid btn left top 1 1
     return btn
 

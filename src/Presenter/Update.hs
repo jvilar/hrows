@@ -17,6 +17,7 @@ data UpdateCommand = UpdateField FieldPos Field
                    | NewFields [(String, FieldType)]
                    | DeleteFields [FieldPos]
                    | RenameFields [String]
+                   | ImportFieldsFromModel Model [(FieldPos, FieldPos)] [(FieldPos, FieldPos)] -- ^Model, keys,  fields to replace
                    | MoveField FieldPos FieldPos
                    | ChangeFieldType FieldType FieldPos
                    | ChangeFieldFormula (Maybe Formula) FieldPos

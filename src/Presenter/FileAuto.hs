@@ -7,6 +7,7 @@ import Control.Auto(Auto, arrM)
 import Control.Exception(SomeException(..), try)
 import Control.Monad(unless, void, when)
 import Control.Monad.Trans(liftIO)
+import Data.Default(def)
 import Data.Maybe(fromJust, isJust)
 import System.Directory(removeFile)
 
@@ -54,6 +55,12 @@ applyCommand (WriteFileFromName fp conf) model info = do
                           when (Just fp /= siFilePath info) $
                               sendInputM $ SetSource (changeFileName fp info)
             Left (HRowsException m) -> message $ ErrorMessage m
+applyCommand (ImportFieldsFromFileName fp separator) _ _ = do
+    r <- liftIO $ try $ fromListatab def { ltInputSeparator = separator} fp Nothing
+    case r of
+        Right m -> sendInputM $ ChooseImportFieldsDialog m
+        Left (HRowsException m) -> message $ ErrorMessage m
+
 applyCommand WriteBackup model info = do
     let ListatabFormat ltinfo = siFormat info
         fp = defaultBackupFileName <$> siFilePath info

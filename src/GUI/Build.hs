@@ -109,6 +109,10 @@ prepareControl iChan builder = do
   sDialog <- getObject castToFileChooserDialog "saveAsDialog"
   confLButton <- getObject castToCheckButton "confFileLoadCheckButton"
   lDialog <- getObject castToFileChooserDialog "loadFileDialog"
+  ifDialog <- getObject castToFileChooserDialog "importFieldsFromFileDialog"
+  ifEntry <- getObject castToEntry "importFieldsInputSeparator"
+  ifoDialog <- getObject castToDialog "importFieldsOptionsDialog"
+  ifRows <- getObject castToGrid "importFieldsOptionsRows"
   tlist <- targetListNew
   targetListAddTextTargets tlist 0
 
@@ -135,6 +139,10 @@ prepareControl iChan builder = do
                     , saveAsDialog = sDialog
                     , confFileLoadCheckButton = confLButton
                     , loadFileDialog = lDialog
+                    , importFieldsFromFileDialog = ifDialog
+                    , importFieldsInputSeparator = ifEntry
+                    , importFieldsOptionsDialog = ifoDialog
+                    , importFieldsOptionsRows = ifRows
                     , targetList = tlist
                     , searchFieldDialog = sfDialog
                     , searchFieldCombo = sfCombo
@@ -197,6 +205,7 @@ prepareFileMenu  = mapM_ (uncurry menuItemInput)
                              ,("quitMenuItem", toInput ExitRequested)
                              ,("createFieldsMenuItem", toInput CreateFieldsDialog)
                              ,("deleteFieldsMenuItem", toInput DeleteFieldsDialog)
+                             ,("importFieldsMenuItem", toInput ImportFieldsFromDialog)
                              ,("changeNamesMenuItem", toInput ChangeNamesDialog)
                              ]
 

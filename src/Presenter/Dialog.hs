@@ -3,12 +3,15 @@ module Presenter.Dialog (
               DialogCommand(..)
 ) where
 
+import Model
 import Message
 
 data DialogCommand = LoadFileDialog
                    | SaveAsFileDialog
                    | CreateFieldsDialog
                    | DeleteFieldsDialog
+                   | ImportFieldsFromDialog
+                   | ChooseImportFieldsDialog Model
                    | ChangeNamesDialog
                    | SortRowsDialog
                    | MessageDialog Message

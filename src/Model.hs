@@ -39,6 +39,7 @@ module Model (
              , newFields
              , deleteFields
              , renameFields
+             , importFields
              , moveField
              , changeFieldType
              , changeFieldFormula
@@ -340,6 +341,15 @@ renameFields names m = addPlan m { _fieldInfo = zipWith updateFInfo (_fieldInfo 
                                         , _formula = Just $ toFormula e'
                                         }
 
+-- |Imports fields from another model.
+importFields :: Model -> [(FieldPos, FieldPos)] -> [(FieldPos, FieldPos)] -> Model -> Model
+importFields other keys values m = addPlan m { _rows = IM.map importRow (_rows m) }
+    where importRow r = case findRow r keys otherElems of
+                            Nothing -> r
+                            Just r' -> replace values r r'
+              where findRow r keys l = undefined
+                    replace = undefined
+                    otherElems = IM.elems $ _rows other
 -- |Move a field to the position just next to the other
 moveField :: FieldPos -> FieldPos -> Model -> Model
 moveField from to m = let
