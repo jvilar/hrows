@@ -70,13 +70,12 @@ applyCommand WriteBackup model info = do
         case r of
             Right _ -> return ()
             Left (HRowsException m) -> message $ ErrorMessage ("Error al hacer la copia de seguridad: " ++ m)
-applyCommand RemoveBackup model info = do
-    let fp = defaultBackupFileName <$> siFilePath info
-        conf = defaultBackupFileName <$> siConfFile info
-    unless (changed model) $ do
-        r <- liftIO $ try $ do
-                 maybe (return ()) removeFile fp
-                 maybe (return ()) removeFile conf
-        return $ case r of
-                     Right _ -> ()
-                     Left (SomeException _) -> ()
+applyCommand BackupOnExit model info
+    | changed model = applyCommand WriteBackup model info
+    | otherwise = do
+                    let fp = defaultBackupFileName <$> siFilePath info
+                        conf = defaultBackupFileName <$> siConfFile info
+                    r <- liftIO $ try $ do
+                              maybe (return ()) removeFile fp
+                              maybe (return ()) removeFile conf
+                    return $ const () (r :: Either SomeException ())

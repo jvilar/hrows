@@ -9,6 +9,6 @@ data FileCommand = LoadFile
                  | WriteFileFromName FilePath (Maybe FilePath)
                  | ImportFieldsFromFileName FilePath Char
                  | WriteBackup
-                 | RemoveBackup
+                 | BackupOnExit
                  deriving Show
 

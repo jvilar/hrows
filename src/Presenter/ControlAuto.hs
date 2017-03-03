@@ -18,7 +18,7 @@ controlAuto = arrM processCommand
 processCommand :: (ControlCommand, ModelChanged) -> PresenterM ()
 processCommand (ExitRequested, c) = sendGUIM $ ShowIteration (ConfirmExit c)
 processCommand (ExitProgram, _) = do
-                                    sendInputM RemoveBackup
+                                    sendInputM BackupOnExit
                                     sendInputM DoExit
 processCommand (DoExit, _) = liftIO exitSuccess
 
