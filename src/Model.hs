@@ -51,6 +51,8 @@ module Model (
 import Data.IntMap.Strict(IntMap)
 import qualified Data.IntMap.Strict as IM
 import Data.List(foldl', sort, sortOn)
+import Data.Map(Map)
+import qualified Data.Map as M
 import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import Data.Ord(Down(..))
 import Debug.Trace
@@ -343,13 +345,27 @@ renameFields names m = addPlan m { _fieldInfo = zipWith updateFInfo (_fieldInfo 
 
 -- |Imports fields from another model.
 importFields :: Model -> [(FieldPos, FieldPos)] -> [(FieldPos, FieldPos)] -> Model -> Model
-importFields other keys values m = addPlan m { _rows = IM.map importRow (_rows m) }
-    where importRow r = case findRow r keys otherElems of
+importFields other keys values m = traceShow (keys, values) addPlan m { _rows = IM.map importRow (_rows m) }
+    where importRow r = case findRow r of
                             Nothing -> r
-                            Just r' -> replace values r r'
-              where findRow r keys l = undefined
-                    replace = undefined
-                    otherElems = IM.elems $ _rows other
+                            Just vals' -> replace r vals'
+              where findRow r = M.lookup (key r) keyTable
+                    key r = map (r !!) $ map fst keys
+                    replace = go 0
+                              where go _ [] _ = []
+                                    go _ l [] = l
+                                    go n (f:fs) ((pos, val):rest) | n /= pos = f : go (n+1) fs ((pos, val):rest)
+                                                                  | otherwise = val : go (n+1) fs rest
+                    keyTable = traceShowId $ prepareKeyTable keys values (IM.elems $ _rows other)
+
+-- |Returns a table that associates to each valid combination of
+-- fields the corresponding value.
+prepareKeyTable :: [(FieldPos, FieldPos)] -> [(FieldPos, FieldPos)] -> [Row] -> Map [Field] [(FieldPos, Field)]
+prepareKeyTable keys values other = M.fromList asig
+    where asig = [(key r, valuesOf r) | r <- other]
+          key r = map (r !!) $ map snd keys
+          valuesOf r = sort [(i, r !! o) | (i, o) <- values]
+
 -- |Move a field to the position just next to the other
 moveField :: FieldPos -> FieldPos -> Model -> Model
 moveField from to m = let

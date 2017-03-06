@@ -48,6 +48,8 @@ update model (DeleteFields fs, pos) =
     completeRefresh pos $ deleteFields fs model
 update model (RenameFields names, pos) =
     completeRefresh pos $ renameFields names model
+update model (ImportFieldsFromModel m keys values, pos) =
+    partialRefresh pos $ importFields m keys values model
 update model (MoveField f t, pos) = do
     completeRefresh pos $ moveField f t model
 update model (ChangeFieldType t f, pos) =

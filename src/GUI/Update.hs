@@ -298,11 +298,11 @@ askImportFieldsOptions ifs cfs m control = do
             Just cb <- gridGetChildAt grid 2 row
             let cbox = castToComboBox cb
             i <- comboBoxGetActive cbox
-            return $ if i== 0 || option == ("" :: Text)
+            return $ if i == 0 || option == ("" :: Text)
                      then Nothing
                      else Just $ case option of
-                                     "<-" -> Left (row, i)
-                                     "==" -> Right (row, i)
+                                     "<-" -> Left (row, i - 1)
+                                     "==" -> Right (row, i - 1)
            )
         let keys = rights l
             values = lefts l
