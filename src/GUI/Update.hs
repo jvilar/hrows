@@ -66,12 +66,13 @@ showFields fis control = do
   let grid = fieldsGrid control
 
   forM_ fis $ \fi -> do
-                       textView <- recoverColumnView (indexFI fi) control
                        let tooltip = fromMaybe (typeLabel $ typeFI fi) $ formulaFI fi
+                       label <- recoverLabel (indexFI fi) control
+                       set label [ widgetTooltipText := Just tooltip ]
+                       textView <- recoverTextView (indexFI fi) control
                        set textView [ textViewEditable := isNothing $ formulaFI fi
                                     , widgetCanFocus := isNothing $ formulaFI fi
                                     , widgetState := StateNormal
-                                    , widgetTooltipText := Just tooltip
                                     ]
                        widgetModifyBg textView StateNormal $ if isErrorFI fi
                                                              then errorColor
@@ -83,16 +84,22 @@ showFields fis control = do
                             textBufferSetText buffer
   widgetShowAll grid
 
-recoverColumnView :: Int -> GUIControl -> IO TextView
-recoverColumnView c control = do
-    Just tv <- gridGetChildAt (fieldsGrid control) 1 c
+recoverTextView :: Int -> GUIControl -> IO TextView
+recoverTextView row control = do
+    Just tv <- gridGetChildAt (fieldsGrid control) 1 row
     return $ castToTextView tv
+
+recoverLabel :: Int -> GUIControl -> IO Label
+recoverLabel row control = do
+    Just ebox <- gridGetChildAt (fieldsGrid control) 0 row
+    lbl <- head <$> containerGetChildren (castToEventBox ebox)
+    return $ castToLabel lbl
 
 disableTextViews :: GUIControl -> IO ()
 disableTextViews control = do
   nfields <- readIORef $ numberOfFields control
   forM_ [0..nfields-1] $ \f -> do
-                                textView <- recoverColumnView f control
+                                textView <- recoverTextView f control
                                 set textView [ textViewEditable := False
                                              , widgetCanFocus := False
                                              , widgetState := StateInsensitive
@@ -105,9 +112,8 @@ updateNames names control = do
   adjustTextFields (length names) control
 
   forM_ (enumerate names) $ \(r, name) -> do
-                             Just ebox <- gridGetChildAt grid 0 r
-                             containerForeach (castToEventBox ebox) $ \lbl ->
-                                 labelSetText (castToLabel lbl) name
+                             label <- recoverLabel r control
+                             labelSetText label name
   widgetShowAll grid
 
 adjustTextFields :: Int -> GUIControl -> IO ()
