@@ -345,7 +345,7 @@ renameFields names m = addPlan m { _fieldInfo = zipWith updateFInfo (_fieldInfo 
 
 -- |Imports fields from another model.
 importFields :: Model -> [(FieldPos, FieldPos)] -> [(FieldPos, FieldPos)] -> Model -> Model
-importFields other keys values m = traceShow (keys, values) addPlan m { _rows = IM.map importRow (_rows m) }
+importFields other keys values m = addPlan m { _rows = IM.map importRow (_rows m) }
     where importRow r = case findRow r of
                             Nothing -> r
                             Just vals' -> replace r vals'
@@ -356,7 +356,7 @@ importFields other keys values m = traceShow (keys, values) addPlan m { _rows = 
                                     go _ l [] = l
                                     go n (f:fs) ((pos, val):rest) | n /= pos = f : go (n+1) fs ((pos, val):rest)
                                                                   | otherwise = val : go (n+1) fs rest
-                    keyTable = traceShowId $ prepareKeyTable keys values (IM.elems $ _rows other)
+                    keyTable = prepareKeyTable keys values (IM.elems $ _rows other)
 
 -- |Returns a table that associates to each valid combination of
 -- fields the corresponding value.
