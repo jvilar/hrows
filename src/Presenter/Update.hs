@@ -21,4 +21,5 @@ data UpdateCommand = UpdateField FieldPos Field
                    | MoveField FieldPos FieldPos
                    | ChangeFieldType FieldType FieldPos
                    | ChangeFieldFormula (Maybe Formula) FieldPos
+                   | SetUnchanged
                      deriving Show

@@ -56,6 +56,7 @@ update model (ChangeFieldType t f, pos) =
     partialRefresh pos $ changeFieldType t f model
 update model (ChangeFieldFormula mf f, pos) =
     partialRefresh pos $ changeFieldFormula mf f model
+update model (SetUnchanged, _) = return $ setUnchanged model
 
 cnames :: Model -> [String]
 cnames = map (++ ": ") . fnames

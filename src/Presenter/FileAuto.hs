@@ -42,19 +42,10 @@ applyCommand (LoadFileFromName n conf) model info = do
     let info' = changeFileName n $
                 changeConfFileName conf info
     applyCommand LoadFile model info'
-applyCommand WriteFile model info = applyCommand (WriteFileFromName fp (siConfFile info)) model info
-        where ListatabFormat ltinfo = siFormat info
-              Just fp = siFilePath info
-applyCommand (WriteFileFromName fp conf) model info = do
-        let ListatabFormat ltinfo = siFormat info
-        r <- liftIO $ try $ toListatab ltinfo fp conf model
-        case r of
-            Right _ -> do
-                          message $ InformationMessage "Fichero escrito correctamente."
-                          sendInputM $ ChangeModel (setUnchanged model)
-                          when (Just fp /= siFilePath info) $
-                              sendInputM $ SetSource (changeFileName fp info)
-            Left (HRowsException m) -> message $ ErrorMessage m
+applyCommand WriteFile model info = doWrite (fromJust $ siFilePath info) (siConfFile info) model info False
+
+applyCommand (WriteFileFromName fp conf) model info = doWrite fp conf model info True
+
 applyCommand (ImportFieldsFromFileName fp separator) _ _ = do
     r <- liftIO $ try $ fromListatab def { ltInputSeparator = separator} fp Nothing
     case r of
@@ -79,3 +70,14 @@ applyCommand BackupOnExit model info
                               maybe (return ()) removeFile fp
                               maybe (return ()) removeFile conf
                     return $ const () (r :: Either SomeException ())
+
+doWrite :: FilePath -> (Maybe FilePath) -> Model -> SourceInfo -> Bool -> PresenterM ()
+doWrite fp conf model info changedSource = do
+        let ListatabFormat ltinfo = siFormat info
+        r <- liftIO $ try $ toListatab ltinfo fp conf model
+        case r of
+            Right _ -> do
+                          message $ InformationMessage "Fichero escrito correctamente."
+                          when changedSource $ sendInputM $ SetSource (changeFileName fp info)
+                          sendInputM SetUnchanged
+            Left (HRowsException m) -> message $ ErrorMessage m
