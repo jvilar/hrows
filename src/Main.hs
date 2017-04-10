@@ -88,9 +88,11 @@ main = do
   cnf <- if isJust $ opts ^. confFileName
          then return $ opts ^. confFileName
          else do
-                let def = defaultConfFileName . fromJust $ opts ^. inputFileName
-                ex <- doesFileExist def
-                return $ if ex
+                let Just fn = opts ^. inputFileName
+                    def = defaultConfFileName fn
+                exFn <- doesFileExist fn
+                exCnf <- doesFileExist def
+                return $ if exFn == exCnf
                          then Just def
                          else Nothing
   let ltinfo = def { ltInputSeparator = opts ^. inputSeparator,

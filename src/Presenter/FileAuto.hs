@@ -61,6 +61,7 @@ applyCommand WriteBackup model info = do
         case r of
             Right _ -> return ()
             Left (HRowsException m) -> message $ ErrorMessage ("Error al hacer la copia de seguridad: " ++ m)
+
 applyCommand BackupOnExit model info
     | changed model = applyCommand WriteBackup model info
     | otherwise = do
