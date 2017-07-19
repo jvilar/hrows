@@ -23,7 +23,7 @@ import Control.Monad(when)
 import Control.Monad.Reader(Reader, ask, runReader)
 import Control.Monad.Writer(tell, runWriter)
 import Data.Char(isAlphaNum)
-import Data.List(elemIndex)
+import Data.List(foldr1, elemIndex)
 import Data.Maybe(fromMaybe)
 import Data.Monoid(Any(..))
 import Model.Field
@@ -47,6 +47,7 @@ data Expression = Position Int
                 | Constant Field
                 | Unary UnaryOpInfo Expression
                 | Binary BinaryOpInfo Expression Expression
+                | Ternary Expression Expression Expression
                 | Cast FieldType Expression
                 | Error String
                 deriving Show
@@ -80,6 +81,7 @@ transform t (Binary info e1 e2) = let
                                     e2' = transform t e2
                                   in t (Binary info e1' e2')
 transform t (Cast ft e) = t (Cast ft $ transform t e)
+transform t (Ternary e1 e2 e3) = t (Ternary (transform t e1) (transform t e2) (transform t e3))
 transform t e = t e
 
 transformM :: Monad m =>  (Expression -> m Expression) -> Expression -> m Expression
@@ -89,6 +91,11 @@ transformM t (Binary info e1 e2) = do
     e2' <- transformM t e2
     t (Binary info e1' e2')
 transformM t (Cast ft e) = transformM t e >>= t . Cast ft
+transformM t (Ternary e1 e2 e3) = do
+    e1' <- transformM t e1
+    e2' <- transformM t e2
+    e3' <- transformM t e3
+    t (Ternary e1' e2' e3')
 transformM t e = t e
 
 evaluate :: Row -> Expression -> Field
@@ -109,11 +116,18 @@ toFormula (Binary info e1 e2) = let
                      NoAssoc -> (prioB info + 1, prioB info + 1)
     in parent pe1 e1 ++ formulaB info ++ parent pe2 e2
 toFormula (Cast ft e) = typeOperator ft ++ "(" ++ toFormula e ++ ")"
+toFormula (Ternary e1 e2 e3) = let
+    f1 = parent 1 e1
+    f2 = parent 0 e2
+    f3 = parent 0 e3
+    in f1 ++ "?" ++ f2 ++ ":" ++ f3
 toFormula (Error s) = "Error: " ++ s
 
 parent :: Priority -> Expression -> String
 parent p e@(Binary info _ _ ) | prioB info >= p = toFormula e
                               | otherwise = "(" ++ toFormula e ++ ")"
+parent p e@(Ternary _ _ _) | p < 1 = toFormula e
+                           | otherwise = "(" ++ toFormula e ++ ")"
 parent _ e = toFormula e
 
 type Eval = Reader Row
@@ -124,6 +138,7 @@ eval (Constant f) = return f
 eval (Unary info exp) = opU info <$> eval exp
 eval (Binary info exp1 exp2) = opB info <$> eval exp1 <*> eval exp2
 eval (Cast ft exp) = convert ft <$> eval exp
+eval (Ternary e1 e2 e3) = ternary <$> eval e1 <*> eval e2 <*> eval e3
 eval (Error m) = return $ mkError m
 
 evalIndex :: Int -> Eval Field
@@ -167,6 +182,7 @@ getPositions (Constant f) = []
 getPositions (Unary _ exp) = getPositions exp
 getPositions (Binary _ exp1 exp2) = merge (getPositions exp1) (getPositions exp2)
 getPositions (Cast _ exp) = getPositions exp
+getPositions (Ternary exp1 exp2 exp3) = foldr1 merge $ map getPositions [exp1, exp2, exp3]
 getPositions (Error _) = []
 
 merge :: [Int] -> [Int] -> [Int]

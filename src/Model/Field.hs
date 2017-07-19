@@ -8,6 +8,7 @@ module Model.Field ( Field
                    -- *Constants
                    , typeLabels
                    -- *Functions
+                   -- **General
                    , typeOf
                    , toString
                    , typeLabel
@@ -16,6 +17,11 @@ module Model.Field ( Field
                    , mkError
                    , isError
                    , convert
+                   -- **Operators
+                   , andField
+                   , orField
+                   , compareField
+                   , ternary
                    ) where
 
 import Data.Aeson
@@ -158,6 +164,39 @@ nmap :: String -> (forall a. Num a => a -> a) -> (Field -> Field)
 nmap _ op (AInt n _) = toField $ op n
 nmap _ op (ADouble d _) = toField $ op d
 nmap name _ f = typeError name f
+
+andField :: Field -> Field -> Field
+andField e@(AnError _ _) _ = e
+andField _ e@(AnError _ _) = e
+andField (AInt n1 _) (AInt n2 _) | n1 > 0 && n2 > 0 = toField (1::Int)
+                                 | otherwise = toField (0::Int)
+andField f1 f2 = typeError2 "y lógico" f1 f2
+
+orField :: Field -> Field -> Field
+orField e@(AnError _ _) _ = e
+orField _ e@(AnError _ _) = e
+orField (AInt n1 _) (AInt n2 _) | n1 > 0 || n2 > 0 = toField (1::Int)
+                                | otherwise = toField (0::Int)
+orField f1 f2 = typeError2 "o lógico" f1 f2
+
+compareField :: (Field -> Field -> Bool) -> Field -> Field -> Field
+compareField _ e@(AnError _ _) _ = e
+compareField _ _ e@(AnError _ _) = e
+compareField cmp f1 f2 | not $ comparable (typeOf f1) (typeOf f2) = AnError TypeInt $ "Tipos no comparables: " ++ typeLabel (typeOf f1) ++ " y " ++ typeLabel (typeOf f2)
+                       | cmp f1 f2 = toField (1::Int)
+                       | otherwise = toField (0::Int)
+    where comparable t1 t2 = numeric t1 && numeric t2 || t1 == t2
+          numeric TypeInt = True
+          numeric TypeInt0 = True
+          numeric TypeDouble = True
+          numeric TypeDouble0 = True
+          numeric _ = False
+
+ternary :: Field -> Field -> Field -> Field
+ternary e@(AnError _ _) _ _ = e
+ternary (AInt n1 _) e2 e3 | n1 > 0 = e2
+                          | otherwise = e3
+ternary e1 _ _ = typeError "operador ?" e1
 
 instance Num Field where
     f@(AnError _ _) + _ = f

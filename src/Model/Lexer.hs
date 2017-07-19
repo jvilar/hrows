@@ -23,6 +23,17 @@ data Token = IntT Int
            | DivT
            | OpenT
            | CloseT
+           | EqualT
+           | NotEqualT
+           | LessThanT
+           | LessOrEqualT
+           | GreaterThanT
+           | GreaterOrEqualT
+           | AndT
+           | OrT
+           | NotT
+           | QuestionMarkT
+           | ColonT
            | CastT FieldType
            | EOFT
            | ErrorT String
@@ -116,16 +127,24 @@ tokenizer =
         (\c -> do
                 select [ (isDigit c, number)
                        , (isAlpha c, shortNamed)
-                       , (c == '"' , string)
-                       , (c == '$' , position)
-                       , (c == '@' , named)
                        , (c == '+' , emit AddT)
                        , (c == '-' , emit SubT)
                        , (c == '*' , emit MultT)
                        , (c == '/' , emit DivT)
                        , (c == '(' , emit OpenT)
                        , (c == ')' , emit CloseT)
+                       , (c == '=' , equal)
+                       , (c == '<' , less)
+                       , (c == '>' , greater)
+                       , (c == '!' , notSign)
+                       , (c == '&' , ampersand)
+                       , (c == '|' , bar)
+                       , (c == '?' , emit QuestionMarkT)
+                       , (c == ':' , emit ColonT)
                        , (isSpace c, omit)
+                       , (c == '"' , string)
+                       , (c == '$' , position)
+                       , (c == '@' , named)
                        , (otherwise , emitl ErrorT)
                        ]
                 tokenizer
@@ -172,6 +191,32 @@ position :: Tokenizer ()
 position = many1 isDigit
              (emitl ErrorT)
              (emitl $ PositionT . read . tail)
+
+equal :: Tokenizer ()
+equal = ifChar (== '=')
+           (emit EqualT)
+           (emit EqualT)
+
+less :: Tokenizer ()
+less = ifChar (== '=')
+           (emit LessOrEqualT)
+           (emit LessThanT)
+
+greater :: Tokenizer ()
+greater = ifChar (== '=')
+           (emit GreaterOrEqualT)
+           (emit GreaterThanT)
+
+notSign :: Tokenizer ()
+notSign = ifChar (== '=')
+           (emit NotEqualT)
+           (emit NotT)
+
+ampersand :: Tokenizer ()
+ampersand = needChar (== '&') $ emit AndT
+
+bar :: Tokenizer ()
+bar = needChar (== '|') $ emit OrT
 
 named :: Tokenizer ()
 named = needChar (== '{')
