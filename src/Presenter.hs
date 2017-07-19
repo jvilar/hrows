@@ -51,7 +51,7 @@ pr auto (i:is) = do
 
 processInput :: PresenterAuto Input ()
 processInput = proc inp -> do
---             arrM (liftIO . putStrLn) -< "inp: " ++ show inp
+             -- arrM (liftIO . putStrLn) -< "inp: " ++ show inp
              rec
                model <- processUpdateCommands -< (inp, pos)
                pos <- processMoveCommands -< (inp, model)
@@ -59,6 +59,8 @@ processInput = proc inp -> do
              processFileCommands -< (inp, model, si)
              processDialogCommands -< (inp, model, pos)
              processControlCommands -< (inp, changed model)
+             -- arrM (liftIO . putStrLn) -< "model changed: " ++ show (changed model)
+
 
 processUpdateCommands :: PresenterAuto (Input, RowPos) Model
 processUpdateCommands = proc (inp, pos) -> do
