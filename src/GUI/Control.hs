@@ -39,6 +39,7 @@ data GUIControl = GUIControl { mainWindow :: Window
                              , targetList :: TargetList
                              , searchFieldDialog :: Dialog
                              , searchFieldCombo :: ComboBox
+                             , textBufferConnections :: IORef [ ConnectId TextBuffer ]
                              }
 
 sendInput :: IsInput cmd => GUIControl -> cmd -> IO ()

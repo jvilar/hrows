@@ -115,6 +115,7 @@ prepareControl iChan builder = do
   ifRows <- getObject castToGrid "importFieldsOptionsRows"
   tlist <- targetListNew
   targetListAddTextTargets tlist 0
+  connections <- newIORef []
 
   sfDialog <- getObject castToDialog "searchFieldDialog"
   sfCombo <- getObject castToComboBox "searchFieldCombo"
@@ -146,6 +147,7 @@ prepareControl iChan builder = do
                     , targetList = tlist
                     , searchFieldDialog = sfDialog
                     , searchFieldCombo = sfCombo
+                    , textBufferConnections = connections
                     }
 
 globalKeys = [ (("Page_Down", []), toInput MoveNext)

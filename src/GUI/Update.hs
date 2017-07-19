@@ -79,9 +79,12 @@ showFields fis control = do
                                                              else if isJust $ formulaFI fi
                                                                   then formulaColor
                                                                   else normalColor
+                       connectId <- recoverConnectId (indexFI fi) control
+                       signalBlock connectId -- Don't update the model
                        buffer <- textViewGetBuffer textView
                        forM_ (textFI fi) $
                             textBufferSetText buffer
+                       signalUnblock connectId
   widgetShowAll grid
 
 recoverTextView :: Int -> GUIControl -> IO TextView
@@ -94,6 +97,12 @@ recoverLabel row control = do
     Just ebox <- gridGetChildAt (fieldsGrid control) 0 row
     lbl <- head <$> containerGetChildren (castToEventBox ebox)
     return $ castToLabel lbl
+
+recoverConnectId :: Int -> GUIControl -> IO (ConnectId TextBuffer)
+recoverConnectId row control = (!! row) <$> readIORef (textBufferConnections control)
+
+storeConnectIds :: [ConnectId TextBuffer] -> GUIControl -> IO ()
+storeConnectIds l control = writeIORef (textBufferConnections control) l
 
 disableTextViews :: GUIControl -> IO ()
 disableTextViews control = do
@@ -127,11 +136,14 @@ adjustTextFields nfields control = do
   writeIORef (numberOfFields control) nfields
 
 addFields :: Grid -> [FieldPos] -> GUIControl -> IO ()
-addFields grid fields control = forM_ fields $ \f -> do
-                 lbl <- createFieldLabel f control
-                 gridAttach grid lbl 0 f 1 1
-                 textView <- createFieldTextView f control
-                 gridAttach grid textView 1 f 1 1
+addFields grid fields control = do
+    connectIds <- forM fields $ \f -> do
+                     lbl <- createFieldLabel f control
+                     gridAttach grid lbl 0 f 1 1
+                     (textView, connectId) <- createFieldTextView f control
+                     gridAttach grid textView 1 f 1 1
+                     return connectId
+    storeConnectIds connectIds control
 
 createFieldLabel :: FieldPos -> GUIControl -> IO EventBox
 createFieldLabel f control = do
@@ -160,7 +172,7 @@ createFieldLabel f control = do
 dndError :: GUIControl -> IO ()
 dndError control = writeChan (inputChan control) . toInput $ MessageDialog (ErrorMessage "Algo está mal en el dnd")
 
-createFieldTextView :: FieldPos -> GUIControl -> IO TextView
+createFieldTextView :: FieldPos -> GUIControl -> IO (TextView, ConnectId TextBuffer)
 createFieldTextView f control = do
          textView <- textViewNew
          set textView [ textViewWrapMode := WrapWord
@@ -171,7 +183,7 @@ createFieldTextView f control = do
                       , widgetHExpand := True
                       ]
          buffer <- textViewGetBuffer textView
-         buffer `on` bufferChanged $ liftIO $ do
+         connectId <- buffer `on` bufferChanged $ liftIO $ do
              begin <- textBufferGetStartIter buffer
              end <- textBufferGetEndIter buffer
              text <- textBufferGetText buffer begin end False
@@ -185,7 +197,7 @@ createFieldTextView f control = do
                       menuPopup (fieldMenu control) Nothing
                       return True
              else return False
-         return textView
+         return (textView, connectId)
 
 deleteFields :: Grid -> [FieldPos] -> IO ()
 deleteFields grid fields = forM_ fields $ \f ->
