@@ -12,6 +12,7 @@ import Data.Aeson.Encode.Pretty(encodePretty)
 import Data.List(intercalate)
 import System.IO (Handle, hClose, hPutStrLn, openFile, readFile, IOMode(ReadMode, WriteMode))
 import Text.Megaparsec hiding (try)
+import qualified Text.Megaparsec as TM
 
 import HRowsException
 import Model
@@ -53,7 +54,7 @@ exception e = throwIO $ HRowsException $ "Exception: " ++ displayException e
 
 
 analyze :: Char -> Maybe ModelConf -> Parsec Dec String Model
-analyze separator mconf = do
+analyze sep mconf = do
   h <-  optional $
           between (char '#') (char '\n')
                     ( many ( between (char '<')
@@ -62,13 +63,23 @@ analyze separator mconf = do
                            )
                     )
   rs <- flip endBy (char '\n') $
-          flip sepBy (char separator)
-            (toField <$> many (noneOf (separator : "\n")))
+          flip sepBy (char sep)
+            (toField <$> stringParser sep)
   return $ case mconf of
                   Nothing -> case h of
                                  Nothing -> fromRows rs
                                  Just names -> fromRowsNames names rs
                   Just cnf -> fromRowsConf cnf rs
+
+stringParser :: Char -> Parsec Dec String String
+stringParser sep = (char '"' *> (many inStringChar <* char '"'))
+                   <|> many (noneOf [sep, '\n'])
+    where inStringChar = TM.try (char '\\' >> ( char '\\'
+                                       <|> (char 'n' >> return '\n')
+                                       <|> (char 't' >> return '\t')
+                                       <|> (char '"' >> return '"')
+                                       <|> noneOf "\n\""))
+                         <|> noneOf "\n\""
 
 -- |Writes a model to a listatab file.
 toListatab :: ListatabInfo -> FilePath -> Maybe FilePath -> Model -> IO ()
@@ -94,4 +105,17 @@ toListatab info fp mconf model = do
                 Left e -> exception e
 
 writeRow :: Char -> Handle -> Row -> IO ()
-writeRow sep h = hPutStrLn h . intercalate [sep] . map toString
+writeRow sep h = hPutStrLn h . intercalate [sep] . map (encodeString sep . toString)
+
+encodeString :: Char -> String -> String
+encodeString sep s = case preprocess s of
+                         (True, s') -> '"':(s' ++ "\"")
+                         (False, _) -> s
+    where preprocess [] = (False, [])
+          preprocess (x:xs) | x == sep = (True, x: pxs)
+                            | x == '\\' = (True, '\\':'\\': pxs)
+                            | x == '\n' = (True, '\\':'n': pxs)
+                            | x == '\t' = (True, '\\':'t': pxs)
+                            | x == '"' =  (True, '\\':'"': pxs)
+                            | otherwise = (bxs, x:pxs)
+                            where (bxs, pxs) = preprocess xs
