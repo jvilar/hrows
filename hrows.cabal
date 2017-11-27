@@ -20,8 +20,41 @@ data-dir:            src
 executable hrows
   main-is:             Main.hs
   ghc-options:         -threaded
-  -- other-modules:       
-  -- other-extensions:    
+  other-modules:       GUI.Build
+                     , GUI.Command
+                     , GUI.Control
+                     , GUI.Iteration
+                     , GUI.Update
+                     , HRowsException
+                     , Message
+                     , Model
+                     , Model.DefaultFileNames
+                     , Model.Expression
+                     , Model.Field
+                     , Model.Lexer
+                     , Model.ListatabFile
+                     , Model.ListatabInfo
+                     , Model.ModelConf
+                     , Model.Parser
+                     , Model.Row
+                     , Model.SourceInfo
+                     , Model.TopoSort
+                     , Model.UpdatePlan
+                     , Presenter
+                     , Presenter.Auto
+                     , Presenter.Control
+                     , Presenter.ControlAuto
+                     , Presenter.Dialog
+                     , Presenter.DialogAuto
+                     , Presenter.File
+                     , Presenter.FileAuto
+                     , Presenter.Input
+                     , Presenter.Movement
+                     , Presenter.MovementAuto
+                     , Presenter.Source
+                     , Presenter.SourceAuto
+                     , Presenter.Update
+                     , Presenter.UpdateAuto
   build-depends:       aeson, aeson-pretty, auto, base, bytestring, containers, data-default,
                        directory, filepath, gtk3,
                        jmvOptions, lens, megaparsec, mtl, text, transformers
@@ -33,4 +66,9 @@ executable testParser
   build-depends:      aeson, base, mtl, readline, text
   hs-source-dirs:      src
   default-language:    Haskell2010
+  other-modules:       Model.Expression
+                     , Model.Field
+                     , Model.Lexer
+                     , Model.Parser
+                     , Model.Row
 
