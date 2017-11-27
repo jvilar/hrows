@@ -11,8 +11,8 @@ import Control.Concurrent.Chan(writeChan)
 import Control.Monad(filterM, forM, forM_, guard, unless, when)
 import Control.Monad.IO.Class(liftIO)
 import Data.Either(lefts, rights)
-import Data.IORef(readIORef, writeIORef)
-import Data.List(elemIndex)
+import Data.IORef(modifyIORef, readIORef, writeIORef)
+import Data.List(elemIndex, sort)
 import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import Data.Text(Text)
 import qualified Data.Text as T
@@ -66,6 +66,8 @@ showFields fis control = do
   let grid = fieldsGrid control
 
   forM_ fis $ \fi -> do
+                       connectId <- recoverConnectId (indexFI fi) control
+                       signalBlock connectId -- Don't update the model
                        let tooltip = fromMaybe (typeLabel $ typeFI fi) $ formulaFI fi
                        label <- recoverLabel (indexFI fi) control
                        set label [ widgetTooltipText := Just tooltip ]
@@ -79,8 +81,6 @@ showFields fis control = do
                                                              else if isJust $ formulaFI fi
                                                                   then formulaColor
                                                                   else normalColor
-                       connectId <- recoverConnectId (indexFI fi) control
-                       signalBlock connectId -- Don't update the model
                        buffer <- textViewGetBuffer textView
                        forM_ (textFI fi) $
                             textBufferSetText buffer
@@ -89,11 +89,13 @@ showFields fis control = do
 
 recoverTextView :: Int -> GUIControl -> IO TextView
 recoverTextView row control = do
+    -- putStrLn $ "Recovering textView in row " ++ show row
     Just tv <- gridGetChildAt (fieldsGrid control) 1 row
     return $ castToTextView tv
 
 recoverLabel :: Int -> GUIControl -> IO Label
 recoverLabel row control = do
+    -- putStrLn $ "Recovering label in row " ++ show row
     Just ebox <- gridGetChildAt (fieldsGrid control) 0 row
     lbl <- head <$> containerGetChildren (castToEventBox ebox)
     return $ castToLabel lbl
@@ -101,8 +103,16 @@ recoverLabel row control = do
 recoverConnectId :: Int -> GUIControl -> IO (ConnectId TextBuffer)
 recoverConnectId row control = (!! row) <$> readIORef (textBufferConnections control)
 
-storeConnectIds :: [ConnectId TextBuffer] -> GUIControl -> IO ()
-storeConnectIds l control = writeIORef (textBufferConnections control) l
+addConnectIds :: [ConnectId TextBuffer] -> GUIControl -> IO ()
+addConnectIds l control = modifyIORef (textBufferConnections control) (++l)
+
+deleteConnectIds :: [Int] -> GUIControl -> IO ()
+deleteConnectIds pos control = let
+    delPos _ _ [] = []
+    delPos _ [] xs = xs
+    delPos index pss@(p:ps) (x:xs) | p == index = delPos (index + 1) ps xs
+                                   | otherwise = x : delPos (index + 1) pss xs
+  in modifyIORef (textBufferConnections control) (delPos 0 $ sort pos)
 
 disableTextViews :: GUIControl -> IO ()
 disableTextViews control = do
@@ -132,7 +142,7 @@ adjustTextFields nfields control = do
   case compare current nfields of
     LT -> addFields grid [current .. nfields - 1] control
     EQ -> return ()
-    GT -> deleteFields grid [nfields .. current - 1]
+    GT -> deleteFields grid [nfields .. current - 1] control
   writeIORef (numberOfFields control) nfields
 
 addFields :: Grid -> [FieldPos] -> GUIControl -> IO ()
@@ -143,7 +153,7 @@ addFields grid fields control = do
                      (textView, connectId) <- createFieldTextView f control
                      gridAttach grid textView 1 f 1 1
                      return connectId
-    storeConnectIds connectIds control
+    addConnectIds connectIds control
 
 createFieldLabel :: FieldPos -> GUIControl -> IO EventBox
 createFieldLabel f control = do
@@ -183,6 +193,7 @@ createFieldTextView f control = do
                       , widgetHExpand := True
                       ]
          buffer <- textViewGetBuffer textView
+
          connectId <- buffer `on` bufferChanged $ liftIO $ do
              begin <- textBufferGetStartIter buffer
              end <- textBufferGetEndIter buffer
@@ -199,11 +210,13 @@ createFieldTextView f control = do
              else return False
          return (textView, connectId)
 
-deleteFields :: Grid -> [FieldPos] -> IO ()
-deleteFields grid fields = forM_ fields $ \f ->
+deleteFields :: Grid -> [FieldPos] -> GUIControl -> IO ()
+deleteFields grid fields control = do
+                      forM_ fields $ \f ->
                          forM_ [0, 1] $ \c -> do
                              Just w <- gridGetChildAt grid c f
                              widgetDestroy w
+                      deleteConnectIds fields control
 
 showIteration :: Iteration -> GUIControl -> IO ()
 showIteration AskReadFile = askReadFile
