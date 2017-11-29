@@ -21,5 +21,6 @@ data Iteration = NoIteration -- ^No need to iterate.
                | DisplayMessage Message -- ^Display a message.
                | ConfirmExit Bool -- ^Confirm exit program.
                | GetFieldFormula Int String (Maybe String) -- ^Introduce the formula for a field
-               | SearchField Int String [String]
+               | SearchField Int String [String] -- ^Search for a record containing a value
+               | CopyOtherField Int String [String] -- ^Copy the value of the field from another record
                deriving Show

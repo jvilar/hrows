@@ -103,6 +103,78 @@
       <action-widget response="-6">button2</action-widget>
     </action-widgets>
   </object>
+  <object class="GtkDialog" id="copyOtherDialog">
+    <property name="can_focus">False</property>
+    <property name="type_hint">dialog</property>
+    <child internal-child="vbox">
+      <object class="GtkBox">
+        <property name="can_focus">False</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">2</property>
+        <child internal-child="action_area">
+          <object class="GtkButtonBox">
+            <property name="can_focus">False</property>
+            <property name="layout_style">end</property>
+            <child>
+              <object class="GtkButton" id="button13">
+                <property name="label">gtk-copy</property>
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">True</property>
+                <property name="use_stock">True</property>
+                <property name="always_show_image">True</property>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="button14">
+                <property name="label">gtk-cancel</property>
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">True</property>
+                <property name="use_stock">True</property>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">1</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkComboBox" id="copyOtherCombo">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="has_entry">True</property>
+            <child internal-child="entry">
+              <object class="GtkEntry">
+                <property name="can_focus">True</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+    <action-widgets>
+      <action-widget response="-5">button13</action-widget>
+      <action-widget response="-6">button14</action-widget>
+    </action-widgets>
+  </object>
   <object class="GtkMenu" id="fieldPopupMenu">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
@@ -110,14 +182,24 @@
       <object class="GtkMenuItem" id="searchFieldMenuItem">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
+        <property name="tooltip_text" translatable="yes">Buscar un registro con un valor</property>
         <property name="label" translatable="yes">Buscar</property>
         <property name="use_underline">True</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="copyOtherMenuItem">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="tooltip_text" translatable="yes">Copiar el valor desde otro registro</property>
+        <property name="label" translatable="yes">Copiar otro</property>
       </object>
     </child>
     <child>
       <object class="GtkMenuItem" id="formulaMenuItem">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
+        <property name="tooltip_text" translatable="yes">Fórmula del campo</property>
         <property name="label" translatable="yes">Fórmula</property>
       </object>
     </child>
@@ -125,6 +207,7 @@
       <object class="GtkMenuItem" id="changeTypeMenuItem">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
+        <property name="tooltip_text" translatable="yes">Cambiar el tipo del campo</property>
         <property name="label" translatable="yes">Cambiar Tipo</property>
         <property name="use_underline">True</property>
         <child type="submenu">
@@ -135,6 +218,7 @@
               <object class="GtkMenuItem" id="changeToStringMenuItem">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
+                <property name="tooltip_text" translatable="yes">Tipo Cadena</property>
                 <property name="label" translatable="yes">Cadena</property>
                 <property name="use_underline">True</property>
               </object>
@@ -143,6 +227,7 @@
               <object class="GtkMenuItem" id="changeToIntMenuItem">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
+                <property name="tooltip_text" translatable="yes">Tipo Entero</property>
                 <property name="label" translatable="yes">Entero</property>
                 <property name="use_underline">True</property>
               </object>
@@ -151,6 +236,7 @@
               <object class="GtkMenuItem" id="changeToInt0MenuItem">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
+                <property name="tooltip_text" translatable="yes">Tipo Entero, si está vació cuenta como cero</property>
                 <property name="label" translatable="yes">Entero0</property>
                 <property name="use_underline">True</property>
               </object>
@@ -159,6 +245,7 @@
               <object class="GtkMenuItem" id="changeToFloatMenuItem">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
+                <property name="tooltip_text" translatable="yes">Tipo Flotante</property>
                 <property name="label" translatable="yes">Flotante</property>
                 <property name="use_underline">True</property>
               </object>
@@ -167,6 +254,7 @@
               <object class="GtkMenuItem" id="changeToFloat0MenuItem">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
+                <property name="tooltip_text" translatable="yes">Tipo Flotante, si está vació cuenta como cero</property>
                 <property name="label" translatable="yes">Flotante0</property>
                 <property name="use_underline">True</property>
               </object>
@@ -179,6 +267,7 @@
       <object class="GtkMenuItem" id="deleteFieldMenuItem">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
+        <property name="tooltip_text" translatable="yes">Eliminar el campo</property>
         <property name="label" translatable="yes">Eliminar</property>
       </object>
     </child>

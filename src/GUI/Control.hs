@@ -39,6 +39,8 @@ data GUIControl = GUIControl { mainWindow :: Window
                              , targetList :: TargetList
                              , searchFieldDialog :: Dialog
                              , searchFieldCombo :: ComboBox
+                             , copyOtherDialog :: Dialog
+                             , copyOtherCombo :: ComboBox
                              , textBufferConnections :: IORef [ ConnectId TextBuffer ]
                              }
 

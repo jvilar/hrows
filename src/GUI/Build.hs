@@ -120,6 +120,9 @@ prepareControl iChan builder = do
   sfDialog <- getObject castToDialog "searchFieldDialog"
   sfCombo <- getObject castToComboBox "searchFieldCombo"
   comboBoxSetModelText sfCombo
+  coDialog <- getObject castToDialog "copyOtherDialog"
+  coCombo <- getObject castToComboBox "copyOtherCombo"
+  comboBoxSetModelText coCombo
 
   return GUIControl { mainWindow = window
                     , positionLabel = lbl
@@ -147,6 +150,8 @@ prepareControl iChan builder = do
                     , targetList = tlist
                     , searchFieldDialog = sfDialog
                     , searchFieldCombo = sfCombo
+                    , copyOtherDialog = coDialog
+                    , copyOtherCombo = coCombo
                     , textBufferConnections = connections
                     }
 
@@ -214,6 +219,7 @@ prepareFileMenu  = mapM_ (uncurry menuItemInput)
 prepareFieldMenu :: BuildMonad ()
 prepareFieldMenu = do
                      fieldMenuAction "searchFieldMenuItem" SearchFieldDialog
+                     fieldMenuAction "copyOtherMenuItem" CopyOtherDialog
                      fieldMenuAction "deleteFieldMenuItem" (DeleteFields . (:[]))
                      fieldMenuAction "formulaMenuItem" ChangeFieldFormulaDialog
                      fieldMenuAction "changeToStringMenuItem" (ChangeFieldType TypeString)

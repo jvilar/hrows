@@ -7,7 +7,6 @@ module GUI.Update (
             , updateGUI
 ) where
 
-import Control.Concurrent.Chan(writeChan)
 import Control.Monad(filterM, forM, forM_, guard, unless, when)
 import Control.Monad.IO.Class(liftIO)
 import Data.Either(lefts, rights)
@@ -174,13 +173,13 @@ createFieldLabel f control = do
                                           Just v -> let
                                                       from = read v
                                                     in if from /= f
-                                                       then writeChan (inputChan control) . toInput $ MoveField from f
+                                                       then sendInput control $ MoveField from f
                                                        else return ()
          containerAdd ebox lbl
          return ebox
 
 dndError :: GUIControl -> IO ()
-dndError control = writeChan (inputChan control) . toInput $ MessageDialog (ErrorMessage "Algo está mal en el dnd")
+dndError control = sendInput control $ MessageDialog (ErrorMessage "Algo está mal en el dnd")
 
 createFieldTextView :: FieldPos -> GUIControl -> IO (TextView, ConnectId TextBuffer)
 createFieldTextView f control = do
@@ -198,7 +197,7 @@ createFieldTextView f control = do
              begin <- textBufferGetStartIter buffer
              end <- textBufferGetEndIter buffer
              text <- textBufferGetText buffer begin end False
-             writeChan (inputChan control) (toInput $ UpdateField f (toField (text::String)))
+             sendInput control $ UpdateField f (toField (text::String))
 
          textView `on` buttonPressEvent $ do
              button <- eventButton
@@ -231,6 +230,7 @@ showIteration (DisplayMessage m) = displayMessage m
 showIteration (ConfirmExit changed) = confirmExit changed
 showIteration (GetFieldFormula fpos flabel ms) = getFieldFormula fpos flabel ms
 showIteration (SearchField fpos initial l) = searchField fpos initial l
+showIteration (CopyOtherField fpos initial l) = copyOther fpos initial l
 showIteration it = unimplemented $ show it
 
 displayMessage :: Message -> GUIControl -> IO ()
@@ -616,6 +616,33 @@ searchField fieldPos initial values control = do
     when (r == ResponseOk) $ do
         mt <- comboBoxGetActiveText combo
         when (isJust mt) $ sendInput control $ MoveToValue fieldPos (T.unpack $ fromJust mt)
+
+copyOther :: FieldPos -> String -> [String] -> GUIControl -> IO ()
+copyOther fieldPos initial values control = do
+    let dlg = copyOtherDialog control
+        combo = copyOtherCombo control
+
+    set dlg [ windowTransientFor := mainWindow control
+            , windowModal := True
+            ]
+
+    modelText <- comboBoxGetModelText combo
+    listStoreClear modelText
+    forM values $ comboBoxAppendText combo . T.pack
+    comboBoxSetActive combo . fromJust $ elemIndex initial values
+
+    widgetShowAll dlg
+    r <- dialogRun dlg
+    widgetHide dlg
+    when (r == ResponseOk) $ do
+        mt <- comboBoxGetActiveText combo
+        when (isJust mt) $ do
+            textView <- recoverTextView fieldPos control
+            editable <- get textView textViewEditable
+            when editable $ do
+                buffer <- textViewGetBuffer textView
+                textBufferSetText buffer (T.unpack $ fromJust mt)
+
 
 unimplemented :: String -> GUIControl -> IO ()
 unimplemented func control = sendInput control . MessageDialog . ErrorMessage $ "Función " ++ func ++ " no implementada"
