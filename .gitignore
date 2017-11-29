@@ -1,5 +1,7 @@
-Setup.hs
 dist
+examples
+Setup.hs
+.stack-work
 
 *~
 *.hi
