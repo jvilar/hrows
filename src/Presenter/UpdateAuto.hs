@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Presenter.UpdateAuto (
     updateAuto
 ) where
@@ -12,49 +14,53 @@ import Model
 import Presenter.Auto
 import Presenter.Input
 
-data ZM = ZM { undo :: [Model]
-             , current :: Model
-             , redo :: [Model]
-             }
+data UndoZipper a = UndoZipper { undo :: [a]
+               , current :: a
+               , redo :: [a]
+               }
 
-initialZM :: ZM
-initialZM = ZM [] empty []
-
-back :: ZM -> Maybe ZM
-back (ZM (u:us) c rs) = Just $ ZM us u (c:rs)
+back :: UndoZipper a -> Maybe (UndoZipper a)
+back (UndoZipper (u:us) c rs) = Just $ UndoZipper us u (c:rs)
 back _ = Nothing
 
-forward :: ZM -> Maybe ZM
-forward (ZM us c (r:rs)) = Just $ ZM (c:us) r rs
+forward :: UndoZipper a -> Maybe (UndoZipper a)
+forward (UndoZipper us c (r:rs)) = Just $ UndoZipper (c:us) r rs
 forward _ = Nothing
 
-push :: ZM -> Model -> ZM
-push (ZM us c _) m = ZM (c:us) m []
+push :: UndoZipper a -> a -> UndoZipper a
+push (UndoZipper us c _) m = UndoZipper (c:us) m []
+
+type ZM = UndoZipper (Model, RowPos)
+
+initialZM :: ZM
+initialZM = UndoZipper [] (empty, 0) []
 
 message :: Message -> PresenterM ()
 message = sendGUIM . ShowIteration . DisplayMessage
 
-updateAuto :: PresenterAuto (UpdateCommand, Int) Model
-updateAuto = current <$> accumM_ undoOrUpdate initialZM
+updateAuto :: PresenterAuto (UpdateCommand, RowPos) Model
+updateAuto = fst . current <$> accumM_ undoOrUpdate initialZM
 
 undoOrUpdate :: ZM -> (UpdateCommand, Int) -> PresenterM ZM
-undoOrUpdate zm (Undo, pos) = case back zm of
+undoOrUpdate zm (Undo, _) = case back zm of
                                 Nothing -> do
                                     message $ InformationMessage "No puedo deshacer"
                                     return zm
                                 Just zm' -> do
-                                    completeRefresh pos (current zm')
+                                    let (model, pos) = current zm'
+                                    completeRefresh pos model
                                     return zm'
 undoOrUpdate zm (Redo, pos) = case forward zm of
                                 Nothing -> do
                                     message $ InformationMessage "No puedo rehacer"
                                     return zm
                                 Just zm' -> do
-                                    completeRefresh pos (current zm')
+                                    let (model, pos) = current zm'
+                                    completeRefresh pos model
                                     return zm'
-undoOrUpdate zm (BlockUndo, _) = return $ ZM [] (current zm) []
+undoOrUpdate zm (BlockUndo, _) = return $ UndoZipper [] (current zm) []
 undoOrUpdate zm (DoNothing, _) = return zm
-undoOrUpdate zm p = push zm <$> update (current zm) p
+undoOrUpdate zm p@(command, pos) = push zm . (,pos) <$> update (fst $ current zm) p
 
 update :: Model -> (UpdateCommand, Int) -> PresenterM Model
 update model (UpdateField fpos v, pos) = do
