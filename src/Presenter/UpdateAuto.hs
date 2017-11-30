@@ -12,8 +12,49 @@ import Model
 import Presenter.Auto
 import Presenter.Input
 
+data ZM = ZM { undo :: [Model]
+             , current :: Model
+             , redo :: [Model]
+             }
+
+initialZM :: ZM
+initialZM = ZM [] empty []
+
+back :: ZM -> Maybe ZM
+back (ZM (u:us) c rs) = Just $ ZM us u (c:rs)
+back _ = Nothing
+
+forward :: ZM -> Maybe ZM
+forward (ZM us c (r:rs)) = Just $ ZM (c:us) r rs
+forward _ = Nothing
+
+push :: ZM -> Model -> ZM
+push (ZM us c _) m = ZM (c:us) m []
+
+message :: Message -> PresenterM ()
+message = sendGUIM . ShowIteration . DisplayMessage
+
 updateAuto :: PresenterAuto (UpdateCommand, Int) Model
-updateAuto = accumM_ update empty
+updateAuto = current <$> accumM_ undoOrUpdate initialZM
+
+undoOrUpdate :: ZM -> (UpdateCommand, Int) -> PresenterM ZM
+undoOrUpdate zm (Undo, pos) = case back zm of
+                                Nothing -> do
+                                    message $ InformationMessage "No puedo deshacer"
+                                    return zm
+                                Just zm' -> do
+                                    completeRefresh pos (current zm')
+                                    return zm'
+undoOrUpdate zm (Redo, pos) = case forward zm of
+                                Nothing -> do
+                                    message $ InformationMessage "No puedo rehacer"
+                                    return zm
+                                Just zm' -> do
+                                    completeRefresh pos (current zm')
+                                    return zm'
+undoOrUpdate zm (BlockUndo, _) = return $ ZM [] (current zm) []
+undoOrUpdate zm (DoNothing, _) = return zm
+undoOrUpdate zm p = push zm <$> update (current zm) p
 
 update :: Model -> (UpdateCommand, Int) -> PresenterM Model
 update model (UpdateField fpos v, pos) = do

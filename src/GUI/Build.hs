@@ -158,6 +158,8 @@ prepareControl iChan builder = do
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
              , (("Page_Up", []), toInput MovePrevious)
              , (("q", [Control]), toInput ExitRequested)
+             , (("r", [Control]), toInput Redo)
+             , (("z", [Control]), toInput Undo)
              , (("Return", []), toInput DoNothing)
              ]
 

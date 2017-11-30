@@ -22,4 +22,7 @@ data UpdateCommand = UpdateField FieldPos Field
                    | ChangeFieldType FieldType FieldPos
                    | ChangeFieldFormula (Maybe Formula) FieldPos
                    | SetUnchanged
+                   | Undo
+                   | Redo
+                   | BlockUndo
                      deriving Show
