@@ -1,6 +1,13 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveFoldable
+           , DeriveFunctor
+           , DeriveTraversable
+           , FlexibleContexts
+           , FlexibleInstances
+           , TypeSynonymInstances
+#-}
 
-module Model.Expression ( Expression (..)
+module Model.Expression ( -- *Types
+                          Expression
                         , Formula
                         , BinaryOp
                         , UnaryOp
@@ -8,6 +15,16 @@ module Model.Expression ( Expression (..)
                         , UnaryOpInfo(..)
                         , Priority
                         , Associativity(..)
+                        -- *Constructors for Expression
+                        , mkPosition
+                        , mkNamedPosition
+                        , mkConstant
+                        , mkUnary
+                        , mkBinary
+                        , mkTernary
+                        , mkCast
+                        , mkErrorExpr
+                        -- *Other functions
                         , addCast
                         , evaluate
                         , eliminateNames
@@ -18,11 +35,12 @@ module Model.Expression ( Expression (..)
                         , module Model.Field
                         ) where
 
-import Control.Arrow(second)
+import Control.Arrow(second, (>>>), (<<<))
 import Control.Monad(when)
 import Control.Monad.Reader(Reader, ask, runReader)
-import Control.Monad.Writer(tell, runWriter)
+import Control.Monad.Writer(Writer, tell, runWriter)
 import Data.Char(isAlphaNum)
+import Data.Function((&))
 import Data.List(foldr1, elemIndex)
 import Data.Maybe(fromMaybe)
 import Data.Monoid(Any(..))
@@ -42,15 +60,47 @@ data WithNames
 data WithNoNames
 
 -- |The Expression is the internal representation of the Formula.
-data Expression = Position Int
-                | NamedPosition String
-                | Constant Field
-                | Unary UnaryOpInfo Expression
-                | Binary BinaryOpInfo Expression Expression
-                | Ternary Expression Expression Expression
-                | Cast FieldType Expression
-                | Error String
-                deriving Show
+type Expression = Fix Node
+
+instance Show Expression where
+    show = cata show
+
+newtype Fix t = In { out :: t (Fix t) }
+
+data Node a = Position Int
+            | NamedPosition String
+            | Constant Field
+            | Unary UnaryOpInfo a
+            | Binary BinaryOpInfo a a
+            | Ternary a a a
+            | Cast FieldType a
+            | Error String
+            deriving (Foldable, Functor, Show, Traversable)
+
+
+mkPosition :: Int -> Expression
+mkPosition = In . Position
+
+mkNamedPosition :: String -> Expression
+mkNamedPosition = In . NamedPosition
+
+mkConstant :: Field -> Expression
+mkConstant = In . Constant
+
+mkUnary :: UnaryOpInfo -> Expression -> Expression
+mkUnary = (In .) . Unary
+
+mkBinary :: BinaryOpInfo -> Expression -> Expression -> Expression
+mkBinary i e e' = In $ Binary i e e'
+
+mkTernary :: Expression -> Expression -> Expression -> Expression
+mkTernary e e' e'' = In $ Ternary e e' e''
+
+mkCast :: FieldType -> Expression -> Expression
+mkCast = (In .) . Cast
+
+mkErrorExpr :: String -> Expression
+mkErrorExpr = In . Error
 
 type UnaryOp = Field -> Field
 
@@ -74,72 +124,79 @@ data BinaryOpInfo = BinaryOpInfo { opB :: BinaryOp
 instance Show BinaryOpInfo where
     show = formulaB
 
-transform :: (Expression -> Expression) -> Expression -> Expression
-transform t (Unary info e) = t (Unary info $ transform t e)
-transform t (Binary info e1 e2) = let
-                                    e1' = transform t e1
-                                    e2' = transform t e2
-                                  in t (Binary info e1' e2')
-transform t (Cast ft e) = t (Cast ft $ transform t e)
-transform t (Ternary e1 e2 e3) = t (Ternary (transform t e1) (transform t e2) (transform t e3))
-transform t e = t e
+type Algebra f a = f a -> a
 
-transformM :: Monad m =>  (Expression -> m Expression) -> Expression -> m Expression
-transformM t (Unary info e) = transformM t e >>= t . Unary info
-transformM t (Binary info e1 e2) = do
-    e1' <- transformM t e1
-    e2' <- transformM t e2
-    t (Binary info e1' e2')
-transformM t (Cast ft e) = transformM t e >>= t . Cast ft
-transformM t (Ternary e1 e2 e3) = do
-    e1' <- transformM t e1
-    e2' <- transformM t e2
-    e3' <- transformM t e3
-    t (Ternary e1' e2' e3')
-transformM t e = t e
+bottomUp :: Functor a => (Fix a -> Fix a) -> Fix a -> Fix a
+bottomUp f = out >>> fmap (bottomUp f) >>> In >>> f
+
+bottomUpM :: (Monad m, Traversable a) => (Fix a -> m (Fix a)) -> Fix a -> m (Fix a)
+-- bottomUpM f = out >>> fmap (bottomUp f) >>> In >>> f
+bottomUpM f v = mapM (bottomUpM f) (out v) >>= f . In
+
+topDown  :: Functor a => (Fix a -> Fix a) -> Fix a -> Fix a
+topDown f = In <<< fmap (topDown f) <<< out <<< f
+
+cata :: Functor f => Algebra f a -> Fix f -> a
+cata f = out >>> fmap (cata f) >>> f
+
+type AlgebraM m f a = f a -> m a
+
+cataM :: (Traversable f, Monad m) => AlgebraM m f a -> Fix f -> m a
+cataM f v = mapM (cataM f) (out v) >>= f
+
+type RAlgebra f a = Fix f -> f a -> a
+
+para :: Functor f => RAlgebra f a -> Fix f -> a
+para rAlg t = out t & fmap (para rAlg) & rAlg t
 
 evaluate :: Row -> Expression -> Field
 evaluate r exp = runReader (eval exp) r
 
 toFormula :: Expression -> Formula
-toFormula (Position p) = "$" ++ show (p + 1)
-toFormula (NamedPosition n) | all isAlphaNum n = n
-                            | otherwise = "@{" ++ n ++ "}"
-toFormula (Constant f) | typeOf f == TypeString = '"' : toString f ++ "\""
-                       | otherwise = toString f
-toFormula (Unary info e) = formulaU info ++ parent 8 e
-toFormula (Binary info e1 e2) = let
-    (pe1, pe2) = case assocB info of
-                     LeftAssoc -> (prioB info, prioB info + 1)
-                     RightAssoc -> (prioB info + 1, prioB info)
-                     TrueAssoc -> (prioB info, prioB info)
-                     NoAssoc -> (prioB info + 1, prioB info + 1)
-    in parent pe1 e1 ++ formulaB info ++ parent pe2 e2
-toFormula (Cast ft e) = typeOperator ft ++ "(" ++ toFormula e ++ ")"
-toFormula (Ternary e1 e2 e3) = let
-    f1 = parent 1 e1
-    f2 = parent 0 e2
-    f3 = parent 0 e3
-    in f1 ++ "?" ++ f2 ++ ":" ++ f3
-toFormula (Error s) = "Error: " ++ s
+toFormula = para tf
+    where tf :: RAlgebra Node Formula
+          tf _ (Position p) = "$" ++ show (p + 1)
+          tf _ (NamedPosition n) | all isAlphaNum n = n
+                                 | otherwise = "@{" ++ n ++ "}"
+          tf _ (Constant f) | typeOf f == TypeString = '"' : toString f ++ "\""
+                            | otherwise = toString f
+          tf (In (Unary info e)) (Unary _ f) = formulaU info ++ parent 8 (prio e) f
+          tf (In (Binary info e1 e2)) (Binary _ f1 f2) = let
+                     (pe1, pe2) = case assocB info of
+                                      LeftAssoc -> (prioB info, prioB info + 1)
+                                      RightAssoc -> (prioB info + 1, prioB info)
+                                      TrueAssoc -> (prioB info, prioB info)
+                                      NoAssoc -> (prioB info + 1, prioB info + 1)
+                     in parent pe1 (prio e1) f1 ++ formulaB info ++ parent pe2 (prio e2) f2
+          tf _ (Cast ft f) = typeOperator ft ++ "(" ++ f ++ ")"
+          tf (In (Ternary e1 e2 e3)) (Ternary f1 f2 f3) = let
+                f1' = parent 1 (prio e1) f1
+                f2' = parent 0 (prio e2) f2
+                f3' = parent 0 (prio e3) f3
+              in f1' ++ "?" ++ f2' ++ ":" ++ f3'
+          tf _ (Error s) = "Error: " ++ s
 
-parent :: Priority -> Expression -> String
-parent p e@(Binary info _ _ ) | prioB info >= p = toFormula e
-                              | otherwise = "(" ++ toFormula e ++ ")"
-parent p e@(Ternary _ _ _) | p < 1 = toFormula e
-                           | otherwise = "(" ++ toFormula e ++ ")"
-parent _ e = toFormula e
+parent :: Priority -> Priority -> String -> String
+parent p1 p2 s | p1 < p2 = "(" ++ s ++ ")"
+               | otherwise = s
+
+prio :: Expression -> Priority
+prio (In (Binary info _ _)) = prioB info
+prio (In (Ternary _ _ _)) = 1
+prio _ = 10
 
 type Eval = Reader Row
 eval :: Expression -> Eval Field
-eval (Position n) = evalIndex n
-eval (NamedPosition name) = return . mkError $ "Expresión con variable: " ++ name
-eval (Constant f) = return f
-eval (Unary info exp) = opU info <$> eval exp
-eval (Binary info exp1 exp2) = opB info <$> eval exp1 <*> eval exp2
-eval (Cast ft exp) = convert ft <$> eval exp
-eval (Ternary e1 e2 e3) = ternary <$> eval e1 <*> eval e2 <*> eval e3
-eval (Error m) = return $ mkError m
+eval = cataM ev
+    where
+      ev (Position n) = evalIndex n
+      ev (NamedPosition name) = return . mkError $ "Expresión con variable: " ++ name
+      ev (Constant f) = return f
+      ev (Unary info v) = return $ opU info v
+      ev (Binary info v1 v2) = return $ opB info v1 v2
+      ev (Cast ft v) = return $ convert ft v
+      ev (Ternary v1 v2 v3) = return $ ternary v1 v2 v3
+      ev (Error m) = return $ mkError m
 
 evalIndex :: Int -> Eval Field
 evalIndex n = do
@@ -149,10 +206,10 @@ evalIndex n = do
              else mkError $ "Índice erróneo " ++ show (n + 1)
 
 eliminateNames :: [String] -> Expression -> Expression
-eliminateNames fnames = transform noNames
-    where noNames (NamedPosition name) = case elemIndex name fnames of
-                                             Nothing -> Error $ "Mal nombre de campo: " ++ name
-                                             Just i -> Position i
+eliminateNames fnames = bottomUp noNames
+    where noNames (In (NamedPosition name)) = In $ case elemIndex name fnames of
+                                                 Nothing -> Error $ "Mal nombre de campo: " ++ name
+                                                 Just i -> Position i
           noNames n = n
 
 type Changed = Bool
@@ -160,30 +217,33 @@ type Changed = Bool
 -- |Changes the absolute references according to the list of new positions.
 -- Returns True if any position changed.
 translatePositions :: [Int] -> Expression -> (Expression, Changed)
-translatePositions newPos = second getAny . runWriter . transformM tPos
-    where tPos (Position n) = do
+translatePositions newPos = second getAny . runWriter . bottomUpM tPos
+    where tPos :: Expression -> Writer Any Expression
+          tPos (In (Position n)) = do
               let n' = newPos !! n
               when (n' /= n) $ tell (Any True)
-              return $ Position n'
+              return . In $ Position n'
           tPos e = return e
 
 translateNames :: [(String, String)] -> Expression -> (Expression, Changed)
-translateNames newNames = second getAny . runWriter . transformM tNames
-    where tNames (NamedPosition name) = do
+translateNames newNames = second getAny . runWriter . bottomUpM tNames
+    where tNames (In (NamedPosition name)) = do
               let name' = fromMaybe name (lookup name newNames)
               when (name' /= name) $ tell (Any True)
-              return $ NamedPosition name'
+              return . In $ NamedPosition name'
           tNames e = return e
 
 getPositions :: Expression -> [Int]
-getPositions (Position n) = [n]
-getPositions (NamedPosition name) = error $ "Expresión con variable: " ++ name
-getPositions (Constant f) = []
-getPositions (Unary _ exp) = getPositions exp
-getPositions (Binary _ exp1 exp2) = merge (getPositions exp1) (getPositions exp2)
-getPositions (Cast _ exp) = getPositions exp
-getPositions (Ternary exp1 exp2 exp3) = foldr1 merge $ map getPositions [exp1, exp2, exp3]
-getPositions (Error _) = []
+getPositions = cata gp
+    where
+        gp (Position n) = [n]
+        gp (NamedPosition name) = error $ "Expresión con variable: " ++ name
+        gp (Constant f) = []
+        gp (Unary _ ps) = ps
+        gp (Binary _ ps1 ps2) = merge ps1 ps2
+        gp (Cast _ ps) = ps
+        gp (Ternary ps1 ps2 ps3) = ps1 `merge` ps2 `merge` ps3
+        gp (Error _) = []
 
 merge :: [Int] -> [Int] -> [Int]
 merge [] l = l
@@ -194,7 +254,7 @@ merge (x:xs) (y:ys) = case compare x y of
                           GT -> y : merge (x:xs) ys
 
 addCast :: FieldType -> Expression -> Expression
-addCast ft exp@(Cast ft' e) | ft == ft' = exp
-                            | otherwise = Cast ft e
-addCast ft exp = Cast ft exp
+addCast ft exp@(In (Cast ft' e)) | ft == ft' = exp
+                                 | otherwise = In (Cast ft e)
+addCast ft exp = In (Cast ft exp)
 

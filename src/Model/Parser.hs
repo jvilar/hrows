@@ -47,7 +47,7 @@ match l = do
 
 parse :: Formula -> Expression
 parse s = case evalState (runExceptT (expression <* eof)) $ tokenize s of
-              Left err -> Error err
+              Left err -> mkErrorExpr err
               Right e -> e
 
 eof :: Parser ()
@@ -63,8 +63,8 @@ expression = do
     cond <- logical
     q <- check QuestionMarkT
     if q
-    then Ternary cond <$> (advance >> expression)
-                      <*> (colon >> expression)
+    then mkTernary cond <$> (advance >> expression)
+                        <*> (colon >> expression)
     else return cond
 
 binaryLevel :: Parser Expression -> Parser (Maybe BinaryOpInfo) -> Parser Expression
@@ -73,7 +73,7 @@ binaryLevel nextLevel operator = do
     mop <- operator
     case mop of
         Nothing -> return nl
-        Just op -> Binary op nl <$> binaryLevel nextLevel operator
+        Just op -> mkBinary op nl <$> binaryLevel nextLevel operator
 
 -- logical -> comparison (logOperator comparison)*
 logical :: Parser Expression
@@ -116,12 +116,12 @@ base :: Parser Expression
 base = do
     t <- current
     case t of
-        IntT n -> advance >> (return . Constant $ toField n)
-        DoubleT d -> advance >> (return . Constant $ toField d)
-        StringT s -> advance >> (return . Constant $ toField s)
-        PositionT n -> advance >> return (Position $ n - 1)
-        NameT s -> advance >> return (NamedPosition s)
-        CastT ft -> advance >> parenthesized >>= return . Cast ft
+        IntT n -> advance >> (return . mkConstant $ toField n)
+        DoubleT d -> advance >> (return . mkConstant $ toField d)
+        StringT s -> advance >> (return . mkConstant $ toField s)
+        PositionT n -> advance >> return (mkPosition $ n - 1)
+        NameT s -> advance >> return (mkNamedPosition s)
+        CastT ft -> advance >> parenthesized >>= return . mkCast ft
         OpenT -> advance >> (expression <* close)
         _ -> throwError $ "Error en " ++ show t ++ ", esperaba un comienzo de expresión"
 
