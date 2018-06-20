@@ -355,7 +355,7 @@ importFields other keys values m = addPlan m { _rows = IM.map importRow (_rows m
                               where go _ [] _ = []
                                     go _ l [] = l
                                     go n (f:fs) ((pos, val):rest) | n /= pos = f : go (n+1) fs ((pos, val):rest)
-                                                                  | otherwise = val : go (n+1) fs rest
+                                                                  | otherwise = convert (typeOf f) val : go (n+1) fs rest
                     keyTable = prepareKeyTable keys values (IM.elems $ _rows other)
 
 -- |Returns a table that associates to each valid combination of
