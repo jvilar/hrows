@@ -128,22 +128,30 @@ convert t f | typeOf f == t = f
 
 doConvert :: Field -> FieldType -> Field
 doConvert (AnError _ m) t = AnError t m
-doConvert f TypeInt = case reads str of
-                        [(n, "")] -> AInt n str
-                        _ -> AnError TypeInt str
-                    where str = toString f
-doConvert f TypeInt0 = AInt ( case reads str of
-                                 [(n, "")] -> n
-                                 _ -> 0) str
-                    where str = toString f
-doConvert f TypeDouble = case reads str of
-                           [(d, "")] -> ADouble d str
-                           _ -> AnError TypeDouble str
-                       where str = toString f
-doConvert f TypeDouble0 = ADouble ( case reads str of
-                                      [(d, "")] -> d
-                                      _ -> 0 ) str
-                       where str = toString f
+
+doConvert (ADouble d str) TypeInt = AInt i $ show i
+                                  where i = truncate d
+doConvert (AString str) TypeInt = case reads str of
+                                        [(n, "")] -> AInt n str
+                                        _ -> AnError TypeInt str
+
+doConvert (ADouble d _) TypeInt0 = AInt i $ show i
+                                   where i = truncate d
+doConvert (AString str) TypeInt0 = AInt ( case reads str of
+                                                [(n, "")] -> n
+                                                _ -> 0) str
+
+doConvert (AInt n _) TypeDouble = ADouble f $ show f
+                       where f = fromIntegral n
+doConvert (AString str) TypeDouble = case reads str of
+                                         [(d, "")] -> ADouble d str
+                                         _ -> AnError TypeDouble str
+
+doConvert (AInt n _) TypeDouble0 = ADouble f $ show f
+                       where f = fromIntegral n
+doConvert (AString str) TypeDouble0 = ADouble ( case reads str of
+                                                    [(d, "")] -> d
+                                                    _ -> 0 ) str
 doConvert f TypeString = AString $ toString f
 doConvert f TypeEmpty = AnError TypeEmpty $ toString f
 
