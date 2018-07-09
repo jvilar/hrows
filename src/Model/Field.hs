@@ -152,8 +152,10 @@ doConvert (AInt n _) TypeDouble0 = ADouble f $ show f
 doConvert (AString str) TypeDouble0 = ADouble ( case reads str of
                                                     [(d, "")] -> d
                                                     _ -> 0 ) str
+doConvert Empty t = AnError t "Conversión de valor vacío"
+
 doConvert f TypeString = AString $ toString f
-doConvert f TypeEmpty = AnError TypeEmpty $ toString f
+doConvert f t = AnError t $ toString f
 
 mkError :: String -> Field
 mkError = AnError TypeEmpty
