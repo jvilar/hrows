@@ -47,16 +47,55 @@ makeGUI iChan = do
 
 type BuildMonad = ReaderT (Builder, GUIControl) IO
 
-getObject :: GObjectClass obj => (GObject -> obj) -> String -> BuildMonad obj
-getObject cast s = do
-    builder <- asks fst
-    liftIO $ builderGetObject builder cast s
+class GObjectClass a => CanBeCast a where
+    doCast :: GObject -> a
 
-getMainWindow :: BuildMonad Window
-getMainWindow = asks $ mainWindow . snd
+instance CanBeCast Button where
+    doCast = castToButton
+
+instance CanBeCast CheckButton where
+    doCast = castToCheckButton
+
+instance CanBeCast ComboBox where
+    doCast = castToComboBox
+
+instance CanBeCast Dialog where
+    doCast = castToDialog
+
+instance CanBeCast Entry where
+    doCast = castToEntry
+
+instance CanBeCast FileChooserDialog where
+    doCast = castToFileChooserDialog
+
+instance CanBeCast Grid where
+    doCast = castToGrid
+
+instance CanBeCast Label where
+    doCast = castToLabel
+
+instance CanBeCast Menu where
+    doCast = castToMenu
+
+instance CanBeCast MenuItem where
+    doCast = castToMenuItem
+
+instance CanBeCast Window where
+    doCast = castToWindow
+
+getBuilder :: BuildMonad Builder
+getBuilder = asks fst
 
 getControl :: BuildMonad GUIControl
 getControl = asks snd
+
+getMainWindow :: BuildMonad Window
+getMainWindow = mainWindow <$> getControl
+
+getObject :: CanBeCast obj => String -> BuildMonad obj
+getObject s = do
+    builder <- getBuilder
+    liftIO $ builderGetObject builder doCast s
 
 ioVoid :: IO a -> BuildMonad ()
 ioVoid = liftIO . void
@@ -64,8 +103,8 @@ ioVoid = liftIO . void
 buttonAction :: IsInput cmd => String -> cmd -> BuildMonad ()
 buttonAction name input = do
     control <- getControl
-    btn <- getObject castToButton name
-    ioVoid (btn `on` buttonActivated $ sendInput control input)
+    btn <- getObject name
+    ioVoid ((btn :: Button) `on` buttonActivated $ sendInput control input)
 
 buttons :: IsInput cmd => [(String, cmd)] -> BuildMonad ()
 buttons = mapM_ (uncurry buttonAction)
@@ -78,8 +117,8 @@ menuItemInput name input = do
 menuItemAction :: String -> IO () -> BuildMonad ()
 menuItemAction name io = do
     control <- getControl
-    itm <- getObject castToMenuItem name
-    ioVoid (itm `on` menuItemActivated $ io)
+    itm <- getObject name
+    ioVoid ((itm :: MenuItem) `on` menuItemActivated $ io)
 
 fieldMenuAction :: IsInput cmd => String -> (Int -> cmd) -> BuildMonad ()
 fieldMenuAction name f = do
@@ -89,39 +128,39 @@ fieldMenuAction name f = do
 
 prepareControl :: Chan Input -> Builder -> IO GUIControl
 prepareControl iChan builder = do
-  let getObject :: GObjectClass obj => (GObject -> obj) -> String -> IO obj
-      getObject = builderGetObject builder
-  lbl <- getObject castToLabel "positionLabel"
-  grid <- getObject castToGrid "fieldsGrid"
-  window <- getObject castToWindow "mainWindow"
-  fmenu <- getObject castToMenu "fieldPopupMenu"
-  bButton <- getObject castToButton "beginButton"
-  eButton <- getObject castToButton "endButton"
-  lButton <- getObject castToButton "leftButton"
-  rButton <- getObject castToButton "rightButton"
+  let getObject :: CanBeCast obj => String -> IO obj
+      getObject = builderGetObject builder doCast
+  lbl <- getObject "positionLabel"
+  grid <- getObject "fieldsGrid"
+  window <- getObject "mainWindow"
+  fmenu <- getObject "fieldPopupMenu"
+  bButton <- getObject "beginButton"
+  eButton <- getObject "endButton"
+  lButton <- getObject "leftButton"
+  rButton <- getObject "rightButton"
   fields <- newIORef 0
   cfield <- newIORef 0
-  cfDialog <- getObject castToDialog "changeFieldFormulaDialog"
-  cfEntry <- getObject castToEntry "changeFieldFormulaEntry"
-  cfLabel <- getObject castToLabel "changeFieldFormulaLabel"
-  cfButton <- getObject castToCheckButton "changeFieldFormulaCheckButton"
-  confSButton <- getObject castToCheckButton "confFileSaveCheckButton"
-  sDialog <- getObject castToFileChooserDialog "saveAsDialog"
-  confLButton <- getObject castToCheckButton "confFileLoadCheckButton"
-  lDialog <- getObject castToFileChooserDialog "loadFileDialog"
-  ifDialog <- getObject castToFileChooserDialog "importFieldsFromFileDialog"
-  ifEntry <- getObject castToEntry "importFieldsInputSeparator"
-  ifoDialog <- getObject castToDialog "importFieldsOptionsDialog"
-  ifRows <- getObject castToGrid "importFieldsOptionsRows"
+  cfDialog <- getObject "changeFieldFormulaDialog"
+  cfEntry <- getObject "changeFieldFormulaEntry"
+  cfLabel <- getObject "changeFieldFormulaLabel"
+  cfButton <- getObject "changeFieldFormulaCheckButton"
+  confSButton <- getObject "confFileSaveCheckButton"
+  sDialog <- getObject "saveAsDialog"
+  confLButton <- getObject "confFileLoadCheckButton"
+  lDialog <- getObject "loadFileDialog"
+  ifDialog <- getObject "importFieldsFromFileDialog"
+  ifEntry <- getObject "importFieldsInputSeparator"
+  ifoDialog <- getObject "importFieldsOptionsDialog"
+  ifRows <- getObject "importFieldsOptionsRows"
   tlist <- targetListNew
   targetListAddTextTargets tlist 0
   connections <- newIORef []
 
-  sfDialog <- getObject castToDialog "searchFieldDialog"
-  sfCombo <- getObject castToComboBox "searchFieldCombo"
+  sfDialog <- getObject "searchFieldDialog"
+  sfCombo <- getObject "searchFieldCombo"
   comboBoxSetModelText sfCombo
-  coDialog <- getObject castToDialog "copyOtherDialog"
-  coCombo <- getObject castToComboBox "copyOtherCombo"
+  coDialog <- getObject "copyOtherDialog"
+  coCombo <- getObject "copyOtherCombo"
   comboBoxSetModelText coCombo
 
   return GUIControl { mainWindow = window
