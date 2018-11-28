@@ -1,0 +1,52 @@
+name: hrows
+version: 0.1.0.0
+synopsis: A program to handle data in form of rows.
+license: GPL-2
+author:              "Juan Miguel Vilar"
+maintainer:          "jvilar@uji.es"
+copyright:           "2018 Juan Miguel Vilar"
+
+dependencies:
+- base >= 4.7 && < 5
+
+data-files:
+- src/hrows.glade
+
+library:
+  source-dirs: lib
+  dependencies:
+  - aeson
+  - aeson-pretty
+  - auto
+  - base
+  - bytestring
+  - containers
+  - data-default
+  - directory
+  - filepath
+  - gtk3
+  - megaparsec
+  - mtl
+  - text
+  - transformers
+
+executables:
+  hrows:
+    main: Main.hs
+    source-dirs: src
+    dependencies:
+    - hrows
+    - auto
+    - data-default
+    - directory
+    - gtk3
+    - jmvOptions >= 0.2
+    - lens
+
+# There are problems with readline
+#  testParser:
+#    main: testParser.hs
+#    source_dirs: src
+#    dependencies:
+#    - hrows
+#    - readline

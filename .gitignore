@@ -1,5 +1,6 @@
 dist
 examples
+hrows.cabal
 Setup.hs
 .stack-work
 

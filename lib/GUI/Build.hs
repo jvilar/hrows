@@ -28,7 +28,7 @@ makeGUI iChan = do
   initGUI
 
   builder <- builderNew
-  gladefn <- getDataFileName "hrows.glade"
+  gladefn <- getDataFileName "src/hrows.glade"
   builderAddFromFile builder gladefn
 
   control <- prepareControl iChan builder

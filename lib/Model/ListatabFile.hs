@@ -10,8 +10,10 @@ import qualified Data.ByteString.Lazy as BS
 import Data.Aeson(decode)
 import Data.Aeson.Encode.Pretty(encodePretty)
 import Data.List(intercalate)
+import Data.Void(Void)
 import System.IO (Handle, hClose, hPutStrLn, openFile, readFile, IOMode(ReadMode, WriteMode))
-import Text.Megaparsec hiding (try)
+import Text.Megaparsec (many, sepBy, endBy, between, optional, parse, Parsec, parseErrorPretty, (<|>))
+import Text.Megaparsec.Char(char, noneOf)
 import qualified Text.Megaparsec as TM
 
 import HRowsException
@@ -52,8 +54,9 @@ fromListatab info fp mconf = do
 exception :: IOException -> IO a
 exception e = throwIO $ HRowsException $ "Exception: " ++ displayException e
 
+type Parser = Parsec Void String
 
-analyze :: Char -> Maybe ModelConf -> Parsec Dec String Model
+analyze :: Char -> Maybe ModelConf -> Parser Model
 analyze sep mconf = do
   h <-  optional $
           between (char '#') (char '\n')
@@ -71,7 +74,7 @@ analyze sep mconf = do
                                  Just names -> fromRowsNames names rs
                   Just cnf -> fromRowsConf cnf rs
 
-stringParser :: Char -> Parsec Dec String String
+stringParser :: Char -> Parser String
 stringParser sep = (char '"' *> (many inStringChar <* char '"'))
                    <|> many (noneOf [sep, '\n'])
     where inStringChar = TM.try (char '\\' >> ( char '\\'
