@@ -122,8 +122,11 @@ defaultValue TypeDouble0 = ADouble 0 ""
 defaultValue TypeString = AString ""
 defaultValue TypeEmpty = Empty
 
+baseType :: FieldType -> FieldType
+baseType = typeOf . defaultValue
+
 convert :: FieldType -> Field -> Field
-convert t f | typeOf f == t = f
+convert t f | typeOf f == baseType t = f
             | otherwise = doConvert f t
 
 doConvert :: Field -> FieldType -> Field
