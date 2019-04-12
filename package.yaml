@@ -49,4 +49,5 @@ executables:
     main: testParser.hs
     source-dirs: src
     dependencies:
+    - haskeline
     - hrows

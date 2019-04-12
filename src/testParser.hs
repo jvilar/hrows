@@ -1,4 +1,4 @@
--- import System.Console.Readline(addHistory, readline)
+import System.Console.Haskeline(outputStrLn, runInputT, InputT, defaultSettings, getInputLine)
 
 import Model.Expression(evaluate, toFormula, toString)
 import Model.Lexer(tokenize)
@@ -7,18 +7,18 @@ import Model.Parser(parse)
 main :: IO ()
 main = do
     putStrLn "Introduce expressions, exit or Ctrl-D to end."
-    loop
+    runInputT defaultSettings loop
 
-loop :: IO()
+loop :: InputT IO ()
 loop = do
-    putStr "% "
-    l <- getLine
+    l <- getInputLine "% "
     case l of
-        "exit" -> return ()
-        formula -> do
+        Nothing -> return ()
+        Just "exit" -> return ()
+        Just formula -> do
             let expression = parse formula
-            putStrLn $ "Tokens: " ++ show (tokenize formula)
-            putStrLn $ "Expresion: " ++ show expression
-            putStrLn $ "As formula: " ++ toFormula expression
-            putStrLn $ "Evaluated: " ++ toString (evaluate [] expression)
+            outputStrLn $ "Tokens: " ++ show (tokenize formula)
+            outputStrLn $ "Expresion: " ++ show expression
+            outputStrLn $ "As formula: " ++ toFormula expression
+            outputStrLn $ "Evaluated: " ++ toString (evaluate [] expression)
             loop
