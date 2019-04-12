@@ -177,7 +177,7 @@ toFormula = para tf
           tf _ (Error s) = "Error: " ++ s
 
 parent :: Priority -> Priority -> String -> String
-parent p1 p2 s | p1 < p2 = "(" ++ s ++ ")"
+parent p1 p2 s | p1 > p2 = "(" ++ s ++ ")"
                | otherwise = s
 
 prio :: Expression -> Priority
