@@ -45,10 +45,8 @@ executables:
     - jmvOptions >= 0.2
     - lens
 
-# There are problems with readline
-#  testParser:
-#    main: testParser.hs
-#    source_dirs: src
-#    dependencies:
-#    - hrows
-#    - readline
+  testParser:
+    main: testParser.hs
+    source-dirs: src
+    dependencies:
+    - hrows

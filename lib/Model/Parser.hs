@@ -13,7 +13,6 @@ import Data.Maybe(isNothing)
 import Model.Lexer
 import Model.Expression
 
-
 type Parser = ExceptT String (State [Token])
 
 many :: Parser (Maybe a) -> Parser [a]
@@ -68,24 +67,27 @@ expression = do
     else return cond
 
 binaryLevel :: Parser Expression -> Parser (Maybe BinaryOpInfo) -> Parser Expression
-binaryLevel nextLevel operator = do
-    nl <- nextLevel
-    mop <- operator
-    case mop of
-        Nothing -> return nl
-        Just op -> mkBinary op nl <$> binaryLevel nextLevel operator
+binaryLevel nextLevel operator = nextLevel >>= go
+    where go left = do
+            mop <- operator
+            case mop of
+              Nothing -> return left
+              Just op -> (mkBinary op left <$> nextLevel) >>= go
 
--- logical -> comparison (logOperator comparison)*
+-- logical -> conjunction (orOperator conjunction)*
 logical :: Parser Expression
-logical = binaryLevel comparsion
-            (match [ (AndT, BinaryOpInfo andField "&&" 2 TrueAssoc)
-                   , (OrT, BinaryOpInfo orField "||" 2 TrueAssoc)
-                   ]
-            )
+logical = binaryLevel conjunction
+            (match [ (OrT, BinaryOpInfo orField "||" 2 TrueAssoc) ])
+
+-- conjuntion -> comparsion (andOperator comparison)*
+conjunction :: Parser Expression
+conjunction = binaryLevel comparison
+            (match [ (AndT, BinaryOpInfo andField "&&" 2 TrueAssoc) ])
+
 
 -- comparsion -> additive (compOperator additive)*
-comparsion :: Parser Expression
-comparsion = binaryLevel additive
+comparison :: Parser Expression
+comparison = binaryLevel additive
              ( match [ (EqualT, BinaryOpInfo (compareField (==)) "==" 3 LeftAssoc)
                      , (NotEqualT, BinaryOpInfo (compareField (/=)) "!=" 3 LeftAssoc)
                      , (LessThanT, BinaryOpInfo (compareField (<)) "<" 3 LeftAssoc)
@@ -115,14 +117,14 @@ multiplicative = binaryLevel base
 base :: Parser Expression
 base = do
     t <- current
-    case t of
-        IntT n -> advance >> (return . mkConstant $ toField n)
-        DoubleT d -> advance >> (return . mkConstant $ toField d)
-        StringT s -> advance >> (return . mkConstant $ toField s)
-        PositionT n -> advance >> return (mkPosition $ n - 1)
-        NameT s -> advance >> return (mkNamedPosition s)
-        CastT ft -> advance >> parenthesized >>= return . mkCast ft
-        OpenT -> advance >> (expression <* close)
+    advance >> case t of
+        IntT n -> return . mkConstant $ toField n
+        DoubleT d -> return . mkConstant $ toField d
+        StringT s -> return . mkConstant $ toField s
+        PositionT n -> return (mkPosition $ n - 1)
+        NameT s -> return $ mkNamedPosition s
+        CastT ft -> mkCast ft <$> parenthesized
+        OpenT -> expression <* close
         _ -> throwError $ "Error en " ++ show t ++ ", esperaba un comienzo de expresión"
 
 parenthesized :: Parser Expression

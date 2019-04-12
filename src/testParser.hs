@@ -1,4 +1,4 @@
-import System.Console.Readline(addHistory, readline)
+-- import System.Console.Readline(addHistory, readline)
 
 import Model.Expression(evaluate, toFormula, toString)
 import Model.Lexer(tokenize)
@@ -11,12 +11,11 @@ main = do
 
 loop :: IO()
 loop = do
-    i <- readline "% "
-    case i of
-        Nothing -> return ()
-	Just "exit" -> return ()
-        Just formula -> do
-            addHistory formula
+    putStr "% "
+    l <- getLine
+    case l of
+        "exit" -> return ()
+        formula -> do
             let expression = parse formula
             putStrLn $ "Tokens: " ++ show (tokenize formula)
             putStrLn $ "Expresion: " ++ show expression
