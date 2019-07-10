@@ -148,8 +148,8 @@ prepareControl iChan builder = do
   sDialog <- getObject "saveAsDialog"
   confLButton <- getObject "confFileLoadCheckButton"
   lDialog <- getObject "loadFileDialog"
-  ifDialog <- getObject "importFieldsFromFileDialog"
-  ifEntry <- getObject "importFieldsInputSeparator"
+  ifDialog <- getObject "importFromFileDialog"
+  ifEntry <- getObject "importInputSeparator"
   ifoDialog <- getObject "importFieldsOptionsDialog"
   ifRows <- getObject "importFieldsOptionsRows"
   tlist <- targetListNew
@@ -182,8 +182,8 @@ prepareControl iChan builder = do
                     , saveAsDialog = sDialog
                     , confFileLoadCheckButton = confLButton
                     , loadFileDialog = lDialog
-                    , importFieldsFromFileDialog = ifDialog
-                    , importFieldsInputSeparator = ifEntry
+                    , importFromFileDialog = ifDialog
+                    , importInputSeparator = ifEntry
                     , importFieldsOptionsDialog = ifoDialog
                     , importFieldsOptionsRows = ifRows
                     , targetList = tlist

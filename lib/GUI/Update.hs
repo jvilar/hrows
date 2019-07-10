@@ -222,7 +222,7 @@ showIteration AskReadFile = askReadFile
 showIteration AskWriteFile = askWriteFile
 showIteration AskCreateField = askCreateField
 showIteration (AskDeleteFields fs) = askDeleteFields fs
-showIteration AskImportFieldsFrom = askImportFieldsFrom
+showIteration AskImportFieldsFrom = askImportFrom ImportFieldsFromFileName
 showIteration (AskImportFieldsOptions ifs cfs m) = askImportFieldsOptions ifs cfs m
 showIteration (AskRenameFields fs) = askRenameFields fs
 showIteration (AskSortRows fs) = askSortRows fs
@@ -276,9 +276,9 @@ askFile dlg btn input control = do
                            else Nothing
                 sendInput control $ input fp conf
 
-askImportFieldsFrom :: GUIControl -> IO ()
-askImportFieldsFrom control = do
-    let dialog = importFieldsFromFileDialog control
+askImportFrom :: (FilePath -> Char -> FileCommand) -> GUIControl -> IO ()
+askImportFrom command control = do
+    let dialog = importFromFileDialog control
     set dialog [ windowTransientFor := mainWindow control
                , windowModal := True
                ]
@@ -286,8 +286,8 @@ askImportFieldsFrom control = do
     widgetHide dialog
     when (r == ResponseOk) $ do
         file <- fileChooserGetFilename dialog
-        separator <- translateChar <$> entryGetText (importFieldsInputSeparator control)
-        when (isJust file) $ sendInput control $ ImportFieldsFromFileName (fromJust file) separator
+        separator <- translateChar <$> entryGetText (importInputSeparator control)
+        when (isJust file) $ sendInput control $ command (fromJust file) separator
 
 askImportFieldsOptions :: [String] -> [String] -> Model -> GUIControl -> IO ()
 askImportFieldsOptions ifs cfs m control = do

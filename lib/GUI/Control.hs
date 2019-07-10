@@ -32,8 +32,8 @@ data GUIControl = GUIControl { mainWindow :: Window
                              , saveAsDialog :: FileChooserDialog
                              , confFileLoadCheckButton :: CheckButton
                              , loadFileDialog :: FileChooserDialog
-                             , importFieldsFromFileDialog :: FileChooserDialog
-                             , importFieldsInputSeparator :: Entry
+                             , importFromFileDialog :: FileChooserDialog
+                             , importInputSeparator :: Entry
                              , importFieldsOptionsDialog :: Dialog
                              , importFieldsOptionsRows :: Grid
                              , targetList :: TargetList
