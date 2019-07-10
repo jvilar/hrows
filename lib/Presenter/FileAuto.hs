@@ -46,10 +46,10 @@ applyCommand WriteFile model info = doWrite (fromJust $ siFilePath info) (siConf
 
 applyCommand (WriteFileFromName fp conf) model info = doWrite fp conf model info True
 
-applyCommand (ImportFieldsFromFileName fp separator) _ _ = do
+applyCommand (ImportFromFileName t fp separator) _ _ = do
     r <- liftIO $ try $ fromListatab def { ltInputSeparator = separator} fp Nothing
     case r of
-        Right m -> sendInputM $ ChooseImportFieldsDialog m
+        Right m -> sendInputM $ ChooseImportDialog t m
         Left (HRowsException m) -> message $ ErrorMessage m
 
 applyCommand WriteBackup model info = do
@@ -82,3 +82,10 @@ doWrite fp conf model info changedSource = do
                           when changedSource $ sendInputM $ SetSource (changeFileName fp info)
                           sendInputM SetUnchanged
             Left (HRowsException m) -> message $ ErrorMessage m
+
+withListatab :: FilePath -> Char -> (Model -> DialogCommand) -> PresenterM ()
+withListatab fp separator command = do
+    r <- liftIO $ try $ fromListatab def { ltInputSeparator = separator} fp Nothing
+    case r of
+        Right m -> sendInputM $ command m
+        Left (HRowsException m) -> message $ ErrorMessage m

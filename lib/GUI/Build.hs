@@ -28,6 +28,7 @@ import Paths_hrows(getDataFileName)
 import GUI.Control
 import GUI.Iteration
 import Model.Field
+import Presenter.ImportType
 import Presenter.Input
 
 makeGUI :: Chan Input -> IO GUIControl
@@ -161,6 +162,8 @@ prepareControl iChan builder = do
     , importInputSeparator = getObject "importInputSeparator"
     , importFieldsOptionsDialog = getObject "importFieldsOptionsDialog"
     , importFieldsOptionsRows = getObject "importFieldsOptionsRows"
+    , importRowsOptionsDialog = getObject "importRowsOptionsDialog"
+    , importRowsOptionsRows = getObject "importRowsOptionsRows"
     , targetList = targetListNew
     , searchFieldDialog = getObject "searchFieldDialog"
     , searchFieldCombo = getObject "searchFieldCombo"
@@ -232,7 +235,8 @@ prepareFileMenu  = mapM_ (uncurry menuItemInput)
                              ,("quitMenuItem", toInput ExitRequested)
                              ,("createFieldsMenuItem", toInput CreateFieldsDialog)
                              ,("deleteFieldsMenuItem", toInput DeleteFieldsDialog)
-                             ,("importFieldsMenuItem", toInput ImportFieldsFromDialog)
+                             ,("importFieldsMenuItem", toInput $ ImportFromDialog ImportFields)
+                             ,("importRowsMenuItem", toInput $ ImportFromDialog ImportRows)
                              ,("changeNamesMenuItem", toInput ChangeNamesDialog)
                              ]
 

@@ -22,6 +22,7 @@ import GUI.Command
 import GUI.Control
 import Model hiding (deleteFields)
 import Model.DefaultFileNames
+import Presenter.ImportType
 import Presenter.Input
 
 updateGUI :: GUICommand -> GUIControl -> IO ()
@@ -222,8 +223,8 @@ showIteration AskReadFile = askReadFile
 showIteration AskWriteFile = askWriteFile
 showIteration AskCreateField = askCreateField
 showIteration (AskDeleteFields fs) = askDeleteFields fs
-showIteration AskImportFieldsFrom = askImportFrom ImportFieldsFromFileName
-showIteration (AskImportFieldsOptions ifs cfs m) = askImportFieldsOptions ifs cfs m
+showIteration (AskImportFrom t) = askImportFrom t
+showIteration (AskImportOptions t ifs cfs m) = askImportOptions t ifs cfs m
 showIteration (AskRenameFields fs) = askRenameFields fs
 showIteration (AskSortRows fs) = askSortRows fs
 showIteration (DisplayMessage m) = displayMessage m
@@ -276,8 +277,8 @@ askFile dlg btn input control = do
                            else Nothing
                 sendInput control $ input fp conf
 
-askImportFrom :: (FilePath -> Char -> FileCommand) -> GUIControl -> IO ()
-askImportFrom command control = do
+askImportFrom :: ImportType -> GUIControl -> IO ()
+askImportFrom t control = do
     let dialog = importFromFileDialog control
     set dialog [ windowTransientFor := mainWindow control
                , windowModal := True
@@ -287,12 +288,13 @@ askImportFrom command control = do
     when (r == ResponseOk) $ do
         file <- fileChooserGetFilename dialog
         separator <- translateChar <$> entryGetText (importInputSeparator control)
-        when (isJust file) $ sendInput control $ command (fromJust file) separator
+        when (isJust file) $ sendInput control $ ImportFromFileName t (fromJust file) separator
 
-askImportFieldsOptions :: [String] -> [String] -> Model -> GUIControl -> IO ()
-askImportFieldsOptions ifs cfs m control = do
-    let dialog = importFieldsOptionsDialog control
-    let grid = importFieldsOptionsRows control
+askImportOptions :: ImportType -> [String] -> [String] -> Model -> GUIControl -> IO ()
+askImportOptions t ifs cfs m control = do
+    let (dialog, grid) = case t of
+          ImportFields -> (importFieldsOptionsDialog control, importFieldsOptionsRows control)
+          ImportRows -> (importRowsOptionsDialog control, importRowsOptionsRows control)
 
     gridSetRowSpacing grid 3
     gridSetColumnSpacing grid 9
@@ -300,7 +302,9 @@ askImportFieldsOptions ifs cfs m control = do
     forM_ children widgetDestroy
 
     let ifst = "" : map T.pack ifs
-        options = ["", "<-", "=="] :: [Text]
+        options = case t of
+                    ImportFields -> ["", "<-", "=="] :: [Text]
+                    ImportRows -> ["", "<-"]
     forM_ (enumerate cfs) $ \(row, current) -> do
         lbl <- addLabel grid current 0 row
         widgetSetHAlign lbl AlignStart
@@ -337,7 +341,9 @@ askImportFieldsOptions ifs cfs m control = do
            )
         let keys = rights l
             values = lefts l
-        sendInput control $ ImportFieldsFromModel m keys values
+        sendInput control $ case t of
+                              ImportFields -> ImportFieldsFromModel m keys values
+                              ImportRows -> ImportRowsFromModel m values
 
 translateChar :: String -> Char
 translateChar "\\t" = '\t'

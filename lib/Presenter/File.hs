@@ -3,12 +3,13 @@ module Presenter.File (
               FileCommand(..)
 ) where
 
+import Presenter.ImportType
+
 data FileCommand = LoadFile
                  | LoadFileFromName FilePath (Maybe FilePath)
                  | WriteFile
                  | WriteFileFromName FilePath (Maybe FilePath)
-                 | ImportFieldsFromFileName FilePath Char
-                 | ImportRecordsFromFileName FilePath Char
+                 | ImportFromFileName ImportType FilePath Char
                  | WriteBackup
                  | BackupOnExit
                  deriving Show

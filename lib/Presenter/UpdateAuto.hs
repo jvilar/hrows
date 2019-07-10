@@ -97,6 +97,8 @@ update model (RenameFields names, pos) =
     completeRefresh pos $ renameFields names model
 update model (ImportFieldsFromModel m keys values, pos) =
     partialRefresh pos $ importFields m keys values model
+update model (ImportRowsFromModel m values, pos) =
+    partialRefresh pos $ importRows m values model
 update model (MoveField f t, pos) = do
     completeRefresh pos $ moveField f t model
 update model (ChangeFieldType t f, pos) =

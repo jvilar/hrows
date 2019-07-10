@@ -8,8 +8,8 @@ import Control.Auto(arrM)
 
 import GUI.Command
 import Model
-import Presenter.Input
 import Presenter.Auto
+import Presenter.Input
 
 dialogAuto :: PresenterAuto (DialogCommand, Model, RowPos) ()
 dialogAuto = arrM $ \(input, model, pos) -> sendGUIM . ShowIteration $ case input of
@@ -17,8 +17,8 @@ dialogAuto = arrM $ \(input, model, pos) -> sendGUIM . ShowIteration $ case inpu
                                              SaveAsFileDialog -> AskWriteFile
                                              CreateFieldsDialog -> AskCreateField
                                              DeleteFieldsDialog -> AskDeleteFields $ fnames model
-                                             ImportFieldsFromDialog -> AskImportFieldsFrom
-                                             ChooseImportFieldsDialog m -> AskImportFieldsOptions (fnames m) (fnames model) m
+                                             ImportFromDialog t -> AskImportFrom t
+                                             ChooseImportDialog t m -> AskImportOptions t (fnames m) (fnames model) m
                                              ChangeNamesDialog -> AskRenameFields $ fnames model
                                              SortRowsDialog -> AskSortRows $ fnames model
                                              MessageDialog m -> DisplayMessage m

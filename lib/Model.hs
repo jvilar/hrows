@@ -40,6 +40,7 @@ module Model (
              , deleteFields
              , renameFields
              , importFields
+             , importRows
              , moveField
              , changeFieldType
              , changeFieldFormula
@@ -351,20 +352,39 @@ importFields other keys values m = addPlan m { _rows = IM.map importRow (_rows m
                             Just vals' -> replace r vals'
               where findRow r = M.lookup (key r) keyTable
                     key r = map (r !!) $ map fst keys
-                    replace = go 0
-                              where go _ [] _ = []
-                                    go _ l [] = l
-                                    go n (f:fs) ((pos, val):rest) | n /= pos = f : go (n+1) fs ((pos, val):rest)
-                                                                  | otherwise = convert (typeOf f) val : go (n+1) fs rest
                     keyTable = prepareKeyTable keys values (IM.elems $ _rows other)
+
+-- |Imports rows from another model.
+importRows :: Model -> [(FieldPos, FieldPos)] -> Model -> Model
+importRows other values m = addPlan m {
+  _rows = IM.union (_rows m) (IM.mapKeys (+ size m) $ IM.map changeValues $ _rows other),
+  _size = _size m + _size other
+  }
+    where changeValues = replace myEmpty . valuesOf values
+          myEmpty = map _defaultValue $ _fieldInfo m
 
 -- |Returns a table that associates to each valid combination of
 -- fields the corresponding value.
 prepareKeyTable :: [(FieldPos, FieldPos)] -> [(FieldPos, FieldPos)] -> [Row] -> Map [Field] [(FieldPos, Field)]
 prepareKeyTable keys values other = M.fromList asig
-    where asig = [(key r, valuesOf r) | r <- other]
+    where asig = [(key r, valuesOf values r) | r <- other]
           key r = map (r !!) $ map snd keys
-          valuesOf r = sort [(i, r !! o) | (i, o) <- values]
+
+-- Returns the values assocaiated to a position from the corresponding
+-- position in the row, given the association of input positions to
+-- output positions
+valuesOf :: [(FieldPos, FieldPos)] -> Row -> [(FieldPos, Field)]
+valuesOf values r = sort [(i, r !! o) | (i, o) <- values]
+
+-- Replaces the fields in the given positions.
+replace :: Row -> [(FieldPos, Field)] -> Row
+replace = go 0
+  where go _ [] _ = []
+        go _ l [] = l
+        go n (f:fs) ((pos, val):rest) | n /= pos = f : go (n+1) fs ((pos, val):rest)
+                                      | otherwise = convert (typeOf f) val : go (n+1) fs rest
+
+
 
 -- |Move a field to the position just next to the other
 moveField :: FieldPos -> FieldPos -> Model -> Model

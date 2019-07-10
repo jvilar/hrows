@@ -42,6 +42,8 @@ data GUIControl' f = GUIControl { mainWindow :: HKD f Window
                                 , importInputSeparator :: HKD f Entry
                                 , importFieldsOptionsDialog :: HKD f Dialog
                                 , importFieldsOptionsRows :: HKD f Grid
+                                , importRowsOptionsDialog :: HKD f Dialog
+                                , importRowsOptionsRows :: HKD f Grid
                                 , targetList :: HKD f TargetList
                                 , searchFieldDialog :: HKD f Dialog
                                 , searchFieldCombo :: HKD f ComboBox

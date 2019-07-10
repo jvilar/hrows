@@ -447,6 +447,14 @@
                       </object>
                     </child>
                     <child>
+                      <object class="GtkMenuItem" id="importRowsMenuItem">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Importar</property>
+                        <property name="use_underline">True</property>
+                      </object>
+                    </child>
+                    <child>
                       <object class="GtkMenuItem" id="sortRowsMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
@@ -895,7 +903,7 @@
       <placeholder/>
     </child>
   </object>
-  <object class="GtkDialog" id="importRecordsOptionsDialog">
+  <object class="GtkDialog" id="importRowsOptionsDialog">
     <property name="can_focus">False</property>
     <property name="type_hint">dialog</property>
     <child internal-child="vbox">
@@ -958,7 +966,7 @@
           </packing>
         </child>
         <child>
-          <object class="GtkGrid" id="importRecordsOptionsRows">
+          <object class="GtkGrid" id="importRowsOptionsRows">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
             <child>

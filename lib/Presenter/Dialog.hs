@@ -5,13 +5,14 @@ module Presenter.Dialog (
 
 import Model
 import Message
+import Presenter.ImportType
 
 data DialogCommand = LoadFileDialog
                    | SaveAsFileDialog
                    | CreateFieldsDialog
                    | DeleteFieldsDialog
-                   | ImportFieldsFromDialog
-                   | ChooseImportFieldsDialog Model
+                   | ImportFromDialog ImportType
+                   | ChooseImportDialog ImportType Model
                    | ChangeNamesDialog
                    | SortRowsDialog
                    | MessageDialog Message
