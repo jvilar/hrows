@@ -1,48 +1,56 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module GUI.Control (
             -- *Types
-            GUIControl(..)
+            GUIControl
+            , GUIControl'(..)
             -- *Functions
             , sendInput
 ) where
 
 import Control.Concurrent.Chan(Chan, writeChan)
+import Data.Functor.Identity(Identity)
 import Data.IORef(IORef)
+import GHC.Generics(Generic)
 import Graphics.UI.Gtk
 
 import Presenter.Input
 
-data GUIControl = GUIControl { mainWindow :: Window
-                             , positionLabel :: Label
-                             , fieldsGrid :: Grid
-                             , numberOfFields :: IORef Int
-                             , currentField :: IORef Int
-                             , inputChan :: Chan Input
-                             , fieldMenu :: Menu
-                             , beginButton :: Button
-                             , endButton :: Button
-                             , leftButton :: Button
-                             , rightButton :: Button
-                             , changeFieldFormulaDialog :: Dialog
-                             , changeFieldFormulaEntry :: Entry
-                             , changeFieldFormulaLabel :: Label
-                             , changeFieldFormulaButton :: CheckButton
-                             , confFileSaveCheckButton :: CheckButton
-                             , saveAsDialog :: FileChooserDialog
-                             , confFileLoadCheckButton :: CheckButton
-                             , loadFileDialog :: FileChooserDialog
-                             , importFromFileDialog :: FileChooserDialog
-                             , importInputSeparator :: Entry
-                             , importFieldsOptionsDialog :: Dialog
-                             , importFieldsOptionsRows :: Grid
-                             , targetList :: TargetList
-                             , searchFieldDialog :: Dialog
-                             , searchFieldCombo :: ComboBox
-                             , copyOtherDialog :: Dialog
-                             , copyOtherCombo :: ComboBox
-                             , textBufferConnections :: IORef [ ConnectId TextBuffer ]
-                             }
+import GUI.HKD
+
+data GUIControl' f = GUIControl { mainWindow :: HKD f Window
+                                , positionLabel :: HKD f Label
+                                , fieldsGrid :: HKD f Grid
+                                , numberOfFields :: HKD f (IORef Int)
+                                , currentField :: HKD f (IORef Int)
+                                , inputChan :: HKD f (Chan Input)
+                                , fieldMenu :: HKD f Menu
+                                , beginButton :: HKD f Button
+                                , endButton :: HKD f Button
+                                , leftButton :: HKD f Button
+                                , rightButton :: HKD f Button
+                                , changeFieldFormulaDialog :: HKD f Dialog
+                                , changeFieldFormulaEntry :: HKD f Entry
+                                , changeFieldFormulaLabel :: HKD f Label
+                                , changeFieldFormulaButton :: HKD f CheckButton
+                                , confFileSaveCheckButton :: HKD f CheckButton
+                                , saveAsDialog :: HKD f FileChooserDialog
+                                , confFileLoadCheckButton :: HKD f CheckButton
+                                , loadFileDialog :: HKD f FileChooserDialog
+                                , importFromFileDialog :: HKD f FileChooserDialog
+                                , importInputSeparator :: HKD f Entry
+                                , importFieldsOptionsDialog :: HKD f Dialog
+                                , importFieldsOptionsRows :: HKD f Grid
+                                , targetList :: HKD f TargetList
+                                , searchFieldDialog :: HKD f Dialog
+                                , searchFieldCombo :: HKD f ComboBox
+                                , copyOtherDialog :: HKD f Dialog
+                                , copyOtherCombo :: HKD f ComboBox
+                                , textBufferConnections :: HKD f (IORef [ ConnectId TextBuffer ])
+                                } deriving Generic
+
+type GUIControl = GUIControl' Identity
 
 sendInput :: IsInput cmd => GUIControl -> cmd -> IO ()
 sendInput control = writeChan (inputChan control) . toInput

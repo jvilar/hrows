@@ -1,3 +1,6 @@
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module GUI.Build (
@@ -11,8 +14,12 @@ import Control.Concurrent.Chan(Chan, writeChan)
 import Control.Monad(forM_, void, when)
 import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Reader(asks, ReaderT, runReaderT)
+import Data.Functor.Identity(Identity)
 import Data.IORef(IORef, newIORef, readIORef, writeIORef)
 import Data.Maybe(isJust, fromJust)
+import GHC.Generics(Generic, K1(..), M1(..), Rep(..), V1(..), U1(..)
+                   , (:*:)(..), (:+:)(..), from, to)
+
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.Enums(Align(..))
 
@@ -130,69 +137,41 @@ prepareControl :: Chan Input -> Builder -> IO GUIControl
 prepareControl iChan builder = do
   let getObject :: CanBeCast obj => String -> IO obj
       getObject = builderGetObject builder doCast
-  lbl <- getObject "positionLabel"
-  grid <- getObject "fieldsGrid"
-  window <- getObject "mainWindow"
-  fmenu <- getObject "fieldPopupMenu"
-  bButton <- getObject "beginButton"
-  eButton <- getObject "endButton"
-  lButton <- getObject "leftButton"
-  rButton <- getObject "rightButton"
-  fields <- newIORef 0
-  cfield <- newIORef 0
-  cfDialog <- getObject "changeFieldFormulaDialog"
-  cfEntry <- getObject "changeFieldFormulaEntry"
-  cfLabel <- getObject "changeFieldFormulaLabel"
-  cfButton <- getObject "changeFieldFormulaCheckButton"
-  confSButton <- getObject "confFileSaveCheckButton"
-  sDialog <- getObject "saveAsDialog"
-  confLButton <- getObject "confFileLoadCheckButton"
-  lDialog <- getObject "loadFileDialog"
-  ifDialog <- getObject "importFromFileDialog"
-  ifEntry <- getObject "importInputSeparator"
-  ifoDialog <- getObject "importFieldsOptionsDialog"
-  ifRows <- getObject "importFieldsOptionsRows"
-  tlist <- targetListNew
-  targetListAddTextTargets tlist 0
-  connections <- newIORef []
-
-  sfDialog <- getObject "searchFieldDialog"
-  sfCombo <- getObject "searchFieldCombo"
-  comboBoxSetModelText sfCombo
-  coDialog <- getObject "copyOtherDialog"
-  coCombo <- getObject "copyOtherCombo"
-  comboBoxSetModelText coCombo
-
-  return GUIControl { mainWindow = window
-                    , positionLabel = lbl
-                    , fieldsGrid = grid
-                    , numberOfFields = fields
-                    , currentField = cfield
-                    , inputChan = iChan
-                    , fieldMenu = fmenu
-                    , beginButton = bButton
-                    , endButton = eButton
-                    , leftButton = lButton
-                    , rightButton = rButton
-                    , changeFieldFormulaDialog = cfDialog
-                    , changeFieldFormulaEntry = cfEntry
-                    , changeFieldFormulaLabel = cfLabel
-                    , changeFieldFormulaButton = cfButton
-                    , confFileSaveCheckButton = confSButton
-                    , saveAsDialog = sDialog
-                    , confFileLoadCheckButton = confLButton
-                    , loadFileDialog = lDialog
-                    , importFromFileDialog = ifDialog
-                    , importInputSeparator = ifEntry
-                    , importFieldsOptionsDialog = ifoDialog
-                    , importFieldsOptionsRows = ifRows
-                    , targetList = tlist
-                    , searchFieldDialog = sfDialog
-                    , searchFieldCombo = sfCombo
-                    , copyOtherDialog = coDialog
-                    , copyOtherCombo = coCombo
-                    , textBufferConnections = connections
-                    }
+  control <- fromIO GUIControl {
+    mainWindow = getObject "mainWindow"
+    , positionLabel = getObject "positionLabel"
+    , fieldsGrid = getObject "fieldsGrid"
+    , numberOfFields = newIORef 0
+    , currentField = newIORef 0
+    , inputChan = return iChan
+    , fieldMenu = getObject "fieldPopupMenu"
+    , beginButton = getObject "beginButton"
+    , endButton =  getObject "endButton"
+    , leftButton = getObject "leftButton"
+    , rightButton = getObject "rightButton"
+    , changeFieldFormulaDialog = getObject "changeFieldFormulaDialog"
+    , changeFieldFormulaEntry = getObject "changeFieldFormulaEntry"
+    , changeFieldFormulaLabel = getObject "changeFieldFormulaLabel"
+    , changeFieldFormulaButton = getObject "changeFieldFormulaCheckButton"
+    , confFileSaveCheckButton =  getObject "confFileSaveCheckButton"
+    , saveAsDialog = getObject "saveAsDialog"
+    , confFileLoadCheckButton = getObject "confFileLoadCheckButton"
+    , loadFileDialog = getObject "loadFileDialog"
+    , importFromFileDialog = getObject "importFromFileDialog"
+    , importInputSeparator = getObject "importInputSeparator"
+    , importFieldsOptionsDialog = getObject "importFieldsOptionsDialog"
+    , importFieldsOptionsRows = getObject "importFieldsOptionsRows"
+    , targetList = targetListNew
+    , searchFieldDialog = getObject "searchFieldDialog"
+    , searchFieldCombo = getObject "searchFieldCombo"
+    , copyOtherDialog = getObject "copyOtherDialog"
+    , copyOtherCombo = getObject "copyOtherCombo"
+    , textBufferConnections = newIORef []
+    }
+  targetListAddTextTargets (targetList control) 0
+  comboBoxSetModelText $ searchFieldCombo control
+  comboBoxSetModelText $ copyOtherCombo control
+  return control
 
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
              , (("Page_Up", []), toInput MovePrevious)
@@ -292,3 +271,37 @@ prepareChangeFieldFormulaDialog = do
 
 notImplementedDialog :: String -> Input
 notImplementedDialog f = toInput $ MessageDialog (InformationMessage $ "Opción " ++ f ++ " no implementada")
+
+fromIO :: GUIControl' IO -> IO GUIControl
+fromIO = fmap to . gFromIO . from
+
+class GFromIO i o where
+  gFromIO :: i p -> IO (o g)
+
+instance GFromIO (K1 a (IO k)) (K1 a k) where
+  gFromIO (K1 k) = K1 <$> k
+
+instance (GFromIO i o, GFromIO i' o')
+     => GFromIO (i :*: i') (o :*: o') where
+  gFromIO (l :*: r) = (:*:)
+                    <$> gFromIO l
+                    <*> gFromIO r
+  {-# INLINE gFromIO #-}
+
+instance (GFromIO i o, GFromIO i' o')
+    => GFromIO (i :+: i') (o :+: o') where
+  gFromIO (L1 l) = L1 <$> gFromIO l
+  gFromIO (R1 r) = R1 <$> gFromIO r
+  {-# INLINE gFromIO #-}
+
+instance GFromIO i o => GFromIO (M1 _a _b i) (M1 _a' _b' o) where
+  gFromIO (M1 x) = M1 <$> gFromIO x
+  {-# INLINE gFromIO #-}
+
+instance GFromIO V1 V1 where
+  gFromIO = undefined
+  {-# INLINE gFromIO #-}
+
+instance GFromIO U1 U1 where
+  gFromIO U1 = return U1
+  {-# INLINE gFromIO #-}

@@ -8,6 +8,7 @@ data FileCommand = LoadFile
                  | WriteFile
                  | WriteFileFromName FilePath (Maybe FilePath)
                  | ImportFieldsFromFileName FilePath Char
+                 | ImportRecordsFromFileName FilePath Char
                  | WriteBackup
                  | BackupOnExit
                  deriving Show
