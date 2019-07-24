@@ -69,8 +69,9 @@ showFields fis control = do
                        set textView [ textViewEditable := isNothing $ formulaFI fi
                                     , widgetCanFocus := isNothing $ formulaFI fi
                                     ]
-
                        #setStateFlags textView [StateFlagsNormal] True
+
+
                          {- TODO
                        widgetModifyBg textView StateNormal $ if isErrorFI fi
                                                              then errorColor
@@ -180,10 +181,10 @@ dndError :: GUIControl -> IO ()
 dndError control = sendInput control $ MessageDialog (ErrorMessage "Algo está mal en el dnd")
 
 disconnectTextView :: FieldPos -> GUIControl -> IO ()
-disconnectTextView t control = modifyIORef (textBufferActive control) (flip setBit $ fromIntegral t)
+disconnectTextView t control = modifyIORef (textBufferActive control) (flip clearBit $ fromIntegral t)
 
 reconnectTextView :: FieldPos -> GUIControl -> IO ()
-reconnectTextView t control = modifyIORef (textBufferActive control) (flip clearBit $ fromIntegral t)
+reconnectTextView t control = modifyIORef (textBufferActive control) (flip setBit $ fromIntegral t)
 
 
 createFieldTextView :: FieldPos -> GUIControl -> IO TextView
@@ -199,7 +200,9 @@ createFieldTextView f control = do
          buffer <- textViewGetBuffer textView
 
          buffer `on` #changed $ liftIO $ do
+             putStrLn $ "Cambiado buffer en " ++ show f
              isActive <- (@. f) <$> readIORef (textBufferActive control)
+             putStrLn $ "  Activo: " ++ show  isActive
              when isActive $ do
                  begin <- #getStartIter buffer
                  end <- #getEndIter buffer
