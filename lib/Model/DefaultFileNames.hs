@@ -4,7 +4,7 @@ module Model.DefaultFileNames ( defaultConfFileName
 
 import System.FilePath((-<.>))
 
-    -- |The default configuration file from a file name.
+-- |The default configuration file from a file name.
 defaultConfFileName :: FilePath -> FilePath
 defaultConfFileName = (-<.> "conf")
 

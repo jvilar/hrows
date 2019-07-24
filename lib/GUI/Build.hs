@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLabels #-}
@@ -24,7 +25,7 @@ import qualified Data.Text as T
 import GHC.Generics(Generic, K1(..), M1(..), Rep(..), V1(..), U1(..)
                    , (:*:)(..), (:+:)(..), from, to)
 
-import GI.Gdk (screenGetDefault, EventKey, keyvalName, ModifierType(ModifierTypeControlMask))
+import GI.Gdk (screenGetDefault, EventKey, keyvalName, ModifierType(..))
 import GI.Gtk hiding (MessageDialog)
 
 import Paths_hrows(getDataFileName)
@@ -188,13 +189,28 @@ prepareControl iChan builder = do
   targetListAddTextTargets (targetList control) 0
   return control
 
+globalKeys :: [ ((Text, [ModifierType]), Input)]
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
+             , (("KP_Next", []), toInput MoveNext)
              , (("Page_Up", []), toInput MovePrevious)
+             , (("KP_Page_Up", []), toInput MovePrevious)
              , (("q", [ModifierTypeControlMask]), toInput ExitRequested)
              , (("r", [ModifierTypeControlMask]), toInput Redo)
              , (("z", [ModifierTypeControlMask]), toInput Undo)
              , (("Return", []), toInput DoNothing)
              ]
+
+ignoredModfifiers :: [ModifierType]
+ignoredModfifiers = [ModifierTypeLockMask, ModifierTypeMod2Mask]
+
+commandFromGlobalKey :: EventKey -> IO (Maybe Input)
+commandFromGlobalKey evk = do
+  n <- get evk #keyval >>= keyvalName
+  case n of
+    Just name -> do
+      mods <- filter (`notElem` ignoredModfifiers) <$> get evk #state
+      return $ lookup (name, mods) globalKeys
+    Nothing -> return Nothing
 
 prepareMainWindow :: BuildMonad ()
 prepareMainWindow = do
@@ -205,24 +221,21 @@ prepareMainWindow = do
         liftIO $ sendInput control ExitRequested
         return False
       window `on` #keyPressEvent $ \evk -> do
-          name <- get evk #keyval >>= keyvalName
-          mods <- get evk #state
           -- showEvent evk
-          let cmd = do
-                n <- name
-                lookup (n, mods) globalKeys
-          -- liftIO $ print cmd
-          maybe (return False)
-                (\c -> liftIO $ sendInput control c >> return True)
-                cmd
+          commandFromGlobalKey evk >>= \case
+              Nothing -> return False
+              Just cmd -> do
+                liftIO $ sendInput control cmd
+                -- liftIO $ print cmd
+                return True
       widgetShowAll window
 
-showEvent :: EventKey -> BuildMonad()
+showEvent :: EventKey -> IO()
 showEvent evk = do
   name <- get evk #keyval >>= keyvalName
   mods <- get evk #state
-  liftIO $ putStrLn $ "Key name: " ++ show name
-  liftIO $ putStrLn $ "Modifiers: " ++ show mods
+  putStrLn $ "Key name: " ++ show name
+  putStrLn $ "Modifiers: " ++ show mods
 
 prepareMovementButtons :: BuildMonad ()
 prepareMovementButtons = buttons
