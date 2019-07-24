@@ -53,10 +53,10 @@ data GUIControl' f = GUIControl { mainWindow :: HKD f Window
                                 , copyOtherDialog :: HKD f Dialog
                                 , copyOtherCombo :: HKD f ComboBoxText
                                 , textBufferActive :: HKD f (IORef BitVector)
-                                , errorColor :: HKD f RGBA
+                                {- , errorColor :: HKD f RGBA
                                 , formulaColor :: HKD f RGBA
                                 , emptyColor :: HKD f RGBA
-                                , normalColor :: HKD f RGBA
+                                , normalColor :: HKD f RGBA -}
                                 } deriving Generic
 
 type GUIControl = GUIControl' Identity

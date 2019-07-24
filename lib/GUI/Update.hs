@@ -46,10 +46,10 @@ changeTitle title control = set (mainWindow control) [ windowTitle := title ]
 
 updatePosition :: Int -> Int -> GUIControl -> IO ()
 updatePosition pos size control = do
-    widgetSetSensitive (beginButton control) $ pos > 1
-    widgetSetSensitive (leftButton control) $ pos > 1
-    widgetSetSensitive (endButton control) $ pos < size
-    widgetSetSensitive (rightButton control) $ pos < size
+    beginButton control `set` [ #sensitive := pos > 1 ]
+    leftButton control `set` [ #sensitive := pos > 1 ]
+    endButton control `set` [ #sensitive := pos < size ]
+    rightButton control `set` [ #sensitive := pos < size ]
 
     labelSetText (positionLabel control) $ T.concat [showt pos, "/", showt size]
 
@@ -65,11 +65,12 @@ showFields fis control = do
                        disconnectTextView (indexFI fi) control
                        let tooltip = fromMaybe (typeLabel $ typeFI fi) $ formulaFI fi
                        label <- recoverLabel (indexFI fi) control
-                       widgetSetTooltipText label $ Just tooltip
+                       label `set` [ #tooltipText := tooltip ]
                        set textView [ textViewEditable := isNothing $ formulaFI fi
                                     , widgetCanFocus := isNothing $ formulaFI fi
- -- TODO                                   , widgetState := StateNormal
                                     ]
+
+                       #setStateFlags textView [StateFlagsNormal] True
                          {- TODO
                        widgetModifyBg textView StateNormal $ if isErrorFI fi
                                                              then errorColor
