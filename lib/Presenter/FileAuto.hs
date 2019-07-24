@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Presenter.FileAuto (
               -- *Functions
               fileAuto
@@ -9,6 +11,7 @@ import Control.Monad(unless, void, when)
 import Control.Monad.Trans(liftIO)
 import Data.Default(def)
 import Data.Maybe(fromJust, isJust)
+import qualified Data.Text as T
 import System.Directory(removeFile)
 
 import GUI.Command
@@ -60,7 +63,7 @@ applyCommand WriteBackup model info = do
         r <- liftIO $ try $ toListatab ltinfo (fromJust fp) conf model
         case r of
             Right _ -> return ()
-            Left (HRowsException m) -> message $ ErrorMessage ("Error al hacer la copia de seguridad: " ++ m)
+            Left (HRowsException m) -> message $ ErrorMessage ("Error al hacer la copia de seguridad: " `T.append` m)
 
 applyCommand BackupOnExit model info
     | changed model = applyCommand WriteBackup model info

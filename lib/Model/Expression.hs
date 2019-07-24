@@ -3,6 +3,7 @@
            , DeriveTraversable
            , FlexibleContexts
            , FlexibleInstances
+           , OverloadedStrings
            , TypeSynonymInstances
 #-}
 
@@ -44,11 +45,14 @@ import Data.Function((&))
 import Data.List(foldr1, elemIndex)
 import Data.Maybe(fromMaybe)
 import Data.Monoid(Any(..))
+import Data.Text(Text)
+import qualified Data.Text as T
+import TextShow(TextShow(showt))
 import Model.Field
 import Model.Row
 
 -- |The Formula is the expression as written by the user.
-type Formula = String
+type Formula = Text
 
 -- |The priority of an operator
 type Priority = Int
@@ -68,20 +72,20 @@ instance Show Expression where
 newtype Fix t = In { out :: t (Fix t) }
 
 data Node a = Position Int
-            | NamedPosition String
+            | NamedPosition Text
             | Constant Field
             | Unary UnaryOpInfo a
             | Binary BinaryOpInfo a a
             | Ternary a a a
             | Cast FieldType a
-            | Error String
+            | Error Text
             deriving (Foldable, Functor, Show, Traversable)
 
 
 mkPosition :: Int -> Expression
 mkPosition = In . Position
 
-mkNamedPosition :: String -> Expression
+mkNamedPosition :: Text -> Expression
 mkNamedPosition = In . NamedPosition
 
 mkConstant :: Field -> Expression
@@ -99,7 +103,7 @@ mkTernary e e' e'' = In $ Ternary e e' e''
 mkCast :: FieldType -> Expression -> Expression
 mkCast = (In .) . Cast
 
-mkErrorExpr :: String -> Expression
+mkErrorExpr :: Text -> Expression
 mkErrorExpr = In . Error
 
 type UnaryOp = Field -> Field
@@ -110,7 +114,7 @@ data UnaryOpInfo = UnaryOpInfo { opU :: UnaryOp
                                }
 
 instance Show UnaryOpInfo where
-    show = formulaU
+    show = T.unpack . formulaU
 
 type BinaryOp = Field -> Field -> Field
 
@@ -122,7 +126,7 @@ data BinaryOpInfo = BinaryOpInfo { opB :: BinaryOp
                                  }
 
 instance Show BinaryOpInfo where
-    show = formulaB
+    show = T.unpack . formulaB
 
 type Algebra f a = f a -> a
 
@@ -155,29 +159,29 @@ evaluate r exp = runReader (eval exp) r
 toFormula :: Expression -> Formula
 toFormula = para tf
     where tf :: RAlgebra Node Formula
-          tf _ (Position p) = "$" ++ show (p + 1)
-          tf _ (NamedPosition n) | all isAlphaNum n = n
-                                 | otherwise = "@{" ++ n ++ "}"
-          tf _ (Constant f) | typeOf f == TypeString = '"' : toString f ++ "\""
+          tf _ (Position p) = "$" `T.append` showt (p + 1)
+          tf _ (NamedPosition n) | T.all isAlphaNum n = n
+                                 | otherwise = T.concat ["@{", n, "}"]
+          tf _ (Constant f) | typeOf f == TypeString = T.concat[ "\"", toString f, "\""]
                             | otherwise = toString f
-          tf (In (Unary info e)) (Unary _ f) = formulaU info ++ parent 8 (prio e) f
+          tf (In (Unary info e)) (Unary _ f) = formulaU info `T.append` parent 8 (prio e) f
           tf (In (Binary info e1 e2)) (Binary _ f1 f2) = let
                      (pe1, pe2) = case assocB info of
                                       LeftAssoc -> (prioB info, prioB info + 1)
                                       RightAssoc -> (prioB info + 1, prioB info)
                                       TrueAssoc -> (prioB info, prioB info)
                                       NoAssoc -> (prioB info + 1, prioB info + 1)
-                     in parent pe1 (prio e1) f1 ++ formulaB info ++ parent pe2 (prio e2) f2
-          tf _ (Cast ft f) = typeOperator ft ++ "(" ++ f ++ ")"
+                     in T.concat [parent pe1 (prio e1) f1, formulaB info, parent pe2 (prio e2) f2]
+          tf _ (Cast ft f) = T.concat [typeOperator ft, "(", f, ")"]
           tf (In (Ternary e1 e2 e3)) (Ternary f1 f2 f3) = let
                 f1' = parent 1 (prio e1) f1
                 f2' = parent 0 (prio e2) f2
                 f3' = parent 0 (prio e3) f3
-              in f1' ++ "?" ++ f2' ++ ":" ++ f3'
-          tf _ (Error s) = "Error: " ++ s
+              in T.concat [f1', "?", f2',  ":", f3']
+          tf _ (Error s) = "Error: " `T.append` s
 
-parent :: Priority -> Priority -> String -> String
-parent p1 p2 s | p1 > p2 = "(" ++ s ++ ")"
+parent :: Priority -> Priority -> Text -> Text
+parent p1 p2 s | p1 > p2 = T.concat ["(", s, ")"]
                | otherwise = s
 
 prio :: Expression -> Priority
@@ -190,7 +194,7 @@ eval :: Expression -> Eval Field
 eval = cataM ev
     where
       ev (Position n) = evalIndex n
-      ev (NamedPosition name) = return . mkError $ "Expresión con variable: " ++ name
+      ev (NamedPosition name) = return . mkError $ "Expresión con variable: " `T.append` name
       ev (Constant f) = return f
       ev (Unary info v) = return $ opU info v
       ev (Binary info v1 v2) = return $ opB info v1 v2
@@ -203,12 +207,12 @@ evalIndex n = do
     r <- ask
     return $ if 0 <= n && n < length r
              then r !! n
-             else mkError $ "Índice erróneo " ++ show (n + 1)
+             else mkError $ "Índice erróneo " `T.append` showt (n + 1)
 
-eliminateNames :: [String] -> Expression -> Expression
+eliminateNames :: [Text] -> Expression -> Expression
 eliminateNames fnames = bottomUp noNames
     where noNames (In (NamedPosition name)) = In $ case elemIndex name fnames of
-                                                 Nothing -> Error $ "Mal nombre de campo: " ++ name
+                                                 Nothing -> Error $ "Mal nombre de campo: " `T.append` name
                                                  Just i -> Position i
           noNames n = n
 
@@ -225,7 +229,7 @@ translatePositions newPos = second getAny . runWriter . bottomUpM tPos
               return . In $ Position n'
           tPos e = return e
 
-translateNames :: [(String, String)] -> Expression -> (Expression, Changed)
+translateNames :: [(Text, Text)] -> Expression -> (Expression, Changed)
 translateNames newNames = second getAny . runWriter . bottomUpM tNames
     where tNames (In (NamedPosition name)) = do
               let name' = fromMaybe name (lookup name newNames)
@@ -237,7 +241,7 @@ getPositions :: Expression -> [Int]
 getPositions = cata gp
     where
         gp (Position n) = [n]
-        gp (NamedPosition name) = error $ "Expresión con variable: " ++ name
+        gp (NamedPosition name) = error $ "Expresión con variable: " ++ T.unpack name
         gp (Constant f) = []
         gp (Unary _ ps) = ps
         gp (Binary _ ps1 ps2) = merge ps1 ps2

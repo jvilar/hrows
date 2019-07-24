@@ -5,6 +5,7 @@ module Model.ModelConf ( ModelConf(..)
                        ) where
 
 import Data.Aeson
+import Data.Text(Text)
 import GHC.Generics
 
 import Model.Expression
@@ -12,7 +13,7 @@ import Model.Field
 
 newtype ModelConf = ModelConf [ FieldConf ] deriving (Generic, Show)
 
-data FieldConf = FieldConf { nameFC :: Maybe String
+data FieldConf = FieldConf { nameFC :: Maybe Text
                            , typeFC :: FieldType
                            , formulaFC :: Maybe Formula
                            } deriving (Generic, Show)

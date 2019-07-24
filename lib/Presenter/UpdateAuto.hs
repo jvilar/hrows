@@ -1,4 +1,4 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE OverloadedStrings, TupleSections #-}
 
 module Presenter.UpdateAuto (
     updateAuto
@@ -8,6 +8,7 @@ import Control.Arrow(first)
 import Control.Auto(Auto, accumM_)
 import Control.Monad.Trans(liftIO)
 import Data.Maybe(fromMaybe)
+import qualified Data.Text as T
 
 import GUI.Command
 import Model
@@ -68,7 +69,7 @@ update model (UpdateField fpos v, pos) = do
         (model', changed) = changeField pos fpos v model
     sendGUIM . ShowFields $ do
                              c <- changed
-                             let f = r !! c
+                             let f = r !!! c
                                  text = if c /= fpos
                                         then Just $ toString f
                                         else Nothing
@@ -107,8 +108,8 @@ update model (ChangeFieldFormula mf f, pos) =
     partialRefresh pos $ changeFieldFormula mf f model
 update model (SetUnchanged, _) = return $ setUnchanged model
 
-cnames :: Model -> [String]
-cnames = map (++ ": ") . fnames
+cnames :: Model -> [Name]
+cnames = map (`T.append` ": ") . fnames
 
 partialRefresh :: Int -> Model -> PresenterM Model
 partialRefresh pos model = do

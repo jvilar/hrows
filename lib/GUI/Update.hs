@@ -1,4 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings
+           , OverloadedLabels
+#-}
 
 module GUI.Update (
             -- *Types
@@ -9,14 +11,19 @@ module GUI.Update (
 
 import Control.Monad(filterM, forM, forM_, guard, unless, when)
 import Control.Monad.IO.Class(liftIO)
+import Data.Bits(Bits(setBit, clearBit))
+import Data.BitVector(nil, BV, extract, (#), ones, (@.))
+import qualified Data.BitVector as BV
 import Data.Either(lefts, rights)
-import Data.IORef(modifyIORef, readIORef, writeIORef)
+import Data.IORef(IORef, modifyIORef, readIORef, writeIORef)
 import Data.List(elemIndex, sort)
 import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import Data.Text(Text)
 import qualified Data.Text as T
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.General.Enums(Align(..))
+import GHC.Int(Int32)
+import GI.Gtk hiding (MessageDialog)
+import GI.Gdk
+import TextShow(TextShow(showt))
 
 import GUI.Command
 import GUI.Control
@@ -34,7 +41,7 @@ updateGUI (ShowIteration iter) = showIteration iter
 updateGUI DisableTextViews = disableTextViews
 
 
-changeTitle :: String -> GUIControl -> IO ()
+changeTitle :: Text -> GUIControl -> IO ()
 changeTitle title control = set (mainWindow control) [ windowTitle := title ]
 
 updatePosition :: Int -> Int -> GUIControl -> IO ()
@@ -44,88 +51,77 @@ updatePosition pos size control = do
     widgetSetSensitive (endButton control) $ pos < size
     widgetSetSensitive (rightButton control) $ pos < size
 
-    labelSetText (positionLabel control) $ show pos ++ "/" ++ show size
+    labelSetText (positionLabel control) $ T.concat [showt pos, "/", showt size]
 
-enumerate :: [a] -> [(Int, a)]
+enumerate :: Integral int => [a] -> [(int, a)]
 enumerate = zip [0..]
-
-errorColor :: Color
-errorColor = Color 65535 36864 2560
-
-formulaColor :: Color
-formulaColor = Color 53000 53000 53000
-
-emptyColor :: Color
-emptyColor = Color 53000 53000 53000
-
-normalColor :: Color
-normalColor = Color 65535 65535 65535
 
 showFields :: [FieldInfo] -> GUIControl -> IO ()
 showFields fis control = do
   let grid = fieldsGrid control
 
   forM_ fis $ \fi -> do
-                       connectId <- recoverConnectId (indexFI fi) control
-                       signalBlock connectId -- Don't update the model
+                       textView <- recoverTextView (indexFI fi) control
+                       disconnectTextView (indexFI fi) control
                        let tooltip = fromMaybe (typeLabel $ typeFI fi) $ formulaFI fi
                        label <- recoverLabel (indexFI fi) control
-                       set label [ widgetTooltipText := Just tooltip ]
-                       textView <- recoverTextView (indexFI fi) control
+                       widgetSetTooltipText label $ Just tooltip
                        set textView [ textViewEditable := isNothing $ formulaFI fi
                                     , widgetCanFocus := isNothing $ formulaFI fi
-                                    , widgetState := StateNormal
+ -- TODO                                   , widgetState := StateNormal
                                     ]
+                         {- TODO
                        widgetModifyBg textView StateNormal $ if isErrorFI fi
                                                              then errorColor
                                                              else if isJust $ formulaFI fi
                                                                   then formulaColor
                                                                   else normalColor
+-}
                        buffer <- textViewGetBuffer textView
-                       forM_ (textFI fi) $
-                            textBufferSetText buffer
-                       signalUnblock connectId
+                       forM_ (textFI fi) $ \t ->
+                            textBufferSetText buffer t (fromIntegral $ T.length t)
+                       reconnectTextView (indexFI fi) control
   widgetShowAll grid
 
-recoverTextView :: Int -> GUIControl -> IO TextView
+recoverTextView :: FieldPos -> GUIControl -> IO TextView
 recoverTextView row control = do
     -- putStrLn $ "Recovering textView in row " ++ show row
     Just tv <- gridGetChildAt (fieldsGrid control) 1 row
-    return $ castToTextView tv
+    unsafeCastTo TextView tv
 
-recoverLabel :: Int -> GUIControl -> IO Label
+recoverLabel :: FieldPos -> GUIControl -> IO Label
 recoverLabel row control = do
     -- putStrLn $ "Recovering label in row " ++ show row
     Just ebox <- gridGetChildAt (fieldsGrid control) 0 row
-    lbl <- head <$> containerGetChildren (castToEventBox ebox)
-    return $ castToLabel lbl
+    cbox <- unsafeCastTo EventBox ebox
+    lbl <- head <$> containerGetChildren cbox
+    unsafeCastTo Label lbl
 
-recoverConnectId :: Int -> GUIControl -> IO (ConnectId TextBuffer)
-recoverConnectId row control = (!! row) <$> readIORef (textBufferConnections control)
+addTextBufferActive :: Int -> GUIControl -> IO ()
+addTextBufferActive n control = modifyIORef (textBufferActive control) (\bv -> ones n # bv)
 
-addConnectIds :: [ConnectId TextBuffer] -> GUIControl -> IO ()
-addConnectIds l control = modifyIORef (textBufferConnections control) (++l)
-
-deleteConnectIds :: [Int] -> GUIControl -> IO ()
-deleteConnectIds pos control = let
-    delPos _ _ [] = []
-    delPos _ [] xs = xs
-    delPos index pss@(p:ps) (x:xs) | p == index = delPos (index + 1) ps xs
-                                   | otherwise = x : delPos (index + 1) pss xs
-  in modifyIORef (textBufferConnections control) (delPos 0 $ sort pos)
+deleteTextBufferActive :: [FieldPos] -> GUIControl -> IO ()
+deleteTextBufferActive ps control = let
+    survivors :: Int32 -> [Int32] -> BV -> BV
+    survivors l [] bv = add l (fromIntegral $ BV.size bv - 1) bv nil
+    survivors l (p:ps) bv = add l (p-1) bv $ survivors (p+1) ps bv
+    add :: Int32 -> Int32 -> BV -> BV -> BV
+    add l r bv | l <= r = (extract r l bv #)
+               | otherwise = id
+  in modifyIORef (textBufferActive control) (survivors 0 ps)
 
 disableTextViews :: GUIControl -> IO ()
 disableTextViews control = do
   nfields <- readIORef $ numberOfFields control
-  forM_ [0..nfields-1] $ \f -> do
+  forM_ [0 .. fromIntegral nfields-1] $ \f -> do
                                 textView <- recoverTextView f control
-                                set textView [ textViewEditable := False
-                                             , widgetCanFocus := False
-                                             , widgetState := StateInsensitive
+                                set textView [ #editable := False
+                                             , #canFocus := False
+                                             , #sensitive := False
                                              ]
-                                widgetModifyBg textView StateInsensitive emptyColor
+                               -- TODO widgetModifyBg textView StateInsensitive emptyColor
 
-updateNames :: [String] -> GUIControl -> IO ()
+updateNames :: [Name] -> GUIControl -> IO ()
 updateNames names control = do
   let grid = fieldsGrid control
   adjustTextFields (length names) control
@@ -140,75 +136,84 @@ adjustTextFields nfields control = do
   let grid = fieldsGrid control
   current <- readIORef $ numberOfFields control
   case compare current nfields of
-    LT -> addFields grid [current .. nfields - 1] control
+    LT -> addFields grid [fromIntegral current .. fromIntegral nfields - 1] control
     EQ -> return ()
-    GT -> deleteFields grid [nfields .. current - 1] control
+    GT -> deleteFields grid [fromIntegral nfields .. fromIntegral current - 1] control
   writeIORef (numberOfFields control) nfields
 
 addFields :: Grid -> [FieldPos] -> GUIControl -> IO ()
 addFields grid fields control = do
-    connectIds <- forM fields $ \f -> do
-                     lbl <- createFieldLabel f control
-                     gridAttach grid lbl 0 f 1 1
-                     (textView, connectId) <- createFieldTextView f control
-                     gridAttach grid textView 1 f 1 1
-                     return connectId
-    addConnectIds connectIds control
+    forM fields $ \f -> do
+       lbl <- createFieldLabel f control
+       #attach grid lbl 0 f 1 1
+       textView <- createFieldTextView f control
+       #attach grid textView 1 f 1 1
+    addTextBufferActive (length fields) control
 
 createFieldLabel :: FieldPos -> GUIControl -> IO EventBox
 createFieldLabel f control = do
-         lbl <- labelNew $ Just ("" :: String)
-         widgetSetHAlign lbl AlignStart
+         lbl <- labelNew $ Just ""
+         #setHalign lbl AlignStart
          ebox <- eventBoxNew
-         dragSourceSet ebox [Button1] [ActionMove]
-         dragSourceSetTargetList ebox (targetList control)
-         dragDestSet ebox [DestDefaultAll] [ActionMove]
-         dragDestSetTargetList ebox (targetList control)
-         ebox `on` dragDataGet $ \_ _ _ -> do
-                               ok <- selectionDataSetText (show f)
-                               unless ok (liftIO $ dndError control)
-         ebox `on` dragDataReceived $ \_ _ _ _ -> do
-                               t <- selectionDataGetText
-                               liftIO $ case (t :: Maybe String) of
+         #dragSourceSet ebox [ModifierTypeButton1Mask] Nothing [DragActionMove] -- Check the Nothing, I have no idea if it is correct
+         #dragSourceSetTargetList ebox (Just $ targetList control)
+         #dragDestSet ebox [DestDefaultsAll] Nothing [DragActionMove] -- Ditto for Nothing
+         #dragDestSetTargetList ebox (Just $ targetList control)
+         ebox `on` #dragDataGet $ \_ sdata _ _ -> do
+                                   let (t,l) = (showt f, fromIntegral $ T.length t)
+                                   ok <- selectionDataSetText sdata t l
+                                   unless ok (liftIO $ dndError control)
+         ebox `on` #dragDataReceived $ \_ _ _ sdata _ _ -> do
+                               t <- selectionDataGetText sdata
+                               liftIO $ case (t :: Maybe Text) of
                                           Nothing -> dndError control
                                           Just v -> let
-                                                      from = read v
+                                                      from = read $ T.unpack v
                                                     in if from /= f
                                                        then sendInput control $ MoveField from f
                                                        else return ()
-         containerAdd ebox lbl
+         #add ebox lbl
          return ebox
 
 dndError :: GUIControl -> IO ()
 dndError control = sendInput control $ MessageDialog (ErrorMessage "Algo está mal en el dnd")
 
-createFieldTextView :: FieldPos -> GUIControl -> IO (TextView, ConnectId TextBuffer)
+disconnectTextView :: FieldPos -> GUIControl -> IO ()
+disconnectTextView t control = modifyIORef (textBufferActive control) (flip setBit $ fromIntegral t)
+
+reconnectTextView :: FieldPos -> GUIControl -> IO ()
+reconnectTextView t control = modifyIORef (textBufferActive control) (flip clearBit $ fromIntegral t)
+
+
+createFieldTextView :: FieldPos -> GUIControl -> IO TextView
 createFieldTextView f control = do
          textView <- textViewNew
-         set textView [ textViewWrapMode := WrapWord
-                      , textViewAcceptsTab := False
-                      , textViewEditable := False
-                      , widgetState := StateInsensitive
-                      , widgetCanFocus := False
-                      , widgetHExpand := True
+         set textView [ #wrapMode := WrapModeWord
+                      , #acceptsTab := False
+                      , #editable := False
+                      , #sensitive := False
+                      , #canFocus := False
+                      , #hexpand := True
                       ]
          buffer <- textViewGetBuffer textView
 
-         connectId <- buffer `on` bufferChanged $ liftIO $ do
-             begin <- textBufferGetStartIter buffer
-             end <- textBufferGetEndIter buffer
-             text <- textBufferGetText buffer begin end False
-             sendInput control $ UpdateField f (toField (text::String))
+         buffer `on` #changed $ liftIO $ do
+             isActive <- (@. f) <$> readIORef (textBufferActive control)
+             when isActive $ do
+                 begin <- #getStartIter buffer
+                 end <- #getEndIter buffer
+                 text <- #getText buffer begin end False
+                 sendInput control $ UpdateField f (toField text)
 
-         textView `on` buttonPressEvent $ do
-             button <- eventButton
-             if button == RightButton
+         textView `on` #buttonPressEvent $ \event -> do
+             button <- get event #button
+             if button == 3
              then liftIO $ do
                       writeIORef (currentField control) f
-                      menuPopup (fieldMenu control) Nothing
+                      #popupAtPointer (fieldMenu control) Nothing
                       return True
              else return False
-         return (textView, connectId)
+         return textView
 
 deleteFields :: Grid -> [FieldPos] -> GUIControl -> IO ()
 deleteFields grid fields control = do
@@ -216,7 +221,7 @@ deleteFields grid fields control = do
                          forM_ [0, 1] $ \c -> do
                              Just w <- gridGetChildAt grid c f
                              widgetDestroy w
-                      deleteConnectIds fields control
+                      deleteTextBufferActive fields control
 
 showIteration :: Iteration -> GUIControl -> IO ()
 showIteration AskReadFile = askReadFile
@@ -235,19 +240,25 @@ showIteration (CopyOtherField fpos initial l) = copyOther fpos initial l
 showIteration it = unimplemented $ show it
 
 displayMessage :: Message -> GUIControl -> IO ()
-displayMessage (ErrorMessage m) = noResponseMessage m MessageError
-displayMessage (WarningMessage m) = noResponseMessage m MessageWarning
-displayMessage (InformationMessage m) = noResponseMessage m MessageWarning
+displayMessage (ErrorMessage m) = noResponseMessage m
+displayMessage (WarningMessage m) = noResponseMessage m
+displayMessage (InformationMessage m) = noResponseMessage m
 displayMessage (QuestionMessage _) = undefined
 
-noResponseMessage :: String -> MessageType -> GUIControl -> IO ()
-noResponseMessage m mtype control = do
-    dlg <- messageDialogNew (Just $ mainWindow control)
-                            []
-                            mtype
-                            ButtonsOk
-                            m
-    dialogRun dlg
+noResponseMessage :: Text -> GUIControl -> IO ()
+noResponseMessage m control = do
+    dlg <- dialogNew
+    set dlg [ #transientFor := mainWindow control
+            , #modal := True
+            , #typeHint := WindowTypeHintDialog
+            , #windowPosition := WindowPositionCenterOnParent
+            ]
+    #addButton dlg "Ok" $ asInt32 ResponseTypeOk
+    content <- #getContentArea dlg
+    message <- labelNew $ Just m
+    #packStart content message True True 2
+    #showAll dlg
+    #run dlg
     widgetDestroy dlg
 
 askReadFile :: GUIControl -> IO ()
@@ -256,18 +267,26 @@ askReadFile = askFile loadFileDialog confFileLoadCheckButton LoadFileFromName
 askWriteFile :: GUIControl -> IO ()
 askWriteFile = askFile saveAsDialog confFileSaveCheckButton WriteFileFromName
 
+isResponse :: Int32 -> ResponseType -> Bool
+isResponse r = (== r) . fromIntegral . fromEnum
+
+asInt32 :: Enum e => e -> Int32
+asInt32 = fromIntegral . fromEnum
+
 askFile :: IsInput t => (GUIControl -> FileChooserDialog)
                      -> (GUIControl -> CheckButton)
                      -> (FilePath -> Maybe FilePath -> t)
                      -> GUIControl -> IO ()
 askFile dlg btn input control = do
     let dialog = dlg control
-    set dialog [ windowTransientFor := mainWindow control
-               , windowModal := True
+    set dialog [ #transientFor := mainWindow control
+               , #modal := True
+               , #typeHint := WindowTypeHintDialog
+               , #windowPosition := WindowPositionCenterOnParent
                ]
-    r <- dialogRun dialog
-    widgetHide dialog
-    when (r == ResponseOk) $ do
+    r <- #run dialog
+    #hide dialog
+    when (isResponse r ResponseTypeOk) $ do
             file <- fileChooserGetFilename dialog
             when (isJust file) $ do
                 chk <- toggleButtonGetActive (btn control)
@@ -280,17 +299,19 @@ askFile dlg btn input control = do
 askImportFrom :: ImportType -> GUIControl -> IO ()
 askImportFrom t control = do
     let dialog = importFromFileDialog control
-    set dialog [ windowTransientFor := mainWindow control
-               , windowModal := True
+    set dialog [ #transientFor := mainWindow control
+               , #modal := True
+               , #typeHint := WindowTypeHintDialog
+               , #windowPosition := WindowPositionCenterOnParent
                ]
-    r <- dialogRun dialog
-    widgetHide dialog
-    when (r == ResponseOk) $ do
+    r <- #run dialog
+    #hide dialog
+    when (isResponse r ResponseTypeOk) $ do
         file <- fileChooserGetFilename dialog
         separator <- translateChar <$> entryGetText (importInputSeparator control)
         when (isJust file) $ sendInput control $ ImportFromFileName t (fromJust file) separator
 
-askImportOptions :: ImportType -> [String] -> [String] -> Model -> GUIControl -> IO ()
+askImportOptions :: ImportType -> [Name] -> [Name] -> Model -> GUIControl -> IO ()
 askImportOptions t ifs cfs m control = do
     let (dialog, grid) = case t of
           ImportFields -> (importFieldsOptionsDialog control, importFieldsOptionsRows control)
@@ -301,15 +322,15 @@ askImportOptions t ifs cfs m control = do
     children <- containerGetChildren grid
     forM_ children widgetDestroy
 
-    let ifst = "" : map T.pack ifs
+    let ifst = "" : ifs
         options = case t of
                     ImportFields -> ["", "<-", "=="] :: [Text]
                     ImportRows -> ["", "<-"]
     forM_ (enumerate cfs) $ \(row, current) -> do
         lbl <- addLabel grid current 0 row
-        widgetSetHAlign lbl AlignStart
+        #setHalign lbl AlignStart
         btn <- addButton grid "" 1 row
-        btn `on` buttonActivated $ do
+        btn `on` #activate $ do
             l <- buttonGetLabel btn
             let Just n = elemIndex l options
                 n' = (n+1) `mod` (length options)
@@ -317,23 +338,23 @@ askImportOptions t ifs cfs m control = do
         addComboBox grid ifst 2 row
 
     widgetShowAll dialog
-    r <- dialogRun dialog
-    set dialog [ windowTransientFor := mainWindow control
-               , windowModal := True
-               , windowTypeHint := WindowTypeHintDialog
-               , windowWindowPosition := WinPosCenterOnParent
+    set dialog [ #transientFor := mainWindow control
+               , #modal := True
+               , #typeHint := WindowTypeHintDialog
+               , #windowPosition := WindowPositionCenterOnParent
                ]
-    widgetHide dialog
+    r <- #run dialog
+    #hide dialog
 
-    when (r == ResponseOk) $ do
+    when (isResponse r ResponseTypeOk) $ do
         l <- catMaybes <$> (forM (enumerate cfs) $ \(row, _) -> do
             Just b <- gridGetChildAt grid 1 row
-            let btn = castToButton b
+            Just btn <- castTo Button b
             option <- buttonGetLabel btn
             Just cb <- gridGetChildAt grid 2 row
-            let cbox = castToComboBox cb
+            Just cbox <- castTo ComboBox cb
             i <- comboBoxGetActive cbox
-            return $ if i == 0 || option == ("" :: Text)
+            return $ if i == 0 || T.null option
                      then Nothing
                      else Just $ case option of
                                      "<-" -> Left (row, i - 1)
@@ -345,10 +366,13 @@ askImportOptions t ifs cfs m control = do
                               ImportFields -> ImportFieldsFromModel m keys values
                               ImportRows -> ImportRowsFromModel m values
 
-translateChar :: String -> Char
-translateChar "\\t" = '\t'
-translateChar ('\\':[c]) = c
-translateChar (c:_) = c
+translateChar :: Text -> Char
+translateChar t = case T.uncons t of
+                    Nothing -> '\t'
+                    Just ('\\', t') -> if T.null t'
+                                       then '\\'
+                                       else T.head t'
+                    Just (c, _) -> c
 
 confirmExit :: Bool -> GUIControl -> IO ()
 confirmExit changed control = do
@@ -356,43 +380,43 @@ confirmExit changed control = do
       msg = if changed
             then "Ha habido cambios, ¿cómo quieres salir?"
             else "¿Seguro que quieres salir?"
-  dlg <- messageDialogNew (Just $ mainWindow control)
-                          [DialogModal]
-                          MessageQuestion
-                          (if changed
-                           then ButtonsNone
-                           else ButtonsYesNo)
-                          msg
-  when changed $ do
-      dialogAddButton dlg ("Grabar y salir" :: String) (ResponseUser 1)
-      dialogAddButton dlg ("Salir sin grabar" :: String) ResponseYes
-      dialogAddButton dlg ("No salir" :: String) ResponseNo
-      return ()
+  dlg <- dialogNew
+  set dlg [ #transientFor := mainWindow control
+          , #modal := True
+          , #typeHint := WindowTypeHintDialog
+          , #windowPosition := WindowPositionCenterOnParent
+          ]
+  if changed
+  then do
+         #addButton dlg "Grabar y salir" 1
+         #addButton dlg "Salir sin grabar" $ asInt32 ResponseTypeYes
+         #addButton dlg "No salir" $ asInt32 ResponseTypeNo
+  else do
+         #addButton dlg "Sí" $ asInt32 ResponseTypeYes
+         #addButton dlg "No" $ asInt32 ResponseTypeNo
 
-  r <- dialogRun dlg
-  when (r == ResponseYes) $ do
+  r <- #run dlg
+  when (isResponse r ResponseTypeYes) $ do
                         sendInput control ExitProgram
                         mainQuit
-  when (r == ResponseUser 1) $ do
-                        sendInput control WriteFile
-                        sendInput control ExitProgram
-                        mainQuit
+  when (r == 1) $ do
+                   sendInput control WriteFile
+                   sendInput control ExitProgram
+                   mainQuit
   widgetDestroy dlg
 
 askCreateField :: GUIControl -> IO ()
 askCreateField control = do
     dlg <- dialogNew
-    set dlg [ windowTransientFor := mainWindow control
-            , windowModal := True
+    set dlg [ #transientFor := mainWindow control
+            , #modal := True
+            , #typeHint := WindowTypeHintDialog
+            , #windowPosition := WindowPositionCenterOnParent
             ]
-    dialogAddButton dlg
-                    ("Crear" :: String)
-                    ResponseOk
-    dialogAddButton dlg
-                    ("Cancelar" :: String)
-                    ResponseCancel
-    content <- castToContainer <$> dialogGetContentArea dlg
-    labelNew (Just ("Crear Campos" :: String)) >>= containerAdd content
+    #addButton dlg "Crear" $ asInt32 ResponseTypeOk
+    #addButton dlg "Cancelar" $ asInt32 ResponseTypeCancel
+    Just content <- #getContentArea dlg >>= castTo Container
+    labelNew (Just "Crear Campos") >>= #add content
 
     grid <- gridNew
     addLabel grid "Nombre" 0 0
@@ -401,116 +425,110 @@ askCreateField control = do
                                     <$> addEntry grid 0 row
                                     <*> addComboBox grid (map snd typeLabels) 1 row
 
-    actionArea <- castToContainer <$> dialogGetActionArea dlg
-    containerAdd actionArea grid
+    Just actionArea <- #getActionArea dlg >>= castTo Container
+    #add actionArea grid
 
     widgetShowAll dlg
-    r <- dialogRun dlg
+    r <- #run dlg
 
-    when (r == ResponseOk) $ do
+    when (isResponse r ResponseTypeOk) $ do
         fields <- catMaybes <$> forM entries (\(entry, cbox) -> do
                                         name <- entryGetText entry
                                         i <- comboBoxGetActive cbox
-                                        return $ if null name || i == -1
+                                        return $ if T.null name || i == -1
                                                  then Nothing
-                                                 else Just (name, fst $ typeLabels !! i)
+                                                 else Just (name, fst $ typeLabels !!! i)
                                 )
         unless (null fields) $ sendInput control $ NewFields fields
     widgetDestroy dlg
 
-addLabel :: Grid -> String -> Int -> Int -> IO Label
+addLabel :: Grid -> Text -> Int32 -> Int32 -> IO Label
 addLabel grid text left top = do
     lbl <- labelNew $ Just text
-    gridAttach grid lbl left top 1 1
+    #attach grid lbl left top 1 1
     return lbl
 
-addButton :: Grid -> String -> Int -> Int -> IO Button
+addButton :: Grid -> Text -> Int32 -> Int32 -> IO Button
 addButton grid label left top = do
     btn <- buttonNewWithLabel label
-    gridAttach grid btn left top 1 1
+    #attach grid btn left top 1 1
     return btn
 
-addRadioButton :: Grid -> String -> Int -> Int -> IO RadioButton
+addRadioButton :: Grid -> Text -> Int32 -> Int32 -> IO RadioButton
 addRadioButton grid label left top = do
-    btn <- radioButtonNewWithLabel label
-    gridAttach grid btn left top 1 1
+    btn <- radioButtonNewWithLabel ([] :: [RadioButton]) label
+    #attach grid btn left top 1 1
     return btn
 
-addRadioButtonFromWidget :: Grid -> RadioButton -> String -> Int -> Int -> IO RadioButton
+addRadioButtonFromWidget :: Grid -> RadioButton -> Text -> Int32 -> Int32 -> IO RadioButton
 addRadioButtonFromWidget grid other label left top = do
-    btn <- radioButtonNewWithLabelFromWidget other label
-    gridAttach grid btn left top 1 1
+    btn <- radioButtonNewWithLabelFromWidget (Just other) label
+    #attach grid btn left top 1 1
     return btn
 
-addCheckButton :: Grid -> String -> Int -> Int -> IO CheckButton
+addCheckButton :: Grid -> Text -> Int32 -> Int32 -> IO CheckButton
 addCheckButton grid label left top = do
     btn <- checkButtonNewWithLabel label
-    gridAttach grid btn left top 1 1
+    #attach grid btn left top 1 1
     return btn
 
-addSimpleCheckButton :: Grid -> Int -> Int -> IO CheckButton
+addSimpleCheckButton :: Grid -> Int32 -> Int32 -> IO CheckButton
 addSimpleCheckButton grid left top = do
     btn <- checkButtonNew
-    gridAttach grid btn left top 1 1
+    #attach grid btn left top 1 1
     return btn
 
-addEntry :: Grid -> Int -> Int -> IO Entry
+addEntry :: Grid -> Int32 -> Int32 -> IO Entry
 addEntry grid left top = do
     entry <- entryNew
-    gridAttach grid entry left top 1 1
+    #attach grid entry left top 1 1
     return entry
 
-addComboBox :: Grid -> [ComboBoxText] -> Int -> Int -> IO ComboBox
+addComboBox :: Grid -> [Text] -> Int32 -> Int32 -> IO ComboBoxText
 addComboBox grid options left top = do
-    cbox <- comboBoxNewText
-    forM_ options $ comboBoxAppendText cbox
-    comboBoxSetActive cbox 0
-    gridAttach grid cbox left top 1 1
+    cbox <- comboBoxTextNew
+    forM_ options $ #append cbox Nothing
+    #setActive cbox 0
+    #attach grid cbox left top 1 1
     return cbox
 
-askDeleteFields :: [String] -> GUIControl -> IO ()
+askDeleteFields :: [Name] -> GUIControl -> IO ()
 askDeleteFields names control = do
     dlg <- dialogNew
-    set dlg [ windowTransientFor := mainWindow control
-            , windowModal := True
+    set dlg [ #transientFor := mainWindow control
+            , #modal := True
+            , #typeHint := WindowTypeHintDialog
+            , #windowPosition := WindowPositionCenterOnParent
             ]
-    dialogAddButton dlg
-                    ("Borrar" :: String)
-                    ResponseOk
-    dialogAddButton dlg
-                    ("Cancelar" :: String)
-                    ResponseCancel
-    content <- castToContainer <$> dialogGetContentArea dlg
-    labelNew (Just ("Borrar Campos" :: String)) >>= containerAdd content
+    #addButton dlg "Borrar" $ asInt32 ResponseTypeOk
+    #addButton dlg "Cancelar" $ asInt32 ResponseTypeCancel
+    Just content <- #getContentArea dlg >>= castTo Container
+    labelNew (Just "Borrar Campos") >>= #add content
 
     grid <- gridNew
     cbuttons <- forM (enumerate names) $ \(row, name) -> addCheckButton grid name 0 row
 
-    actionArea <- castToContainer <$> dialogGetActionArea dlg
-    containerAdd actionArea grid
+    Just actionArea <- #getActionArea dlg >>= castTo Container
+    #add actionArea grid
 
     widgetShowAll dlg
-    r <- dialogRun dlg
+    r <- #run dlg
 
-    when (r == ResponseOk) $ do
+    when (isResponse r ResponseTypeOk) $ do
         fields <- map fst <$> filterM (toggleButtonGetActive . snd) (enumerate cbuttons)
         unless (null fields) $ sendInput control $ DeleteFields fields
     widgetDestroy dlg
 
-askRenameFields :: [String] -> GUIControl -> IO ()
+askRenameFields :: [Name] -> GUIControl -> IO ()
 askRenameFields names control = do
     dlg <- dialogNew
     set dlg [ windowTransientFor := mainWindow control
             , windowModal := True
             ]
-    dialogAddButton dlg
-                    ("Cambiar" :: String)
-                    ResponseOk
-    dialogAddButton dlg
-                    ("Cancelar" :: String)
-                    ResponseCancel
-    content <- castToContainer <$> dialogGetContentArea dlg
-    labelNew (Just ("Cambiar Nombres Campos" :: String)) >>= containerAdd content
+    #addButton dlg "Cambiar" $ asInt32 ResponseTypeOk
+    #addButton dlg "Cancelar" $ asInt32  ResponseTypeCancel
+    Just content <- #getContentArea dlg >>= castTo Container
+    labelNew (Just "Cambiar Nombres Campos") >>= #add content
 
     grid <- gridNew
     centries <- forM (enumerate names) $ \(row, name) -> do
@@ -519,34 +537,28 @@ askRenameFields names control = do
         entrySetText entry name
         return entry
 
-    actionArea <- castToContainer <$> dialogGetActionArea dlg
-    containerAdd actionArea grid
+    Just actionArea <- #getActionArea dlg >>= castTo Container
+    #add actionArea grid
 
     widgetShowAll dlg
-    r <- dialogRun dlg
+    r <- #run dlg
 
-    when (r == ResponseOk) $ do
+    when (isResponse r ResponseTypeOk) $ do
         names <- mapM entryGetText centries
         sendInput control $ RenameFields names
     widgetDestroy dlg
 
-askSortRows :: [String] -> GUIControl -> IO ()
+askSortRows :: [Name] -> GUIControl -> IO ()
 askSortRows names control = do
     dlg <- dialogNew
     set dlg [ windowTransientFor := mainWindow control
             , windowModal := True
             ]
-    dialogAddButton dlg
-                    ("Ascendente" :: String)
-                    (ResponseUser 1)
-    dialogAddButton dlg
-                    ("Descendente" :: String)
-                    (ResponseUser 2)
-    dialogAddButton dlg
-                    ("Cancelar" :: String)
-                    ResponseCancel
-    content <- castToContainer <$> dialogGetContentArea dlg
-    labelNew (Just ("Ordenar" :: String)) >>= containerAdd content
+    #addButton dlg "Ascendente" 1
+    #addButton dlg "Descendente" 2
+    #addButton dlg "Cancelar" 3
+    Just content <- #getContentArea dlg >>= castTo Container
+    labelNew (Just "Ordenar") >>= #add content
 
     grid <- gridNew
 
@@ -555,22 +567,22 @@ askSortRows names control = do
     cbuttons <- (btn :) <$> (forM (enumerate $ tail names) $ \(row, name) ->
         addRadioButtonFromWidget grid btn name 0 (row + 1))
 
-    actionArea <- castToContainer <$> dialogGetActionArea dlg
-    containerAdd actionArea grid
+    Just actionArea <- #getActionArea dlg >>= castTo Container
+    #add actionArea grid
 
     widgetShowAll dlg
-    r <- dialogRun dlg
+    r <- #run dlg
 
-    unless (r == ResponseCancel) $ do
+    unless (r == 3) $ do
         fp <- fst . head . filter snd . enumerate <$> mapM toggleButtonGetActive cbuttons
         let order = case r of
-                        ResponseUser 1 -> Ascending
-                        ResponseUser 2 -> Descending
+                        1 -> Ascending
+                        2 -> Descending
         sendInput control $ SortRows fp order
     widgetDestroy dlg
 
 
-getFieldFormula :: FieldPos -> String -> Maybe String -> GUIControl -> IO ()
+getFieldFormula :: FieldPos -> Name -> Maybe Formula -> GUIControl -> IO ()
 getFieldFormula fieldPos fieldName mFormula control = do
     let dlg = changeFieldFormulaDialog control
         btn = changeFieldFormulaButton control
@@ -583,72 +595,64 @@ getFieldFormula fieldPos fieldName mFormula control = do
     toggleButtonSetActive btn $ isJust mFormula
     entrySetText entry $ fromMaybe "" mFormula
     widgetSetSensitive entry $ isJust mFormula
-    entry `on` keyPressEvent $ do
+    #setActivatesDefault entry True
+{- TODO    entry `on` keyPressEvent $ do
       name <- eventKeyName
       mods <- eventModifier
       if null mods && name == "Return"
-      then liftIO (dialogResponse dlg ResponseOk) >> return True
-      else return False
-    labelSetText lbl $ fieldName ++ " = "
+      then liftIO (dialogResponse dlg ResponseTypeOk) >> return True
+      else return False -}
+    labelSetText lbl $ fieldName `T.append` " = "
 
     widgetShowAll dlg
-    r <- dialogRun dlg
-    widgetHide dlg
+    r <- #run dlg
+    #hide dlg
     -- putStrLn $ "Response: " ++ show r
-    when (r == ResponseOk) $ do
+    when (isResponse r ResponseTypeOk) $ do
         active <- toggleButtonGetActive btn
         f <- entryGetText entry
         sendInput control $ ChangeFieldFormula (if active
                                                 then Just f
                                                 else Nothing) fieldPos
 
-searchField :: FieldPos -> String -> [String] -> GUIControl -> IO ()
+useCombo :: Dialog -> ComboBoxText -> Text -> [Text] -> GUIControl -> IO (Maybe Text)
+useCombo dlg combo initial values control = do
+    set dlg [ windowTransientFor := mainWindow control
+            , windowModal := True
+            ]
+
+    #removeAll combo
+    forM values $ #appendText combo
+    comboBoxSetActive combo . fromIntegral . fromJust $ elemIndex initial values
+
+    widgetShowAll dlg
+    r <- #run dlg
+    #hide dlg
+    if (isResponse r ResponseTypeOk)
+    then Just <$> #getActiveText combo
+    else return Nothing
+
+searchField :: FieldPos -> Text -> [Text] -> GUIControl -> IO ()
 searchField fieldPos initial values control = do
     let dlg = searchFieldDialog control
         combo = searchFieldCombo control
 
-    set dlg [ windowTransientFor := mainWindow control
-            , windowModal := True
-            ]
+    mt <- useCombo dlg combo initial values control
+    when (isJust mt) $ sendInput control $ MoveToValue fieldPos (fromJust mt)
 
-    modelText <- comboBoxGetModelText combo
-    listStoreClear modelText
-    forM values $ comboBoxAppendText combo . T.pack
-    comboBoxSetActive combo . fromJust $ elemIndex initial values
-
-    widgetShowAll dlg
-    r <- dialogRun dlg
-    widgetHide dlg
-    when (r == ResponseOk) $ do
-        mt <- comboBoxGetActiveText combo
-        when (isJust mt) $ sendInput control $ MoveToValue fieldPos (T.unpack $ fromJust mt)
-
-copyOther :: FieldPos -> String -> [String] -> GUIControl -> IO ()
+copyOther :: FieldPos -> Text -> [Text] -> GUIControl -> IO ()
 copyOther fieldPos initial values control = do
     let dlg = copyOtherDialog control
         combo = copyOtherCombo control
 
-    set dlg [ windowTransientFor := mainWindow control
-            , windowModal := True
-            ]
-
-    modelText <- comboBoxGetModelText combo
-    listStoreClear modelText
-    forM values $ comboBoxAppendText combo . T.pack
-    comboBoxSetActive combo . fromJust $ elemIndex initial values
-
-    widgetShowAll dlg
-    r <- dialogRun dlg
-    widgetHide dlg
-    when (r == ResponseOk) $ do
-        mt <- comboBoxGetActiveText combo
-        when (isJust mt) $ do
-            textView <- recoverTextView fieldPos control
-            editable <- get textView textViewEditable
-            when editable $ do
-                buffer <- textViewGetBuffer textView
-                textBufferSetText buffer (T.unpack $ fromJust mt)
-
+    mt <- useCombo dlg combo initial values control
+    when (isJust mt) $ do
+      textView <- recoverTextView fieldPos control
+      editable <- get textView textViewEditable
+      when editable $ do
+         buffer <- textViewGetBuffer textView
+         let (t,l) = (fromJust mt, fromIntegral $ T.length t)
+         textBufferSetText buffer t l
 
 unimplemented :: String -> GUIControl -> IO ()
-unimplemented func control = sendInput control . MessageDialog . ErrorMessage $ "Función " ++ func ++ " no implementada"
+unimplemented func control = sendInput control . MessageDialog . ErrorMessage $ T.concat ["Función ", T.pack func, " no implementada"]

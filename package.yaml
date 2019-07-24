@@ -1,5 +1,5 @@
 name: hrows
-version: 0.1.0.0
+version: 0.2.0.0
 synopsis: A program to handle data in form of rows.
 license: GPL-2
 author:              "Juan Miguel Vilar"
@@ -20,14 +20,18 @@ library:
   - auto
   - base
   - bytestring
+  - bv
   - containers
   - data-default
   - directory
   - filepath
-  - gtk3
+  - gi-gdk
+  - gi-gtk
+  - haskell-gi-base
   - megaparsec
   - mtl
   - text
+  - text-show
   - transformers
 
 executables:
@@ -41,7 +45,8 @@ executables:
     - auto
     - data-default
     - directory
-    - gtk3
+    - gi-gtk
+    - gi-gtk-hs
     - jmvOptions >= 0.2
     - lens
 
@@ -51,3 +56,4 @@ executables:
     dependencies:
     - haskeline
     - hrows
+    - text

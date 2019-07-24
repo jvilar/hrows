@@ -14,9 +14,9 @@ data UpdateCommand = UpdateField FieldPos Field
                    | NewRow
                    | DeleteRow
                    | SortRows FieldPos SortDirection
-                   | NewFields [(String, FieldType)]
+                   | NewFields [(Name, FieldType)]
                    | DeleteFields [FieldPos]
-                   | RenameFields [String]
+                   | RenameFields [Name]
                    | ImportFieldsFromModel Model [(FieldPos, FieldPos)] [(FieldPos, FieldPos)] -- ^Model, keys, fields to replace
                    | ImportRowsFromModel Model [(FieldPos, FieldPos)] -- ^Model, fields to load from the model
                    | MoveField FieldPos FieldPos

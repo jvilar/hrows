@@ -12,18 +12,21 @@ module GUI.Control (
 import Control.Concurrent.Chan(Chan, writeChan)
 import Data.Functor.Identity(Identity)
 import Data.IORef(IORef)
+import Data.BitVector(BitVector)
 import GHC.Generics(Generic)
-import Graphics.UI.Gtk
+import GI.Gdk.Structs.RGBA(RGBA)
+import GI.Gtk
 
 import Presenter.Input
 
+import GUI.Command
 import GUI.HKD
 
 data GUIControl' f = GUIControl { mainWindow :: HKD f Window
                                 , positionLabel :: HKD f Label
                                 , fieldsGrid :: HKD f Grid
                                 , numberOfFields :: HKD f (IORef Int)
-                                , currentField :: HKD f (IORef Int)
+                                , currentField :: HKD f (IORef FieldPos)
                                 , inputChan :: HKD f (Chan Input)
                                 , fieldMenu :: HKD f Menu
                                 , beginButton :: HKD f Button
@@ -46,10 +49,14 @@ data GUIControl' f = GUIControl { mainWindow :: HKD f Window
                                 , importRowsOptionsRows :: HKD f Grid
                                 , targetList :: HKD f TargetList
                                 , searchFieldDialog :: HKD f Dialog
-                                , searchFieldCombo :: HKD f ComboBox
+                                , searchFieldCombo :: HKD f ComboBoxText
                                 , copyOtherDialog :: HKD f Dialog
-                                , copyOtherCombo :: HKD f ComboBox
-                                , textBufferConnections :: HKD f (IORef [ ConnectId TextBuffer ])
+                                , copyOtherCombo :: HKD f ComboBoxText
+                                , textBufferActive :: HKD f (IORef BitVector)
+                                , errorColor :: HKD f RGBA
+                                , formulaColor :: HKD f RGBA
+                                , emptyColor :: HKD f RGBA
+                                , normalColor :: HKD f RGBA
                                 } deriving Generic
 
 type GUIControl = GUIControl' Identity

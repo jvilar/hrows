@@ -1,3 +1,6 @@
+{-# LANGUAGE OverloadedStrings #-}
+
+import qualified Data.Text as T
 import System.Console.Haskeline(outputStrLn, runInputT, InputT, defaultSettings, getInputLine)
 
 import Model.Expression(evaluate, toFormula, toString)
@@ -12,13 +15,13 @@ main = do
 loop :: InputT IO ()
 loop = do
     l <- getInputLine "% "
-    case l of
+    case T.pack <$> l of
         Nothing -> return ()
         Just "exit" -> return ()
         Just formula -> do
             let expression = parse formula
             outputStrLn $ "Tokens: " ++ show (tokenize formula)
             outputStrLn $ "Expresion: " ++ show expression
-            outputStrLn $ "As formula: " ++ toFormula expression
-            outputStrLn $ "Evaluated: " ++ toString (evaluate [] expression)
+            outputStrLn $ "As formula: " ++ T.unpack (toFormula expression)
+            outputStrLn $ "Evaluated: " ++ T.unpack (toString $ evaluate [] expression)
             loop

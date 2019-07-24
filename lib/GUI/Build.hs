@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedLabels #-}
 
 module GUI.Build (
             -- *Types
@@ -14,14 +15,17 @@ import Control.Concurrent.Chan(Chan, writeChan)
 import Control.Monad(forM_, void, when)
 import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Reader(asks, ReaderT, runReaderT)
+import Data.BitVector(nil)
 import Data.Functor.Identity(Identity)
 import Data.IORef(IORef, newIORef, readIORef, writeIORef)
 import Data.Maybe(isJust, fromJust)
+import Data.Text(Text)
+import qualified Data.Text as T
 import GHC.Generics(Generic, K1(..), M1(..), Rep(..), V1(..), U1(..)
                    , (:*:)(..), (:+:)(..), from, to)
 
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.General.Enums(Align(..))
+import GI.Gdk (EventKey, keyvalName, ModifierType(ModifierTypeControlMask))
+import GI.Gtk hiding (MessageDialog)
 
 import Paths_hrows(getDataFileName)
 
@@ -33,11 +37,11 @@ import Presenter.Input
 
 makeGUI :: Chan Input -> IO GUIControl
 makeGUI iChan = do
-  initGUI
+  GI.Gtk.init Nothing
 
   builder <- builderNew
   gladefn <- getDataFileName "src/hrows.glade"
-  builderAddFromFile builder gladefn
+  builderAddFromFile builder $ T.pack gladefn
 
   control <- prepareControl iChan builder
   runReaderT (do
@@ -55,41 +59,44 @@ makeGUI iChan = do
 
 type BuildMonad = ReaderT (Builder, GUIControl) IO
 
-class GObjectClass a => CanBeCast a where
-    doCast :: GObject -> a
+class GObject a => CanBeCast a where
+    doCast :: GObject o => o -> IO a
 
 instance CanBeCast Button where
-    doCast = castToButton
+    doCast = unsafeCastTo Button
 
 instance CanBeCast CheckButton where
-    doCast = castToCheckButton
+    doCast = unsafeCastTo CheckButton
 
 instance CanBeCast ComboBox where
-    doCast = castToComboBox
+    doCast = unsafeCastTo ComboBox
+
+instance CanBeCast ComboBoxText where
+    doCast = unsafeCastTo ComboBoxText
 
 instance CanBeCast Dialog where
-    doCast = castToDialog
+    doCast = unsafeCastTo Dialog
 
 instance CanBeCast Entry where
-    doCast = castToEntry
+    doCast = unsafeCastTo Entry
 
 instance CanBeCast FileChooserDialog where
-    doCast = castToFileChooserDialog
+    doCast = unsafeCastTo FileChooserDialog
 
 instance CanBeCast Grid where
-    doCast = castToGrid
+    doCast = unsafeCastTo Grid
 
 instance CanBeCast Label where
-    doCast = castToLabel
+    doCast = unsafeCastTo Label
 
 instance CanBeCast Menu where
-    doCast = castToMenu
+    doCast = unsafeCastTo Menu
 
 instance CanBeCast MenuItem where
-    doCast = castToMenuItem
+    doCast = unsafeCastTo MenuItem
 
 instance CanBeCast Window where
-    doCast = castToWindow
+    doCast = unsafeCastTo Window
 
 getBuilder :: BuildMonad Builder
 getBuilder = asks fst
@@ -100,35 +107,35 @@ getControl = asks snd
 getMainWindow :: BuildMonad Window
 getMainWindow = mainWindow <$> getControl
 
-getObject :: CanBeCast obj => String -> BuildMonad obj
+getObject :: CanBeCast obj => Text -> BuildMonad obj
 getObject s = do
     builder <- getBuilder
-    liftIO $ builderGetObject builder doCast s
+    liftIO $ builderGetObject builder s >>= doCast . fromJust
 
 ioVoid :: IO a -> BuildMonad ()
 ioVoid = liftIO . void
 
-buttonAction :: IsInput cmd => String -> cmd -> BuildMonad ()
+buttonAction :: IsInput cmd => Text -> cmd -> BuildMonad ()
 buttonAction name input = do
     control <- getControl
     btn <- getObject name
-    ioVoid ((btn :: Button) `on` buttonActivated $ sendInput control input)
+    ioVoid ((btn :: Button) `on` #clicked $ sendInput control input)
 
-buttons :: IsInput cmd => [(String, cmd)] -> BuildMonad ()
+buttons :: IsInput cmd => [(Text, cmd)] -> BuildMonad ()
 buttons = mapM_ (uncurry buttonAction)
 
-menuItemInput :: IsInput cmd => String -> cmd -> BuildMonad ()
+menuItemInput :: IsInput cmd => Text -> cmd -> BuildMonad ()
 menuItemInput name input = do
     control <- getControl
     menuItemAction name $ sendInput control input
 
-menuItemAction :: String -> IO () -> BuildMonad ()
+menuItemAction :: Text -> IO () -> BuildMonad ()
 menuItemAction name io = do
     control <- getControl
     itm <- getObject name
-    ioVoid ((itm :: MenuItem) `on` menuItemActivated $ io)
+    ioVoid ((itm :: MenuItem) `on` #activate $ io)
 
-fieldMenuAction :: IsInput cmd => String -> (Int -> cmd) -> BuildMonad ()
+fieldMenuAction :: IsInput cmd => Text -> (FieldPos -> cmd) -> BuildMonad ()
 fieldMenuAction name f = do
     control <- getControl
     menuItemAction name $ (f <$> readIORef (currentField control)) >>=
@@ -136,8 +143,8 @@ fieldMenuAction name f = do
 
 prepareControl :: Chan Input -> Builder -> IO GUIControl
 prepareControl iChan builder = do
-  let getObject :: CanBeCast obj => String -> IO obj
-      getObject = builderGetObject builder doCast
+  let getObject :: CanBeCast obj => Text -> IO obj
+      getObject name = builderGetObject builder name >>= doCast . fromJust
   control <- fromIO GUIControl {
     mainWindow = getObject "mainWindow"
     , positionLabel = getObject "positionLabel"
@@ -164,23 +171,28 @@ prepareControl iChan builder = do
     , importFieldsOptionsRows = getObject "importFieldsOptionsRows"
     , importRowsOptionsDialog = getObject "importRowsOptionsDialog"
     , importRowsOptionsRows = getObject "importRowsOptionsRows"
-    , targetList = targetListNew
+    , targetList = targetListNew (Just [])
     , searchFieldDialog = getObject "searchFieldDialog"
     , searchFieldCombo = getObject "searchFieldCombo"
     , copyOtherDialog = getObject "copyOtherDialog"
     , copyOtherCombo = getObject "copyOtherCombo"
-    , textBufferConnections = newIORef []
+    , textBufferActive = newIORef nil
+{-    , errorColor = createColor  65535 36864 2560
+    , formulaColor = createColor 53000 53000 53000
+    , emptyColor = cretateColor 53000 53000 53000
+    , normalColor = createColor 65535 65535 65535
+-}
     }
   targetListAddTextTargets (targetList control) 0
-  comboBoxSetModelText $ searchFieldCombo control
-  comboBoxSetModelText $ copyOtherCombo control
+{- TODO  comboBoxSetModelText $ searchFieldCombo control
+  combooxSetModelText $ copyOtherCombo control -}
   return control
 
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
              , (("Page_Up", []), toInput MovePrevious)
-             , (("q", [Control]), toInput ExitRequested)
-             , (("r", [Control]), toInput Redo)
-             , (("z", [Control]), toInput Undo)
+             , (("q", [ModifierTypeControlMask]), toInput ExitRequested)
+             , (("r", [ModifierTypeControlMask]), toInput Redo)
+             , (("z", [ModifierTypeControlMask]), toInput Undo)
              , (("Return", []), toInput DoNothing)
              ]
 
@@ -189,25 +201,27 @@ prepareMainWindow = do
   window <- getMainWindow
   control <- getControl
   liftIO $ do
-      void (window `on` deleteEvent $ do
+      window `on` #deleteEvent $ const $ do
         liftIO $ sendInput control ExitRequested
-        return False)
-      void (window `on` keyPressEvent $ do
-          name <- eventKeyName
-          mods <- eventModifier
-          -- showEvent
-          let cmd = lookup (name, mods) globalKeys
+        return False
+      window `on` #keyPressEvent $ \evk -> do
+          name <- get evk #keyval >>= keyvalName
+          mods <- get evk #state
+          -- showEvent evk
+          let cmd = do
+                n <- name
+                lookup (n, mods) globalKeys
           -- liftIO $ print cmd
           maybe (return False)
                 (\c -> liftIO $ sendInput control c >> return True)
                 cmd
-       )
       widgetShowAll window
 
-showEvent = do
-  name <- eventKeyName
+showEvent :: EventKey -> BuildMonad()
+showEvent evk = do
+  name <- get evk #keyval >>= keyvalName
+  mods <- get evk #state
   liftIO $ putStrLn $ "Key name: " ++ show name
-  mods <- eventModifier
   liftIO $ putStrLn $ "Modifiers: " ++ show mods
 
 prepareMovementButtons :: BuildMonad ()
@@ -259,22 +273,24 @@ prepareRecordMenu = mapM_ (uncurry menuItemInput)
                               ,("sortRowsMenuItem", toInput SortRowsDialog)
                               ]
 
-
+{-
 gray :: Color
 gray = Color 53000 53000 53000
+-}
 
 prepareChangeFieldFormulaDialog :: BuildMonad ()
 prepareChangeFieldFormulaDialog = do
     control <- getControl
     let btn = changeFieldFormulaButton control
         entry = changeFieldFormulaEntry control
-    ioVoid $ widgetModifyBg entry StateInsensitive gray
-    ioVoid $ btn `on` toggled $ toggleButtonGetActive btn >>=
+    {- TODO 
+    ioVoid $ widgetModifyBg entry StateInsensitive gray -}
+    ioVoid $ btn `on` #toggled $ toggleButtonGetActive btn >>=
                                  widgetSetSensitive entry
 
 
-notImplementedDialog :: String -> Input
-notImplementedDialog f = toInput $ MessageDialog (InformationMessage $ "Opción " ++ f ++ " no implementada")
+notImplementedDialog :: Text -> Input
+notImplementedDialog f = toInput $ MessageDialog (InformationMessage  $ T.concat ["Opción ", f, " no implementada"])
 
 fromIO :: GUIControl' IO -> IO GUIControl
 fromIO = fmap to . gFromIO . from

@@ -4,8 +4,9 @@ module HRowsException (
 
 import Control.Exception(Exception)
 import Data.Typeable(Typeable)
+import Data.Text(Text)
 
-data HRowsException = HRowsException String
+data HRowsException = HRowsException Text
                       deriving (Show, Typeable)
 
 instance Exception HRowsException

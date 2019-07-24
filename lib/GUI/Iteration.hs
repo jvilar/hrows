@@ -5,6 +5,8 @@ module GUI.Iteration (
     , module Message
     ) where
 
+import Data.Text(Text)
+
 import Model
 import Message
 import Presenter.ImportType
@@ -14,14 +16,14 @@ data Iteration = NoIteration -- ^No need to iterate.
                | AskReadFile -- ^Ask for a file name to read.
                | AskWriteFile -- ^Ask for a file name to write.
                | AskCreateField -- ^Ask for fields to create.
-               | AskDeleteFields [String] -- ^Ask for fields to delete.
+               | AskDeleteFields [Name] -- ^Ask for fields to delete.
                | AskImportFrom ImportType -- ^Ask for a file to import from.
-               | AskImportOptions ImportType [String] [String] Model -- ^Ask for the pairing of fields in an import.
-               | AskRenameFields [String] -- ^Ask for fields to rename.
-               | AskSortRows [String] -- ^Ask the field for sorting.
+               | AskImportOptions ImportType [Name] [Name] Model -- ^Ask for the pairing of fields in an import.
+               | AskRenameFields [Name] -- ^Ask for fields to rename.
+               | AskSortRows [Name] -- ^Ask the field for sorting.
                | DisplayMessage Message -- ^Display a message.
                | ConfirmExit Bool -- ^Confirm exit program.
-               | GetFieldFormula Int String (Maybe String) -- ^Introduce the formula for a field
-               | SearchField Int String [String] -- ^Search for a record containing a value
-               | CopyOtherField Int String [String] -- ^Copy the value of the field from another record
+               | GetFieldFormula FieldPos Name (Maybe Formula) -- ^Introduce the formula for a field
+               | SearchField FieldPos Text [Text] -- ^Search for a record containing a value
+               | CopyOtherField FieldPos Text [Text] -- ^Copy the value of the field from another record
                deriving Show

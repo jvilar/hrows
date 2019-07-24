@@ -22,37 +22,49 @@ module Model.Field ( Field
                    , orField
                    , compareField
                    , ternary
+                   -- *Other
+                   , (!!!)
                    ) where
 
 import Data.Aeson
 import Data.Maybe(fromJust)
 import Data.Text(Text)
 import qualified Data.Text as T
+import Data.Text.Read(decimal, signed, double)
+import GHC.Int(Int32)
+import TextShow(TextShow(showt))
+
 import GHC.Generics
 
 -- |A field can store an Int, a Double or a String or it may be
 -- empty. The special constructor AnError stores an erroneous string
 -- for the type. It is useful for converting without loosing the
 -- original value.
-data Field = AInt Int String
-           | ADouble Double String
-           | AString String
-           | AnError FieldType String
+data Field = AInt Int Text
+           | ADouble Double Text
+           | AString Text
+           | AnError FieldType Text
            | Empty
              deriving (Show, Eq)
 
-type FieldPos = Int
+-- |The position of the field, it is an Int32 for compatibility with gi-gtk
+type FieldPos = Int32
+
+-- |Auxiliary operator for accessing a list with a FieldPos
+(!!!) :: [a] -> FieldPos -> a
+(!!!) l =  (!!) l . fromIntegral
+
 
 class ToField t where
     toField :: t -> Field
 
 instance ToField Int where
-    toField n = AInt n (show n)
+    toField n = AInt n $ showt n
 
 instance ToField Double where
-    toField d = ADouble d (show d)
+    toField d = ADouble d $ showt d
 
-instance ToField String where
+instance ToField Text where
     toField = AString
 
 instance ToField () where
@@ -71,11 +83,11 @@ typeLabels = [ (TypeString, "Cadena")
              , (TypeDouble0, "Flotante0")
              ]
 
-typeLabel :: FieldType -> String
-typeLabel = T.unpack . fromJust . flip lookup typeLabels
+typeLabel :: FieldType -> Text
+typeLabel = fromJust . flip lookup typeLabels
 
 -- |The operators used for casting in formulas.
-typeOperators :: [(FieldType, String)]
+typeOperators :: [(FieldType, Text)]
 typeOperators = [ (TypeString, "str")
                 , (TypeInt, "int")
                 , (TypeInt0, "int0")
@@ -83,11 +95,11 @@ typeOperators = [ (TypeString, "str")
                 , (TypeDouble0, "float0")
                 ]
 
-typeOperator :: FieldType -> String
+typeOperator :: FieldType -> Text
 typeOperator = fromJust . flip lookup typeOperators
 
 -- |The string associated to a `Field`.
-toString :: Field -> String
+toString :: Field -> Text
 toString (AInt _ s) = s
 toString (ADouble _ s) = s
 toString (AString s) = s
@@ -132,48 +144,48 @@ convert t f | typeOf f == baseType t = f
 doConvert :: Field -> FieldType -> Field
 doConvert (AnError _ m) t = AnError t m
 
-doConvert (ADouble d str) TypeInt = AInt i $ show i
+doConvert (ADouble d str) TypeInt = AInt i $ showt i
                                   where i = truncate d
-doConvert (AString str) TypeInt = case reads str of
-                                        [(n, "")] -> AInt n str
+doConvert (AString str) TypeInt = case signed decimal str of
+                                        Right (n, "") -> AInt n str
                                         _ -> AnError TypeInt str
 
-doConvert (ADouble d _) TypeInt0 = AInt i $ show i
+doConvert (ADouble d _) TypeInt0 = AInt i $ showt i
                                    where i = truncate d
-doConvert (AString str) TypeInt0 = AInt ( case reads str of
-                                                [(n, "")] -> n
+doConvert (AString str) TypeInt0 = AInt (case signed decimal str of
+                                                Right (n, "") -> n
                                                 _ -> 0) str
 
-doConvert (AInt n _) TypeDouble = ADouble f $ show f
+doConvert (AInt n _) TypeDouble = ADouble f $ showt f
                        where f = fromIntegral n
-doConvert (AString str) TypeDouble = case reads str of
-                                         [(d, "")] -> ADouble d str
+doConvert (AString str) TypeDouble = case signed double str of
+                                         Right (d, "") -> ADouble d str
                                          _ -> AnError TypeDouble str
 
-doConvert (AInt n _) TypeDouble0 = ADouble f $ show f
+doConvert (AInt n _) TypeDouble0 = ADouble f $ showt f
                        where f = fromIntegral n
-doConvert (AString str) TypeDouble0 = ADouble ( case reads str of
-                                                    [(d, "")] -> d
+doConvert (AString str) TypeDouble0 = ADouble (case signed double str of
+                                                    Right (d, "") -> d
                                                     _ -> 0 ) str
 doConvert Empty t = AnError t "Conversión de valor vacío"
 
 doConvert f TypeString = AString $ toString f
 doConvert f t = AnError t $ toString f
 
-mkError :: String -> Field
+mkError :: Text -> Field
 mkError = AnError TypeEmpty
 
 isError :: Field -> Bool
 isError (AnError _ _) = True
 isError _ = False
 
-typeError :: String -> Field -> Field
-typeError op f = AnError TypeEmpty $ "Error de tipos en " ++ op ++ ": " ++ typeLabel (typeOf f)
+typeError :: Text -> Field -> Field
+typeError op f = AnError TypeEmpty $ T.concat ["Error de tipos en ", op, ": ", typeLabel $ typeOf f]
 
-typeError2 :: String -> Field -> Field -> Field
-typeError2 op f1 f2 = AnError TypeEmpty $ "Error de tipos en " ++ op ++ ": " ++ typeLabel (typeOf f1) ++ " y " ++ typeLabel (typeOf f2)
+typeError2 :: Text -> Field -> Field -> Field
+typeError2 op f1 f2 = AnError TypeEmpty $ T.concat ["Error de tipos en ", op, ": ", typeLabel $ typeOf f1, " y ", typeLabel $ typeOf f2]
 
-nmap :: String -> (forall a. Num a => a -> a) -> (Field -> Field)
+nmap :: Text -> (forall a. Num a => a -> a) -> (Field -> Field)
 nmap _ op (AInt n _) = toField $ op n
 nmap _ op (ADouble d _) = toField $ op d
 nmap name _ f = typeError name f
@@ -195,7 +207,7 @@ orField f1 f2 = typeError2 "o lógico" f1 f2
 compareField :: (Field -> Field -> Bool) -> Field -> Field -> Field
 compareField _ e@(AnError _ _) _ = e
 compareField _ _ e@(AnError _ _) = e
-compareField cmp f1 f2 | not $ comparable (typeOf f1) (typeOf f2) = AnError TypeInt $ "Tipos no comparables: " ++ typeLabel (typeOf f1) ++ " y " ++ typeLabel (typeOf f2)
+compareField cmp f1 f2 | not $ comparable (typeOf f1) (typeOf f2) = AnError TypeInt $ T.concat ["Tipos no comparables: ", typeLabel $ typeOf f1, " y ", typeLabel $ typeOf f2]
                        | cmp f1 f2 = toField (1::Int)
                        | otherwise = toField (0::Int)
     where comparable t1 t2 = numeric t1 && numeric t2 || t1 == t2
@@ -220,7 +232,7 @@ instance Num Field where
     ADouble d _ + AInt n _ = toField $ d + fromIntegral n
     ADouble d1 _ + ADouble d2 _ = toField $ d1 + d2
 
-    AString s1 + AString s2 = AString (s1 ++ s2)
+    AString s1 + AString s2 = AString $ T.append s1 s2
 
     f1 + f2 = typeError2 "suma" f1 f2
 
@@ -232,14 +244,14 @@ instance Num Field where
     ADouble d _ * AInt n _ = toField $ d * fromIntegral n
     ADouble d1 _ * ADouble d2 _ = toField $ d1 * d2
 
-    AString s * AInt n _ = AString (concat $ replicate n s)
-    AInt n _ * AString s = AString (concat $ replicate n s)
+    AString s * AInt n _ = AString $ T.replicate n s
+    AInt n _ * AString s = AString $ T.replicate n s
 
     f1 * f2 = typeError2 "producto" f1 f2
 
     abs = nmap "valor absoluto" abs
 
-    fromInteger v = AInt (fromInteger v) (show v)
+    fromInteger v = AInt (fromInteger v) (showt v)
 
     negate = nmap "negación" negate
 
@@ -272,7 +284,7 @@ instance Ord Field where
     compare Empty _ = GT
 
 instance Enum Field where
-    toEnum v = AInt v (show v)
+    toEnum v = AInt v $ showt v
 
     fromEnum (AInt n _) = n
     fromEnum _ = error "fromEnum de un no entero"
@@ -301,7 +313,7 @@ instance Integral Field where
                     , typeError2 "resto" f1 f2)
 
     toInteger (AInt n _) = toInteger n
-    toInteger f = error $ "toInteger de un " ++ typeLabel (typeOf f)
+    toInteger f = error $ "toInteger de un " ++ T.unpack (typeLabel $ typeOf f)
 
 instance Fractional Field where
     (AInt n1 _) / (AInt n2 _) = toField ((fromIntegral n1 / fromIntegral n2)::Double)

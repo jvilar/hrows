@@ -16,7 +16,7 @@ data DialogCommand = LoadFileDialog
                    | ChangeNamesDialog
                    | SortRowsDialog
                    | MessageDialog Message
-                   | ChangeFieldFormulaDialog Int
-                   | SearchFieldDialog Int
-                   | CopyOtherDialog Int
+                   | ChangeFieldFormulaDialog FieldPos
+                   | SearchFieldDialog FieldPos
+                   | CopyOtherDialog FieldPos
                      deriving Show

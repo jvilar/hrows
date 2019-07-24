@@ -9,7 +9,8 @@ import Control.Lens (makeLenses, (^.), set, Getting)
 import Control.Monad(forM_, unless, void, when)
 import Data.Default(Default(..))
 import Data.Maybe(fromJust, isJust)
-import Graphics.UI.Gtk (mainGUI, postGUIAsync)
+import Data.GI.Gtk.Threading(postGUIASync)
+import qualified GI.Gtk as Gtk
 import System.Directory (doesFileExist)
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
@@ -110,10 +111,10 @@ main = do
   writeList2Chan inputChan [ toInput MoveBegin
                            , toInput $ SetSource sinfo
                            , toInput LoadFile]
-  mainGUI
+  Gtk.main
 
 updateScreen :: GUIControl -> [GUICommand] -> IO Bool
 updateScreen control commands = do
-  forM_ commands $ \command -> postGUIAsync (updateGUI command control)
+  forM_ commands $ \command -> postGUIASync (updateGUI command control)
   return True
 

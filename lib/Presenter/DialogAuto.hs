@@ -22,6 +22,6 @@ dialogAuto = arrM $ \(input, model, pos) -> sendGUIM . ShowIteration $ case inpu
                                              ChangeNamesDialog -> AskRenameFields $ fnames model
                                              SortRowsDialog -> AskSortRows $ fnames model
                                              MessageDialog m -> DisplayMessage m
-                                             ChangeFieldFormulaDialog f -> GetFieldFormula f (fnames model !! f) (formulas model !! f)
-                                             SearchFieldDialog f -> SearchField f (toString $ row pos model !! f) (fieldValues f model)
-                                             CopyOtherDialog f -> CopyOtherField f (toString $ row pos model !! f) (fieldValues f model)
+                                             ChangeFieldFormulaDialog f -> GetFieldFormula f (fnames model !!! f) (formulas model !!! f)
+                                             SearchFieldDialog f -> SearchField f (toString $ row pos model !!! f) (fieldValues f model)
+                                             CopyOtherDialog f -> CopyOtherField f (toString $ row pos model !!! f) (fieldValues f model)

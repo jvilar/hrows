@@ -1,7 +1,10 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Model (
               -- *Types
               Model
              , ModelChanged
+             , Name
              , Row
              , RowPos
              , SortDirection(..)
@@ -56,7 +59,10 @@ import Data.Map(Map)
 import qualified Data.Map as M
 import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import Data.Ord(Down(..))
+import Data.Text(Text)
+import qualified Data.Text as T
 import Debug.Trace
+import TextShow(TextShow(showt))
 
 import Model.Expression
 import Model.Field
@@ -71,6 +77,9 @@ type RowPos = Int
 -- |Whether the model changed.
 type ModelChanged = Bool
 
+-- |The name of a Field
+type Name = Text
+
 -- |Holds the rows.
 data Model = Model { _rows :: IntMap Row
                    , _fieldInfo :: [FieldInfo]
@@ -81,7 +90,7 @@ data Model = Model { _rows :: IntMap Row
                    } deriving Show
 
 -- |The information about a Field
-data FieldInfo = FieldInfo { _name :: Maybe String
+data FieldInfo = FieldInfo { _name :: Maybe Name
                            , _type :: FieldType
                            , _defaultValue :: Field
                            , _expression :: Maybe Expression
@@ -180,7 +189,7 @@ fromRows rs = let
     in (foldl' addRow m rs) { _changed = False }
 
 -- |Creates a `Model` from a list of `Row`s and a list of names.
-fromRowsNames :: [String] -> [Row] -> Model
+fromRowsNames :: [Name] -> [Row] -> Model
 fromRowsNames l rs = (setNames l $ fromRows rs) { _changed = False }
 
 -- |Creates a model from a list of `Row`s and a `ModelConf`
@@ -188,7 +197,7 @@ fromRowsConf :: ModelConf -> [Row] -> Model
 fromRowsConf conf  m = (foldl' addRow  (emptyConf conf) m) { _changed = False }
 
 -- |Sets the names of the fields.
-setNames :: [String] -> Model -> Model
+setNames :: [Name] -> Model -> Model
 setNames l m = m { _fieldInfo = zipWith (\i n -> i { _name = Just n }) (_fieldInfo m) l
                  , _changed = True
                  }
@@ -208,29 +217,29 @@ formulas = map _formula . _fieldInfo
 
 -- |True if the field is a formula
 isFormula :: FieldPos -> Model -> Bool
-isFormula c = isJust . _formula . (!! c) .  _fieldInfo
+isFormula c = isJust . _formula . (!!! c) .  _fieldInfo
 
 -- |The formula of a field
 fieldFormula :: FieldPos -> Model -> Maybe Formula
-fieldFormula c = (!! c) . formulas
+fieldFormula c = (!!!  c) . formulas
 
 -- |The type of a field
 fieldType :: FieldPos -> Model -> FieldType
-fieldType f = (!! f) . types
+fieldType f = (!!! f) . types
 
 -- |The values of a field
-fieldValues :: FieldPos -> Model -> [String]
-fieldValues f = unique . sort . IM.foldr (\r l -> toString (r !! f) : l) [] . _rows
+fieldValues :: FieldPos -> Model -> [Text]
+fieldValues f = unique . sort . IM.foldr (\r l -> toString (r !!! f) : l) [] . _rows
                 where unique [] = []
                       unique [x] = [x]
                       unique (x:r@(y:l)) | x == y = unique r
                                          | otherwise = x : unique r
 
 -- |The position of the next appearance of a value
-nextPos :: FieldPos -> String -> RowPos -> Model -> RowPos
+nextPos :: FieldPos -> Text -> RowPos -> Model -> RowPos
 nextPos fpos s pos model = let
     v = convert (fieldType fpos model) $ toField s
-    step i n (p, q) | n !! fpos /= v = (p, q)
+    step i n (p, q) | n !!! fpos /= v = (p, q)
                     | i < pos = (Just $ maybe i (min i) p, q)
                     | i > pos = (p, Just $ maybe i (min i) q)
                     | otherwise = (p, q)
@@ -242,13 +251,13 @@ nfields :: Model -> Int
 nfields = _nfields
 
 -- |Returns the names of the rows.
-names :: Model -> Maybe [String]
+names :: Model -> Maybe [Name]
 names = mapM _name . _fieldInfo
 
 -- |Returns the names of the model with a default format.
-fnames :: Model -> [String]
+fnames :: Model -> [Name]
 fnames model = fromMaybe
-                   (map (("Campo " ++).show) [1 .. nfields model])
+                   (map (T.append "Campo " . showt) [1 .. nfields model])
                    (names model)
 
 -- |Returns the rows of the model.
@@ -265,8 +274,8 @@ sortRows fp dir m = m { _changed = True
                       }
                     where rs = IM.elems $ _rows m
                           sorted = case dir of
-                                      Ascending -> sortOn (!! fp) rs
-                                      Descending -> sortOn (Down . (!! fp)) rs
+                                      Ascending -> sortOn (!!! fp) rs
+                                      Descending -> sortOn (Down . (!!! fp)) rs
                           rows' = IM.fromAscList $ zip [0..] sorted
 
 -- |Marks the model as unchanged
@@ -277,14 +286,14 @@ setUnchanged model = model { _changed = False }
 changeField :: RowPos -> FieldPos -> Field -> Model -> (Model, [FieldPos])
 changeField r c field m = let
       row = _rows m IM.! r
-      field' = convert (_type $ _fieldInfo m !! c) field
+      field' = convert (_type $ _fieldInfo m !!! c) field
       (row', poss) = updateField (_updatePlan m) field' c row
-    in if row !! c /= field'
+    in if row !!! c /= field'
        then (m { _rows = IM.insert r row' (_rows m), _changed = True }, poss)
        else (m, [])
 
 -- |Adds new fields to the model.
-newFields :: [(Maybe String, FieldType)] -> Model -> Model
+newFields :: [(Maybe Name, FieldType)] -> Model -> Model
 newFields l m = let
     names = adjustNames m (map fst l)
     oldInfo = [ i { _name = n } | (i, n) <- zip (_fieldInfo m) names ]
@@ -307,9 +316,9 @@ addPlan m = let
     up = mkUpdatePlan exps
   in m { _updatePlan = up, _rows = IM.map (updateAll up) (_rows m), _changed = True }
 
-adjustNames :: Model -> [Maybe String] -> [Maybe String]
+adjustNames :: Model -> [Maybe Name] -> [Maybe Name]
 adjustNames m newNames = zipWith (flip maybe Just . Just) defNames (map _name (_fieldInfo m) ++ newNames)
-    where defNames = ["Campo " ++ show n | n <- [(1 :: Int) ..]]
+    where defNames = ["Campo " `T.append` showt n | n <- [(1 :: Int) ..]]
 
 -- |Deletes the given fields from the model.
 deleteFields :: [FieldPos] -> Model -> Model
@@ -318,18 +327,18 @@ deleteFields fs m = addPlan m { _rows = IM.map (del fs) (_rows m)
                               , _nfields = _nfields m - length fs
                               }
 
-del :: [Int] -> [a] -> [a]
+del :: [FieldPos] -> [a] -> [a]
 del [] l = l
 del pos l = go ps l
     where go [] l = l
           go (n:ns) l = let
               (i, _:t) = splitAt n l
               in i ++ go ns t
-          spos = sort $ filter (< length l) pos
+          spos = sort $ filter (< length l) $ map fromIntegral pos
           ps = head spos : zipWith (\n m -> n - m - 1) (tail spos) spos
 
 -- |Changes the names of the fields to those given.
-renameFields :: [String] -> Model -> Model
+renameFields :: [Name] -> Model -> Model
 renameFields names m = addPlan m { _fieldInfo = zipWith updateFInfo (_fieldInfo m) names }
     where translations = catMaybes $ zipWith (\n1 n2 -> (,) <$> n1 <*> Just n2)
                                              (map _name $ _fieldInfo m)
@@ -351,7 +360,7 @@ importFields other keys values m = addPlan m { _rows = IM.map importRow (_rows m
                             Nothing -> r
                             Just vals' -> replace r vals'
               where findRow r = M.lookup (key r) keyTable
-                    key r = map (r !!) $ map fst keys
+                    key r = map ((r !!!) . fst) keys
                     keyTable = prepareKeyTable keys values (IM.elems $ _rows other)
 
 -- |Imports rows from another model.
@@ -368,13 +377,13 @@ importRows other values m = addPlan m {
 prepareKeyTable :: [(FieldPos, FieldPos)] -> [(FieldPos, FieldPos)] -> [Row] -> Map [Field] [(FieldPos, Field)]
 prepareKeyTable keys values other = M.fromList asig
     where asig = [(key r, valuesOf values r) | r <- other]
-          key r = map (r !!) $ map snd keys
+          key r = map ((r !!!) . snd) keys
 
 -- Returns the values assocaiated to a position from the corresponding
 -- position in the row, given the association of input positions to
 -- output positions
 valuesOf :: [(FieldPos, FieldPos)] -> Row -> [(FieldPos, Field)]
-valuesOf values r = sort [(i, r !! o) | (i, o) <- values]
+valuesOf values r = sort [(i, r !!! o) | (i, o) <- values]
 
 -- Replaces the fields in the given positions.
 replace :: Row -> [(FieldPos, Field)] -> Row
@@ -389,14 +398,16 @@ replace = go 0
 -- |Move a field to the position just next to the other
 moveField :: FieldPos -> FieldPos -> Model -> Model
 moveField from to m = let
+    from' = fromIntegral from
+    to' = fromIntegral to
     perm = case compare from to of
                EQ -> id
-               LT -> mvf from to
-               GT -> mvb from to
+               LT -> mvf from' to'
+               GT -> mvb from' to'
     iperm = case compare from to of
                EQ -> id
-               LT -> mvb to from
-               GT -> mvf to from
+               LT -> mvb to' from'
+               GT -> mvf to' from'
     newPos = iperm [0 .. _nfields m - 1]
     updateFInfo fi = let
                        e = _expression fi
@@ -426,20 +437,21 @@ moveField from to m = let
 
 -- |Changes the type of the field.
 changeFieldType :: FieldType -> FieldPos -> Model -> Model
-changeFieldType t n m | t /= types m !! n =
+changeFieldType t n m | t /= types m !! n' =
                           addPlan m { _rows = IM.map (change $ convert t) (_rows m)
                                     , _fieldInfo = newInfo
                                     }
                       | otherwise = m
     where newInfo = change (\i -> i { _type = t, _defaultValue = defaultValue t }) $ _fieldInfo m
           change f xs = let
-              (h, x:t) = splitAt n xs
+              (h, x:t) = splitAt n' xs
               in h ++ f x : t
+          n' = fromIntegral n
 
 -- |Changes the formula of the field.
 changeFieldFormula :: Maybe Formula -> FieldPos -> Model -> Model
 changeFieldFormula mf n m = addPlan m { _fieldInfo = newInfo, _changed = True }
     where newInfo = change (\fi -> fi { _expression = parse <$> mf, _formula = mf }) $ _fieldInfo m
           change f xs = let
-              (h, x:t) = splitAt n xs
+              (h, x:t) = splitAt (fromIntegral n) xs
               in h ++ f x : t

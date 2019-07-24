@@ -1,4 +1,5 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE OverloadedStrings
+           , TupleSections #-}
 
 module Model.UpdatePlan ( UpdatePlan
                         , mkUpdatePlan
@@ -6,8 +7,9 @@ module Model.UpdatePlan ( UpdatePlan
                         , updateField
                         ) where
 
+import Control.Arrow(second, (***), (|||), (&&&))
 import Data.IntMap(IntMap)
-import qualified Data.IntMap as IM
+import qualified Data.IntMap.Strict as IM
 import qualified Data.IntSet as IS
 import Data.Maybe(fromJust, isJust)
 import Data.List(foldl', sortOn)
@@ -28,7 +30,7 @@ enumerate = zip [0..]
 
 mkUpdatePlan :: [Maybe Expression] -> UpdatePlan
 mkUpdatePlan exps = let
-    dependencies = enumerate $ map (maybe [] getPositions) exps
+    dependencies = enumerate $ map (map fromIntegral . maybe [] getPositions) exps
 
     pars = foldl' updatePars (IM.fromList . enumerate $ replicate (length exps) []) dependencies
     updatePars im (i, vars) = foldr (IM.adjust (i:)) im vars
@@ -39,12 +41,12 @@ mkUpdatePlan exps = let
     (order, cycles) = toposort $ mkGraph edges
     goodOrder = filter (`IS.member` isExp) order ++ [ i | (i, []) <- dependencies, i `IS.member` isExp ]
     in UpdatePlan { expressions = exps
-                  , influences = closureUpdates pars
-                  , updateOrder = goodOrder
-                  , cycled = cycles
+                  , influences = closureUpdates  pars
+                  , updateOrder = map fromIntegral goodOrder
+                  , cycled = map fromIntegral cycles
                   }
 
-closureUpdates :: IntMap [FieldPos] -> IntMap[FieldPos]
+closureUpdates :: IntMap [Int] -> IntMap [FieldPos]
 closureUpdates isParameterOf = let
     ks = IM.keys isParameterOf
     edges = foldl' updateEdges [] ks
@@ -56,7 +58,7 @@ closureUpdates isParameterOf = let
     updateClosure n cl = let
           deps = tail $ dfs graph n
         in IM.insert n (sortOn (orderMap IM.!) deps) cl
-    in foldr updateClosure initial order
+    in IM.map (map fromIntegral) $ foldr updateClosure initial order
 
 updateAll :: UpdatePlan -> Row -> Row
 updateAll up r = foldr (changeRow $ mkError "Fórmula con dependencias circulares")
@@ -67,16 +69,16 @@ updateAll up r = foldr (changeRow $ mkError "Fórmula con dependencias circulare
 -- the one responsible of the change.
 updateField :: UpdatePlan -> Field -> FieldPos -> Row -> (Row, [FieldPos])
 updateField up f n r = let
-    deps = influences up IM.! n
+    deps = influences up IM.! fromIntegral n
     in (foldl' (evaluateField up) (changeRow f n r) deps, n:deps)
 
 changeRow :: Field -> FieldPos -> Row -> Row
 changeRow f n r = let
-    (h, _:t) = splitAt n r
+    (h, _:t) = splitAt (fromIntegral n) r
     in h ++ f : t
 
 evaluateField :: UpdatePlan -> Row -> FieldPos -> Row
 evaluateField up r f = let
-    v = evaluate r (fromJust $ expressions up !! f)
+    v = evaluate r (fromJust $ expressions up !! fromIntegral f)
     in changeRow v f r
- 
+

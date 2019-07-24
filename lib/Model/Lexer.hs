@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Model.Lexer ( Token (..)
                    , tokenize
                    ) where
@@ -7,6 +8,8 @@ import Control.Monad(void, when)
 import Control.Monad.State.Strict(evalStateT, get, gets, StateT, modify, put)
 import Control.Monad.Writer(execWriter, tell, Writer)
 import Data.Char(isAlpha, isAlphaNum, isDigit, isSpace)
+import Data.Text(Text)
+import qualified Data.Text as T
 
 import Model.Field
 
@@ -39,8 +42,8 @@ data Token = IntT Int
            | ErrorT String
            deriving (Show, Eq)
 
-tokenize :: String -> [Token]
-tokenize inp = execWriter $ evalStateT tokenizer ([], inp)
+tokenize :: Text -> [Token]
+tokenize inp = execWriter $ evalStateT tokenizer ([], T.unpack inp)
 
 type Lexeme = String
 type Input = String
@@ -55,9 +58,8 @@ peek = do
         c:_ -> Just c
 
 pop :: Tokenizer ()
-pop = do
-    (c:lex, inp) <- get
-    put (lex, c:inp)
+pop = get >>= \case
+        (c:lex, inp) -> put (lex, c:inp)
 
 next :: Tokenizer (Maybe Char)
 next = do
@@ -228,7 +230,7 @@ named = needChar (== '{')
         )
 
 reservedWords :: [(String, Token)]
-reservedWords = [(typeOperator t, CastT t) | t <- [TypeString, TypeInt, TypeInt0, TypeDouble, TypeDouble0]]
+reservedWords = [(T.unpack $ typeOperator t, CastT t) | t <- [TypeString, TypeInt, TypeInt0, TypeDouble, TypeDouble0]]
 
 shortNamed :: Tokenizer ()
 shortNamed = do

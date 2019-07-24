@@ -3,8 +3,10 @@ module Message (
     Message(..)
     ) where
 
-data Message = ErrorMessage String
-             | WarningMessage String
-             | InformationMessage String
-             | QuestionMessage String
+import Data.Text(Text)
+
+data Message = ErrorMessage Text
+             | WarningMessage Text
+             | InformationMessage Text
+             | QuestionMessage Text
              deriving Show

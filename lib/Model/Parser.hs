@@ -1,4 +1,5 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE OverloadedStrings
+           , TupleSections #-}
 
 module Model.Parser ( parse
                     ) where
@@ -9,11 +10,17 @@ import Control.Monad.State.Strict(evalState, gets, State, modify)
 import Control.Monad.Trans(lift)
 import Data.List(foldl')
 import Data.Maybe(isNothing)
+import Data.Text(Text)
+import qualified Data.Text as T
+import TextShow(fromString, TextShow(..))
 
 import Model.Lexer
 import Model.Expression
 
-type Parser = ExceptT String (State [Token])
+type Parser = ExceptT Text (State [Token])
+
+instance TextShow Token where
+  showb = fromString . show
 
 many :: Parser (Maybe a) -> Parser [a]
 many p = do
@@ -31,10 +38,10 @@ advance = lift $ modify tail
 check :: Token -> Parser Bool
 check t = (== t) <$> current
 
-expect :: Token -> String -> Parser ()
+expect :: Token -> Text -> Parser ()
 expect t message = do
     c <- current
-    unless (t == c) $ throwError $ "Error en " ++ show c ++ ", esperaba " ++ message
+    unless (t == c) $ throwError $ T.concat ["Error en ", showt c, ", esperaba ", message]
     advance
 
 match :: [(Token, a)] -> Parser (Maybe a)
@@ -54,7 +61,7 @@ eof = do
     t <- current
     case t of
         EOFT -> return ()
-        _ -> throwError $ "Error en " ++ show t ++ ", esperaba el fin de la expresión"
+        _ -> throwError $ T.concat ["Error en ", showt t, ", esperaba el fin de la expresión"]
 
 -- expression -> logical (QuestionMarkT expression ColonT expression)?
 expression :: Parser Expression
@@ -120,12 +127,12 @@ base = do
     advance >> case t of
         IntT n -> return . mkConstant $ toField n
         DoubleT d -> return . mkConstant $ toField d
-        StringT s -> return . mkConstant $ toField s
+        StringT s -> return . mkConstant $ toField $ T.pack s
         PositionT n -> return (mkPosition $ n - 1)
-        NameT s -> return $ mkNamedPosition s
+        NameT s -> return $ mkNamedPosition $ T.pack s
         CastT ft -> mkCast ft <$> parenthesized
         OpenT -> expression <* close
-        _ -> throwError $ "Error en " ++ show t ++ ", esperaba un comienzo de expresión"
+        _ -> throwError $ T.concat ["Error en ", showt t, ", esperaba un comienzo de expresión"]
 
 parenthesized :: Parser Expression
 parenthesized = open >> expression <* close

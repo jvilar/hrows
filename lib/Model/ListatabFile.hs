@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Model.ListatabFile (
    -- *Functions
    fromListatab,
@@ -10,16 +12,23 @@ import qualified Data.ByteString.Lazy as BS
 import Data.Aeson(decode)
 import Data.Aeson.Encode.Pretty(encodePretty)
 import Data.List(intercalate)
+import Data.Text(Text)
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import Data.Void(Void)
 import System.IO (Handle, hClose, hPutStrLn, openFile, readFile, IOMode(ReadMode, WriteMode))
-import Text.Megaparsec (many, sepBy, endBy, between, optional, parse, Parsec, parseErrorPretty, (<|>))
-import Text.Megaparsec.Char(char, noneOf)
+import Text.Megaparsec (many, sepBy, endBy, between, noneOf, optional, parse, Parsec, errorBundlePretty, (<|>))
+import Text.Megaparsec.Char(char)
 import qualified Text.Megaparsec as TM
 
 import HRowsException
 import Model
 import Model.ModelConf
 import Model.SourceInfo
+
+-- Auxiliary function to help creating the exceptions from string
+hRowsException :: String -> HRowsException
+hRowsException = HRowsException . T.pack
 
 -- |Creates a `Model` from a listatab file.
 fromListatab :: ListatabInfo -> FilePath -> Maybe FilePath -> IO Model
@@ -31,30 +40,30 @@ fromListatab info fp mconf = do
                                l <- BS.readFile fp
                                if BS.length l > 0
                                    then return l
-                                   else throwIO $ HRowsException $ "Empty config file: " ++ fp
+                                   else throwIO $ hRowsException $ "Empty config file: " ++ fp
                  case mf of
                      Right s -> case decode s of
-                                    Nothing -> throwIO $ HRowsException $ "Bad config file: " ++ fp
+                                    Nothing -> throwIO $ hRowsException $ "Bad config file: " ++ fp
                                     Just c -> return $ Just c
                      Left e -> exception e
   mr <- try $ do
-             l <- readFile fp
-             if length l > 0
+             l <- T.readFile fp
+             if T.length l > 0
                  then return l
-                 else throwIO $ HRowsException $ "Empty rows file: " ++ fp
+                 else throwIO $ hRowsException $ "Empty rows file: " ++ fp
   rows <- case mr of
               Right r -> return r
               Left e -> exception e
   case parse (analyze (ltInputSeparator info) conf) fp rows of
       Right m -> return m
-      Left e -> throwIO $ HRowsException $
+      Left e -> throwIO $ hRowsException $
                        "Error reading file " ++ fp ++ ":\n"
-                        ++ parseErrorPretty e
+                        ++ errorBundlePretty e
 
 exception :: IOException -> IO a
-exception e = throwIO $ HRowsException $ "Exception: " ++ displayException e
+exception e = throwIO $ hRowsException $ "Exception: " ++ displayException e
 
-type Parser = Parsec Void String
+type Parser = Parsec Void Text
 
 analyze :: Char -> Maybe ModelConf -> Parser Model
 analyze sep mconf = do
@@ -62,7 +71,7 @@ analyze sep mconf = do
           between (char '#') (char '\n')
                     ( many ( between (char '<')
                                      (char '>')
-                                     $ many (noneOf ">")
+                                     $ many (noneOf (">":: String))
                            )
                     )
   rs <- flip endBy (char '\n') $
@@ -71,18 +80,18 @@ analyze sep mconf = do
   return $ case mconf of
                   Nothing -> case h of
                                  Nothing -> fromRows rs
-                                 Just names -> fromRowsNames names rs
+                                 Just names -> fromRowsNames (map T.pack names) rs
                   Just cnf -> fromRowsConf cnf rs
 
-stringParser :: Char -> Parser String
-stringParser sep = (char '"' *> (many inStringChar <* char '"'))
-                   <|> many (noneOf [sep, '\n'])
+stringParser :: Char -> Parser Text
+stringParser sep = T.pack <$> ((char '"' *> (many inStringChar <* char '"'))
+                               <|> many (noneOf [sep, '\n']))
     where inStringChar = TM.try (char '\\' >> ( char '\\'
                                        <|> (char 'n' >> return '\n')
                                        <|> (char 't' >> return '\t')
                                        <|> (char '"' >> return '"')
-                                       <|> noneOf "\n\""))
-                         <|> noneOf "\n\""
+                                       <|> noneOf ("\n\"" ::String)))
+                         <|> noneOf ("\n\"" :: String)
 
 -- |Writes a model to a listatab file.
 toListatab :: ListatabInfo -> FilePath -> Maybe FilePath -> Model -> IO ()
@@ -93,9 +102,9 @@ toListatab info fp mconf model = do
                      case names model of
                         Nothing -> return ()
                         Just ns -> case ltHeaderType info of
-                                   NoHeader -> return ()
-                                   FirstLine -> hPutStrLn h $ intercalate [ltOutputSeparator info] ns
-                                   Comment -> hPutStrLn h $ "#<" ++ intercalate "><" ns ++ ">"
+                                     NoHeader -> return ()
+                                     FirstLine -> T.hPutStrLn h $ T.intercalate (T.singleton $ ltOutputSeparator info) ns
+                                     Comment -> T.hPutStrLn h $ T.concat ["#<", T.intercalate "><" ns, ">"]
                      mapM_ (writeRow (ltOutputSeparator info) h) $ rows model
                      hClose h
         Left e -> exception e
@@ -108,7 +117,7 @@ toListatab info fp mconf model = do
                 Left e -> exception e
 
 writeRow :: Char -> Handle -> Row -> IO ()
-writeRow sep h = hPutStrLn h . intercalate [sep] . map (encodeString sep . toString)
+writeRow sep h = hPutStrLn h . intercalate [sep] . map (encodeString sep . T.unpack . toString)
 
 encodeString :: Char -> String -> String
 encodeString sep s = case preprocess s of
