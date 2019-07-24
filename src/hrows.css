@@ -1,0 +1,19 @@
+* {
+  font : 20px Sans;
+}
+
+#normal text {
+  background-color : #FFFFFF;
+}
+
+#formula text {
+  background-color : #A0FFFF;
+}
+
+#error text {
+  background-color : #FFA000;
+}
+
+#empty text {
+  background-color: #A0A0A0;
+}

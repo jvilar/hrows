@@ -68,17 +68,14 @@ showFields fis control = do
                        label `set` [ #tooltipText := tooltip ]
                        set textView [ textViewEditable := isNothing $ formulaFI fi
                                     , widgetCanFocus := isNothing $ formulaFI fi
+                                    , #name := if isErrorFI fi
+                                               then "error"
+                                               else if isJust $ formulaFI fi
+                                                    then "formula"
+                                                    else "normal"
                                     ]
                        #setStateFlags textView [StateFlagsNormal] True
 
-
-                         {- TODO
-                       widgetModifyBg textView StateNormal $ if isErrorFI fi
-                                                             then errorColor
-                                                             else if isJust $ formulaFI fi
-                                                                  then formulaColor
-                                                                  else normalColor
--}
                        buffer <- textViewGetBuffer textView
                        forM_ (textFI fi) $ \t ->
                             textBufferSetText buffer t (fromIntegral $ T.length t)
@@ -120,8 +117,9 @@ disableTextViews control = do
                                 set textView [ #editable := False
                                              , #canFocus := False
                                              , #sensitive := False
+                                             , #name := "empty"
                                              ]
-                               -- TODO widgetModifyBg textView StateInsensitive emptyColor
+
 
 updateNames :: [Name] -> GUIControl -> IO ()
 updateNames names control = do
@@ -200,9 +198,7 @@ createFieldTextView f control = do
          buffer <- textViewGetBuffer textView
 
          buffer `on` #changed $ liftIO $ do
-             putStrLn $ "Cambiado buffer en " ++ show f
              isActive <- (@. f) <$> readIORef (textBufferActive control)
-             putStrLn $ "  Activo: " ++ show  isActive
              when isActive $ do
                  begin <- #getStartIter buffer
                  end <- #getEndIter buffer

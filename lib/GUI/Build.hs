@@ -24,7 +24,7 @@ import qualified Data.Text as T
 import GHC.Generics(Generic, K1(..), M1(..), Rep(..), V1(..), U1(..)
                    , (:*:)(..), (:+:)(..), from, to)
 
-import GI.Gdk (EventKey, keyvalName, ModifierType(ModifierTypeControlMask))
+import GI.Gdk (screenGetDefault, EventKey, keyvalName, ModifierType(ModifierTypeControlMask))
 import GI.Gtk hiding (MessageDialog)
 
 import Paths_hrows(getDataFileName)
@@ -42,6 +42,13 @@ makeGUI iChan = do
   builder <- builderNew
   gladefn <- getDataFileName "src/hrows.glade"
   builderAddFromFile builder $ T.pack gladefn
+
+  styleFile <- getDataFileName "src/hrows.css"
+
+  provider <- cssProviderNew
+  cssProviderLoadFromPath provider $ T.pack styleFile
+  Just screen <- screenGetDefault
+  styleContextAddProviderForScreen screen provider $ fromIntegral STYLE_PROVIDER_PRIORITY_APPLICATION
 
   control <- prepareControl iChan builder
   runReaderT (do
@@ -177,15 +184,8 @@ prepareControl iChan builder = do
     , copyOtherDialog = getObject "copyOtherDialog"
     , copyOtherCombo = getObject "copyOtherCombo"
     , textBufferActive = newIORef nil
-{-    , errorColor = createColor  65535 36864 2560
-    , formulaColor = createColor 53000 53000 53000
-    , emptyColor = cretateColor 53000 53000 53000
-    , normalColor = createColor 65535 65535 65535
--}
     }
   targetListAddTextTargets (targetList control) 0
-{- TODO  comboBoxSetModelText $ searchFieldCombo control
-  combooxSetModelText $ copyOtherCombo control -}
   return control
 
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
