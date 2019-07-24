@@ -155,15 +155,9 @@
           </packing>
         </child>
         <child>
-          <object class="GtkComboBox" id="copyOtherCombo">
+          <object class="GtkComboBoxText" id="copyOtherCombo">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
-            <property name="has_entry">True</property>
-            <child internal-child="entry">
-              <object class="GtkEntry">
-                <property name="can_focus">True</property>
-              </object>
-            </child>
           </object>
           <packing>
             <property name="expand">False</property>
@@ -1215,15 +1209,9 @@
           </packing>
         </child>
         <child>
-          <object class="GtkComboBox" id="searchFieldCombo">
+          <object class="GtkComboBoxText" id="searchFieldCombo">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
-            <property name="has_entry">True</property>
-            <child internal-child="entry">
-              <object class="GtkEntry">
-                <property name="can_focus">False</property>
-              </object>
-            </child>
           </object>
           <packing>
             <property name="expand">False</property>
