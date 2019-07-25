@@ -37,8 +37,7 @@ library:
 
 executables:
   hrows:
-    main: Main.hs
-    source-dirs: src
+    main: src/Main.hs
     ghc-options:
     - -threaded
     dependencies:
@@ -52,8 +51,7 @@ executables:
     - lens
 
   testParser:
-    main: testParser.hs
-    source-dirs: src
+    main: src/testParser.hs
     dependencies:
     - haskeline
     - hrows
