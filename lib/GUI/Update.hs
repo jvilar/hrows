@@ -376,16 +376,18 @@ translateChar t = case T.uncons t of
 
 confirmExit :: Bool -> GUIControl -> IO ()
 confirmExit changed control = do
-  let msg :: String
-      msg = if changed
-            then "Ha habido cambios, ¿cómo quieres salir?"
-            else "¿Seguro que quieres salir?"
   dlg <- dialogNew
   set dlg [ #transientFor := mainWindow control
           , #modal := True
           , #typeHint := WindowTypeHintDialog
           , #windowPosition := WindowPositionCenterOnParent
           ]
+  content <- #getContentArea dlg
+  label <- labelNew $ Just $ if changed
+                             then "Ha habido cambios, ¿cómo quieres salir?"
+                             else "¿Seguro que quieres salir?"
+  #packStart content label True True 8
+
   if changed
   then do
          #addButton dlg "Grabar y salir" 1
@@ -395,6 +397,7 @@ confirmExit changed control = do
          #addButton dlg "Sí" $ asInt32 ResponseTypeYes
          #addButton dlg "No" $ asInt32 ResponseTypeNo
 
+  widgetShowAll dlg
   r <- #run dlg
   when (isResponse r ResponseTypeYes) $ do
                         sendInput control ExitProgram
