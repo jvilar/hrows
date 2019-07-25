@@ -418,7 +418,7 @@ askCreateField control = do
             ]
     #addButton dlg "Crear" $ asInt32 ResponseTypeOk
     #addButton dlg "Cancelar" $ asInt32 ResponseTypeCancel
-    Just content <- #getContentArea dlg >>= castTo Container
+    content <- #getContentArea dlg
     labelNew (Just "Crear Campos") >>= #add content
 
     grid <- gridNew
@@ -428,8 +428,7 @@ askCreateField control = do
                                     <$> addEntry grid 0 row
                                     <*> addComboBox grid (map snd typeLabels) 1 row
 
-    Just actionArea <- #getActionArea dlg >>= castTo Container
-    #add actionArea grid
+    #add content grid
 
     widgetShowAll dlg
     r <- #run dlg
@@ -448,6 +447,7 @@ askCreateField control = do
 addLabel :: Grid -> Text -> Int32 -> Int32 -> IO Label
 addLabel grid text left top = do
     lbl <- labelNew $ Just text
+    lbl `set` [ #halign := AlignStart ]
     #attach grid lbl left top 1 1
     return lbl
 
@@ -505,14 +505,13 @@ askDeleteFields names control = do
             ]
     #addButton dlg "Borrar" $ asInt32 ResponseTypeOk
     #addButton dlg "Cancelar" $ asInt32 ResponseTypeCancel
-    Just content <- #getContentArea dlg >>= castTo Container
+    content <- #getContentArea dlg
     labelNew (Just "Borrar Campos") >>= #add content
 
     grid <- gridNew
     cbuttons <- forM (enumerate names) $ \(row, name) -> addCheckButton grid name 0 row
 
-    Just actionArea <- #getActionArea dlg >>= castTo Container
-    #add actionArea grid
+    #add content grid
 
     widgetShowAll dlg
     r <- #run dlg
@@ -525,23 +524,25 @@ askDeleteFields names control = do
 askRenameFields :: [Name] -> GUIControl -> IO ()
 askRenameFields names control = do
     dlg <- dialogNew
-    set dlg [ windowTransientFor := mainWindow control
-            , windowModal := True
+    set dlg [ #transientFor := mainWindow control
+            , #modal := True
+            , #typeHint := WindowTypeHintDialog
+            , #windowPosition := WindowPositionCenterOnParent
             ]
     #addButton dlg "Cambiar" $ asInt32 ResponseTypeOk
     #addButton dlg "Cancelar" $ asInt32  ResponseTypeCancel
-    Just content <- #getContentArea dlg >>= castTo Container
-    labelNew (Just "Cambiar Nombres Campos") >>= #add content
+    content <- #getContentArea dlg
+    labelNew (Just "Cambiar Nombres de Campos") >>= #add content
 
     grid <- gridNew
+    setGridColumnSpacing grid 4
     centries <- forM (enumerate names) $ \(row, name) -> do
         addLabel grid name 0 row
         entry <- addEntry grid 1 row
         entrySetText entry name
         return entry
 
-    Just actionArea <- #getActionArea dlg >>= castTo Container
-    #add actionArea grid
+    #packStart content grid True True 8
 
     widgetShowAll dlg
     r <- #run dlg
@@ -554,13 +555,15 @@ askRenameFields names control = do
 askSortRows :: [Name] -> GUIControl -> IO ()
 askSortRows names control = do
     dlg <- dialogNew
-    set dlg [ windowTransientFor := mainWindow control
-            , windowModal := True
+    set dlg [ #transientFor := mainWindow control
+            , #modal := True
+            , #typeHint := WindowTypeHintDialog
+            , #windowPosition := WindowPositionCenterOnParent
             ]
     #addButton dlg "Ascendente" 1
     #addButton dlg "Descendente" 2
     #addButton dlg "Cancelar" 3
-    Just content <- #getContentArea dlg >>= castTo Container
+    content <- #getContentArea dlg
     labelNew (Just "Ordenar") >>= #add content
 
     grid <- gridNew
@@ -570,8 +573,7 @@ askSortRows names control = do
     cbuttons <- (btn :) <$> (forM (enumerate $ tail names) $ \(row, name) ->
         addRadioButtonFromWidget grid btn name 0 (row + 1))
 
-    Just actionArea <- #getActionArea dlg >>= castTo Container
-    #add actionArea grid
+    #add content grid
 
     widgetShowAll dlg
     r <- #run dlg
