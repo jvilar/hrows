@@ -16,7 +16,7 @@ import Model.Field
 data GUICommand = ChangeTitle Text
                 | ShowPosition Int Int
                 | ShowFields [FieldInfo]
-                | ShowNames [Name]
+                | ShowNames [FieldName]
                 | ShowIteration Iteration
                 | DisableTextViews
                 deriving Show

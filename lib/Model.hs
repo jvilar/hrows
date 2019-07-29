@@ -4,7 +4,7 @@ module Model (
               -- *Types
               Model
              , ModelChanged
-             , Name
+             , FieldName
              , Row
              , RowPos
              , SortDirection(..)
@@ -78,7 +78,7 @@ type RowPos = Int
 type ModelChanged = Bool
 
 -- |The name of a Field
-type Name = Text
+type FieldName = Text
 
 -- |Holds the rows.
 data Model = Model { _rows :: IntMap Row
@@ -90,7 +90,7 @@ data Model = Model { _rows :: IntMap Row
                    } deriving Show
 
 -- |The information about a Field
-data FieldInfo = FieldInfo { _name :: Maybe Name
+data FieldInfo = FieldInfo { _name :: Maybe FieldName
                            , _type :: FieldType
                            , _defaultValue :: Field
                            , _expression :: Maybe Expression
@@ -189,7 +189,7 @@ fromRows rs = let
     in (foldl' addRow m rs) { _changed = False }
 
 -- |Creates a `Model` from a list of `Row`s and a list of names.
-fromRowsNames :: [Name] -> [Row] -> Model
+fromRowsNames :: [FieldName] -> [Row] -> Model
 fromRowsNames l rs = (setNames l $ fromRows rs) { _changed = False }
 
 -- |Creates a model from a list of `Row`s and a `ModelConf`
@@ -197,7 +197,7 @@ fromRowsConf :: ModelConf -> [Row] -> Model
 fromRowsConf conf  m = (foldl' addRow  (emptyConf conf) m) { _changed = False }
 
 -- |Sets the names of the fields.
-setNames :: [Name] -> Model -> Model
+setNames :: [FieldName] -> Model -> Model
 setNames l m = m { _fieldInfo = zipWith (\i n -> i { _name = Just n }) (_fieldInfo m) l
                  , _changed = True
                  }
@@ -251,11 +251,11 @@ nfields :: Model -> Int
 nfields = _nfields
 
 -- |Returns the names of the rows.
-names :: Model -> Maybe [Name]
+names :: Model -> Maybe [FieldName]
 names = mapM _name . _fieldInfo
 
 -- |Returns the names of the model with a default format.
-fnames :: Model -> [Name]
+fnames :: Model -> [FieldName]
 fnames model = fromMaybe
                    (map (T.append "Campo " . showt) [1 .. nfields model])
                    (names model)
@@ -293,7 +293,7 @@ changeField r c field m = let
        else (m, [])
 
 -- |Adds new fields to the model.
-newFields :: [(Maybe Name, FieldType)] -> Model -> Model
+newFields :: [(Maybe FieldName, FieldType)] -> Model -> Model
 newFields l m = let
     names = adjustNames m (map fst l)
     oldInfo = [ i { _name = n } | (i, n) <- zip (_fieldInfo m) names ]
@@ -316,7 +316,7 @@ addPlan m = let
     up = mkUpdatePlan exps
   in m { _updatePlan = up, _rows = IM.map (updateAll up) (_rows m), _changed = True }
 
-adjustNames :: Model -> [Maybe Name] -> [Maybe Name]
+adjustNames :: Model -> [Maybe FieldName] -> [Maybe FieldName]
 adjustNames m newNames = zipWith (flip maybe Just . Just) defNames (map _name (_fieldInfo m) ++ newNames)
     where defNames = ["Campo " `T.append` showt n | n <- [(1 :: Int) ..]]
 
@@ -338,7 +338,7 @@ del pos l = go ps l
           ps = head spos : zipWith (\n m -> n - m - 1) (tail spos) spos
 
 -- |Changes the names of the fields to those given.
-renameFields :: [Name] -> Model -> Model
+renameFields :: [FieldName] -> Model -> Model
 renameFields names m = addPlan m { _fieldInfo = zipWith updateFInfo (_fieldInfo m) names }
     where translations = catMaybes $ zipWith (\n1 n2 -> (,) <$> n1 <*> Just n2)
                                              (map _name $ _fieldInfo m)

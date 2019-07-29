@@ -121,7 +121,7 @@ disableTextViews control = do
                                              ]
 
 
-updateNames :: [Name] -> GUIControl -> IO ()
+updateNames :: [FieldName] -> GUIControl -> IO ()
 updateNames names control = do
   let grid = fieldsGrid control
   adjustTextFields (length names) control
@@ -311,7 +311,7 @@ askImportFrom t control = do
         separator <- translateChar <$> entryGetText (importInputSeparator control)
         when (isJust file) $ sendInput control $ ImportFromFileName t (fromJust file) separator
 
-askImportOptions :: ImportType -> [Name] -> [Name] -> Model -> GUIControl -> IO ()
+askImportOptions :: ImportType -> [FieldName] -> [FieldName] -> Model -> GUIControl -> IO ()
 askImportOptions t ifs cfs m control = do
     let (dialog, grid) = case t of
           ImportFields -> (importFieldsOptionsDialog control, importFieldsOptionsRows control)
@@ -495,7 +495,7 @@ addComboBox grid options left top = do
     #attach grid cbox left top 1 1
     return cbox
 
-askDeleteFields :: [Name] -> GUIControl -> IO ()
+askDeleteFields :: [FieldName] -> GUIControl -> IO ()
 askDeleteFields names control = do
     dlg <- dialogNew
     set dlg [ #transientFor := mainWindow control
@@ -521,7 +521,7 @@ askDeleteFields names control = do
         unless (null fields) $ sendInput control $ DeleteFields fields
     widgetDestroy dlg
 
-askRenameFields :: [Name] -> GUIControl -> IO ()
+askRenameFields :: [FieldName] -> GUIControl -> IO ()
 askRenameFields names control = do
     dlg <- dialogNew
     set dlg [ #transientFor := mainWindow control
@@ -552,7 +552,7 @@ askRenameFields names control = do
         sendInput control $ RenameFields names
     widgetDestroy dlg
 
-askSortRows :: [Name] -> GUIControl -> IO ()
+askSortRows :: [FieldName] -> GUIControl -> IO ()
 askSortRows names control = do
     dlg <- dialogNew
     set dlg [ #transientFor := mainWindow control
@@ -587,7 +587,7 @@ askSortRows names control = do
     widgetDestroy dlg
 
 
-getFieldFormula :: FieldPos -> Name -> Maybe Formula -> GUIControl -> IO ()
+getFieldFormula :: FieldPos -> FieldName -> Maybe Formula -> GUIControl -> IO ()
 getFieldFormula fieldPos fieldName mFormula control = do
     let dlg = changeFieldFormulaDialog control
         btn = changeFieldFormulaButton control

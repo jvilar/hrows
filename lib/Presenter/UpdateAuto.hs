@@ -108,7 +108,7 @@ update model (ChangeFieldFormula mf f, pos) =
     partialRefresh pos $ changeFieldFormula mf f model
 update model (SetUnchanged, _) = return $ setUnchanged model
 
-cnames :: Model -> [Name]
+cnames :: Model -> [FieldName]
 cnames = map (`T.append` ": ") . fnames
 
 partialRefresh :: Int -> Model -> PresenterM Model
