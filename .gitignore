@@ -7,4 +7,5 @@ Setup.hs
 *~
 *.hi
 *.swp
+*.lock
 
