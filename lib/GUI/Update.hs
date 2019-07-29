@@ -180,7 +180,7 @@ dndError control = sendInput control $ MessageDialog (ErrorMessage "Algo está m
 
 
 clearBit' :: BV.BitVector -> Int -> BV.BitVector
-clearBit' bv i = complement (setBit (complement bv) i)
+clearBit' bv = complement . setBit (complement bv)
 
 disconnectTextView :: FieldPos -> GUIControl -> IO ()
 disconnectTextView = changeActiveStatus clearBit'
