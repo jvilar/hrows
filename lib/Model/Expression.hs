@@ -67,7 +67,15 @@ data WithNoNames
 type Expression = Fix Node
 
 instance Show Expression where
-    show = cata show
+    show = cata gshow
+             where gshow (Position i) = "Position " ++ show i
+                   gshow (NamedPosition t) = "NamedPosition " ++ T.unpack t
+                   gshow (Constant f) = "Constant " ++ show f
+                   gshow (Unary u exp) = concat ["Unary ", show u, " (", exp, ")" ]
+                   gshow (Binary b exp1 exp2) = concat ["Binary ", show b, " (", exp1,", ", exp2, ")" ]
+                   gshow (Ternary exp1 exp2 exp3) = concat ["Ternary ", " (", exp1, ", ", exp2, ", ", exp3, ")" ]
+                   gshow (Cast t exp) = concat ["Cast ", show t, " (", exp, ")" ]
+                   gshow (Error e) = T.unpack e
 
 newtype Fix t = In { out :: t (Fix t) }
 
