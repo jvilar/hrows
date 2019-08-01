@@ -148,7 +148,7 @@ doConvert (ADouble d str) TypeInt = AInt i $ showt i
                                   where i = truncate d
 doConvert (AString str) TypeInt = case signed decimal str of
                                         Right (n, "") -> AInt n str
-                                        _ -> AnError TypeInt str
+                                        _ -> AnError TypeInt (str `T.append` " no es un entero")
 
 doConvert (ADouble d _) TypeInt0 = AInt i $ showt i
                                    where i = truncate d
@@ -160,7 +160,7 @@ doConvert (AInt n _) TypeDouble = ADouble f $ showt f
                        where f = fromIntegral n
 doConvert (AString str) TypeDouble = case signed double str of
                                          Right (d, "") -> ADouble d str
-                                         _ -> AnError TypeDouble str
+                                         _ -> AnError TypeDouble (str `T.append` " no es un flotante")
 
 doConvert (AInt n _) TypeDouble0 = ADouble f $ showt f
                        where f = fromIntegral n
