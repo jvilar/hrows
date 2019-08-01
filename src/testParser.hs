@@ -20,8 +20,10 @@ loop = do
         Just "exit" -> return ()
         Just formula -> do
             let expression = parse formula
+                ev = evaluate [] expression
             outputStrLn $ "Tokens: " ++ show (tokenize formula)
             outputStrLn $ "Expresion: " ++ show expression
             outputStrLn $ "As formula: " ++ T.unpack (toFormula expression)
-            outputStrLn $ "Evaluated: " ++ T.unpack (toString $ evaluate [] expression)
+            outputStrLn $ "Evaluated as string: " ++ T.unpack (toString ev)
+            outputStrLn $ "Evaluated: " ++ show ev
             loop
