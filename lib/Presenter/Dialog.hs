@@ -1,6 +1,8 @@
 module Presenter.Dialog (
               -- *Types
               DialogCommand(..)
+              -- *Reexported
+              , ImportType(..)
 ) where
 
 import Model
