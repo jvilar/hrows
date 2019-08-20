@@ -46,55 +46,44 @@ updateGUI DisableTextViews = disableTextViews . mainWindow
 dndError :: GUIControl -> IO ()
 dndError control = sendInput control $ MessageDialog (ErrorMessage "Algo está mal en el dnd")
 
-dialogCall :: DialogFunction t -> DialogAction t -> GUIControl -> IO ()
-dialogCall dlg action control = dlg (dialogManager control) action (window $ mainWindow control)
+dialogCall :: DialogFunction t -> (GUIControl -> DialogAction t) -> GUIControl -> IO ()
+dialogCall dlg action control = dlg (dialogManager control)
+                                    (action control)
+                                    (window $ mainWindow control)
 
 showIteration :: Iteration -> GUIControl -> IO ()
-showIteration AskReadFile control = dialogCall askReadFile
-                                       (sendInput control . uncurry LoadFileFromName)
-                                       control
-showIteration AskWriteFile control = dialogCall askWriteFile
-                                       (sendInput control . uncurry WriteFileFromName)
-                                       control
-showIteration AskCreateField control = dialogCall askCreateField
-                                       (sendInput control . NewFields)
-                                       control
-showIteration (AskDeleteFields fs) control = dialogCall (askDeleteFields fs)
-                                       (sendInput control . DeleteFields)
-                                       control
-showIteration (AskImportFrom t) control = dialogCall askImportFrom
-                (sendInput control . uncurry (ImportFromFileName t))
-                control
-showIteration (AskImportOptions t ifs cfs m) control = dialogCall (askImportOptions t ifs cfs m)
-   (\(keys, values) -> sendInput control $ case t of
+showIteration AskReadFile = dialogCall askReadFile $
+                            (. uncurry LoadFileFromName) . sendInput
+showIteration AskWriteFile = dialogCall askWriteFile $
+                             (. uncurry WriteFileFromName) . sendInput
+showIteration AskCreateField = dialogCall askCreateField $
+                               (. NewFields) . sendInput
+showIteration (AskDeleteFields fs) = dialogCall (askDeleteFields fs) $
+                                     (. DeleteFields) . sendInput
+showIteration (AskImportFrom t) = dialogCall askImportFrom $
+                (. uncurry (ImportFromFileName t)) . sendInput
+showIteration (AskImportOptions t ifs cfs m) = dialogCall (askImportOptions t ifs cfs m)
+   (\control (keys, values) -> sendInput control $ case t of
                               ImportFields -> ImportFieldsFromModel m keys values
                               ImportRows -> ImportRowsFromModel m values)
-   control
-showIteration (AskRenameFields fs) control = dialogCall (askRenameFields fs)
-                                              (sendInput control . RenameFields)
-                                              control
-showIteration (AskSortRows fs) control = dialogCall (askSortRows fs)
-                (sendInput control . uncurry SortRows)
-                control
-showIteration (DisplayMessage m) control = displayMessage m (window $ mainWindow control)
-showIteration (ConfirmExit changed) control = dialogCall (confirmExit changed)
-   (\save -> do
+showIteration (AskRenameFields fs) = dialogCall (askRenameFields fs) $
+                                     (. RenameFields) . sendInput
+showIteration (AskSortRows fs) = dialogCall (askSortRows fs) $
+                (. uncurry SortRows) . sendInput
+showIteration (DisplayMessage m) = displayMessage m . window . mainWindow
+showIteration (ConfirmExit changed) = dialogCall (confirmExit changed)
+   (\control save -> do
        when save $ sendInput control WriteFile
        sendInput control ExitProgram
        mainQuit
    )
-   control
-
-showIteration (GetFieldFormula fpos flabel ms) control = dialogCall (getFieldFormula fpos flabel ms)
-                                                         (\mf -> sendInput control $ ChangeFieldFormula mf fpos)
-                                                         control
-showIteration (SearchField fpos initial l) control = dialogCall (searchField fpos initial l)
-                                                     (sendInput control . MoveToValue fpos)
-                                                     control
-showIteration (CopyOtherField fpos initial l) control  = dialogCall (copyOther fpos initial l)
-                                                         (\t -> setTextField fpos t $ mainWindow control)
-                                                         control
-showIteration it control = unimplemented (T.pack $ show it) control
+showIteration (GetFieldFormula fpos flabel ms) = dialogCall (getFieldFormula fpos flabel ms)
+                                                 (\control mf -> sendInput control $ ChangeFieldFormula mf fpos)
+showIteration (SearchField fpos initial l) = dialogCall (searchField fpos initial l) $
+                                             (. MoveToValue fpos) . sendInput
+showIteration (CopyOtherField fpos initial l) = dialogCall (copyOther fpos initial l)
+                                                (\control t -> setTextField fpos t $ mainWindow control)
+showIteration it = unimplemented (T.pack $ show it)
 
 
 unimplemented :: Text -> GUIControl -> IO ()
