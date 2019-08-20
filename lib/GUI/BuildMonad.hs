@@ -7,6 +7,8 @@ module GUI.BuildMonad (
   , runBuild
   , getBuilder
   , getControl
+  , getMainWindow
+  , getDialogManager
   , getObject
   , ioVoid
   -- *General actions
@@ -25,6 +27,8 @@ import GI.Gtk(on, MenuItem, Button, builderGetObject, Builder)
 
 import GUI.CanBeCast
 import GUI.Control
+import GUI.DialogManager
+import GUI.MainWindow
 import Presenter.Input
 
 type BuildMonad = ReaderT (Builder, GUIControl) IO
@@ -37,6 +41,12 @@ getBuilder = asks fst
 
 getControl :: BuildMonad GUIControl
 getControl = asks snd
+
+getMainWindow :: BuildMonad MainWindow
+getMainWindow = asks (mainWindow . snd)
+
+getDialogManager :: BuildMonad DialogManager
+getDialogManager = asks (dialogManager . snd)
 
 getObject :: CanBeCast obj => Text -> BuildMonad obj
 getObject s = do

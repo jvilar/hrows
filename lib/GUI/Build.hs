@@ -22,9 +22,10 @@ import GI.Gtk hiding (MessageDialog)
 
 import Paths_hrows(getDataFileName)
 
+import GUI.BuildMonad
 import GUI.CanBeCast
 import GUI.Control
-import GUI.BuildMonad
+import GUI.DialogManager.Build
 import GUI.Iteration
 import GUI.MainWindow
 import GUI.MainWindow.Build
@@ -49,7 +50,9 @@ makeGUI iChan = do
   styleContextAddProviderForScreen screen provider $ fromIntegral STYLE_PROVIDER_PRIORITY_APPLICATION
 
   control <- prepareControl iChan builder
-  runBuild  builder control buildMainWindow
+  runBuild  builder control $ do
+    configureMainWindow
+    configureDialogManager
   return control
 
 
@@ -58,28 +61,10 @@ prepareControl iChan builder = do
   let getObject :: CanBeCast obj => Text -> IO obj
       getObject name = builderGetObject builder name >>= doCast . fromJust
   fromIO GUIControl {
-    mainWindow = getMainWindow iChan builder
+    mainWindow = buildMainWindow iChan builder
     , inputChan = return iChan
-    , changeFieldFormulaDialog = getObject "changeFieldFormulaDialog"
-    , changeFieldFormulaEntry = getObject "changeFieldFormulaEntry"
-    , changeFieldFormulaLabel = getObject "changeFieldFormulaLabel"
-    , changeFieldFormulaButton = getObject "changeFieldFormulaCheckButton"
-    , confFileSaveCheckButton =  getObject "confFileSaveCheckButton"
-    , saveAsDialog = getObject "saveAsDialog"
-    , confFileLoadCheckButton = getObject "confFileLoadCheckButton"
-    , loadFileDialog = getObject "loadFileDialog"
-    , importFromFileDialog = getObject "importFromFileDialog"
-    , importInputSeparator = getObject "importInputSeparator"
-    , importFieldsOptionsDialog = getObject "importFieldsOptionsDialog"
-    , importFieldsOptionsRows = getObject "importFieldsOptionsRows"
-    , importRowsOptionsDialog = getObject "importRowsOptionsDialog"
-    , importRowsOptionsRows = getObject "importRowsOptionsRows"
-    , searchFieldDialog = getObject "searchFieldDialog"
-    , searchFieldCombo = getObject "searchFieldCombo"
-    , copyOtherDialog = getObject "copyOtherDialog"
-    , copyOtherCombo = getObject "copyOtherCombo"
+    , dialogManager = buildDialogManager builder
     }
-
 
 
 notImplementedDialog :: Text -> Input

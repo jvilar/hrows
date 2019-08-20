@@ -4,8 +4,8 @@
 
 module GUI.MainWindow.Build (
   -- *Functions
-  getMainWindow
-  , buildMainWindow
+  buildMainWindow
+  , configureMainWindow
   ) where
 
 import Control.Concurrent.Chan(Chan)
@@ -27,8 +27,8 @@ import GUI.BuildMonad
 import GUI.HKD
 import GUI.MainWindow
 
-getMainWindow :: Chan Input -> Builder -> IO MainWindow
-getMainWindow iChan builder = do
+buildMainWindow :: Chan Input -> Builder -> IO MainWindow
+buildMainWindow iChan builder = do
     let
       getObject :: CanBeCast obj => Text -> IO obj
       getObject name = builderGetObject builder name >>= doCast . fromJust
@@ -50,8 +50,8 @@ getMainWindow iChan builder = do
     targetListAddTextTargets (targetList mw) 0
     return mw
 
-buildMainWindow :: BuildMonad ()
-buildMainWindow = do
+configureMainWindow :: BuildMonad ()
+configureMainWindow = do
                 prepareMainWindow
                 prepareMovementButtons
                 prepareRecordButtons
@@ -59,7 +59,6 @@ buildMainWindow = do
                 prepareFileMenu
                 prepareFieldMenu
                 prepareRecordMenu
-                prepareChangeFieldFormulaDialog
 
 globalKeys :: [ ((Text, [ModifierType]), Input)]
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
@@ -87,7 +86,7 @@ commandFromGlobalKey evk = do
 prepareMainWindow :: BuildMonad ()
 prepareMainWindow = do
   control <- getControl
-  let w = window $ mainWindow control
+  w <- window <$> getMainWindow
   liftIO $ do
       w `on` #deleteEvent $ const $ do
         liftIO $ sendInput control ExitRequested
@@ -157,16 +156,6 @@ prepareRecordMenu = mapM_ (uncurry menuItemInput)
                               ,("deleteRowMenuItem", toInput DeleteRow)
                               ,("sortRowsMenuItem", toInput SortRowsDialog)
                               ]
-
-
-prepareChangeFieldFormulaDialog :: BuildMonad ()
-prepareChangeFieldFormulaDialog = do
-    control <- getControl
-    let btn = changeFieldFormulaButton control
-        entry = changeFieldFormulaEntry control
-    ioVoid $ btn `on` #toggled $ toggleButtonGetActive btn >>=
-                                 widgetSetSensitive entry
-
 
 fieldMenuAction :: IsInput cmd => Text -> (FieldPos -> cmd) -> BuildMonad ()
 fieldMenuAction name f = do
