@@ -18,12 +18,14 @@ import Control.Monad.IO.Class(liftIO)
 import Data.Bits(Bits(..))
 import Data.BitVector(nil, BV, extract, (#), ones, (@.))
 import qualified Data.BitVector as BV
+import qualified Data.ByteString as BS
 import Data.Either(lefts, rights)
 import Data.IORef(IORef, modifyIORef, readIORef, writeIORef)
 import Data.List(elemIndex, sort)
 import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import Data.Text(Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import GHC.Int(Int32)
 import GI.Gtk hiding (MessageDialog)
 import GI.Gdk
@@ -74,7 +76,7 @@ showFields fis mWindow = do
 
                        buffer <- textViewGetBuffer textView
                        forM_ (textFI fi) $ \t ->
-                            textBufferSetText buffer t (fromIntegral $ T.length t)
+                            textBufferSetText buffer t (fromIntegral . BS.length $ T.encodeUtf8 t)
                        reconnectTextView (indexFI fi) mWindow
   widgetShowAll grid
 
