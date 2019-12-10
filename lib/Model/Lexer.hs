@@ -20,6 +20,8 @@ data Token = IntT Int
            | StringT String
            | PositionT Int
            | NameT String
+           | MaxT
+           | MinT
            | AddT
            | SubT
            | MultT
@@ -37,6 +39,7 @@ data Token = IntT Int
            | NotT
            | QuestionMarkT
            | ColonT
+           | CommaT
            | CastT FieldType
            | EOFT
            | ErrorT String
@@ -143,6 +146,7 @@ tokenizer =
                        , (c == '|' , bar)
                        , (c == '?' , emit QuestionMarkT)
                        , (c == ':' , emit ColonT)
+                       , (c == ',' , emit CommaT)
                        , (isSpace c, omit)
                        , (c == '"' , string)
                        , (c == '$' , position)
@@ -230,7 +234,8 @@ named = needChar (== '{')
         )
 
 reservedWords :: [(String, Token)]
-reservedWords = [(T.unpack $ typeOperator t, CastT t) | t <- [TypeString, TypeInt, TypeInt0, TypeDouble, TypeDouble0]]
+reservedWords = [("max", MaxT), ("min", MinT)] ++
+       [(T.unpack $ typeOperator t, CastT t) | t <- [TypeString, TypeInt, TypeInt0, TypeDouble, TypeDouble0]]
 
 shortNamed :: Tokenizer ()
 shortNamed = do

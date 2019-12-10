@@ -13,6 +13,7 @@ module Model.Expression ( -- *Types
                         , BinaryOp
                         , UnaryOp
                         , BinaryOpInfo(..)
+                        , PBinaryOpInfo(..)
                         , UnaryOpInfo(..)
                         , Priority
                         , Associativity(..)
@@ -22,6 +23,7 @@ module Model.Expression ( -- *Types
                         , mkConstant
                         , mkUnary
                         , mkBinary
+                        , mkPBinary
                         , mkTernary
                         , mkCast
                         , mkErrorExpr
@@ -73,6 +75,7 @@ instance Show Expression where
                    gshow (Constant f) = "Constant " ++ show f
                    gshow (Unary u exp) = concat ["Unary ", show u, " (", exp, ")" ]
                    gshow (Binary b exp1 exp2) = concat ["Binary ", show b, " (", exp1,", ", exp2, ")" ]
+                   gshow (PrefixBinary b exp1 exp2) = concat ["PrefixBinary ", show b, " (", exp1,", ", exp2, ")" ]
                    gshow (Ternary exp1 exp2 exp3) = concat ["Ternary ", " (", exp1, ", ", exp2, ", ", exp3, ")" ]
                    gshow (Cast t exp) = concat ["Cast ", show t, " (", exp, ")" ]
                    gshow (Error e) = T.unpack e
@@ -84,6 +87,7 @@ data Node a = Position Int
             | Constant Field
             | Unary UnaryOpInfo a
             | Binary BinaryOpInfo a a
+            | PrefixBinary PBinaryOpInfo a a
             | Ternary a a a
             | Cast FieldType a
             | Error Text
@@ -104,6 +108,9 @@ mkUnary = (In .) . Unary
 
 mkBinary :: BinaryOpInfo -> Expression -> Expression -> Expression
 mkBinary i e e' = In $ Binary i e e'
+
+mkPBinary :: PBinaryOpInfo -> Expression -> Expression -> Expression
+mkPBinary i e e' = In $ PrefixBinary i e e'
 
 mkTernary :: Expression -> Expression -> Expression -> Expression
 mkTernary e e' e'' = In $ Ternary e e' e''
@@ -135,6 +142,14 @@ data BinaryOpInfo = BinaryOpInfo { opB :: BinaryOp
 
 instance Show BinaryOpInfo where
     show = T.unpack . formulaB
+
+-- |The information stored about a prefix binary operation.
+data PBinaryOpInfo = PBinaryOpInfo { opPB :: BinaryOp
+                                   , formulaPB :: Formula
+                                   }
+
+instance Show PBinaryOpInfo where
+    show = T.unpack . formulaPB
 
 type Algebra f a = f a -> a
 
@@ -180,6 +195,8 @@ toFormula = para tf
                                       TrueAssoc -> (prioB info, prioB info)
                                       NoAssoc -> (prioB info + 1, prioB info + 1)
                      in T.concat [parent pe1 (prio e1) f1, formulaB info, parent pe2 (prio e2) f2]
+          tf (In (PrefixBinary info e1 e2)) (PrefixBinary _ f1 f2) =
+                    T.concat [formulaPB info, "(", f1, ", ", f2, ")"]
           tf _ (Cast ft f) = T.concat [typeOperator ft, "(", f, ")"]
           tf (In (Ternary e1 e2 e3)) (Ternary f1 f2 f3) = let
                 f1' = parent 1 (prio e1) f1
@@ -206,6 +223,7 @@ eval = cataM ev
       ev (Constant f) = return f
       ev (Unary info v) = return $ opU info v
       ev (Binary info v1 v2) = return $ opB info v1 v2
+      ev (PrefixBinary info v1 v2) = return $ opPB info v1 v2
       ev (Cast ft v) = return $ convert ft v
       ev (Ternary v1 v2 v3) = return $ ternary v1 v2 v3
       ev (Error m) = return $ mkError m
@@ -253,6 +271,7 @@ getPositions = cata gp
         gp (Constant f) = []
         gp (Unary _ ps) = ps
         gp (Binary _ ps1 ps2) = merge ps1 ps2
+        gp (PrefixBinary _ ps1 ps2) = merge ps1 ps2
         gp (Cast _ ps) = ps
         gp (Ternary ps1 ps2 ps3) = ps1 `merge` ps2 `merge` ps3
         gp (Error _) = []

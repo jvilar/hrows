@@ -121,6 +121,8 @@ multiplicative = binaryLevel base
                  )
 
 -- base -> IntT | DoubleT | StringT | PositionT | NameT | CastT parenthesized | OpenT expression CloseT
+--         | MaxT OpenT expression CommaT expression CloseT
+--         | MinT OpenT expression CommaT expression CloseT
 base :: Parser Expression
 base = do
     t <- current
@@ -132,6 +134,8 @@ base = do
         NameT s -> return $ mkNamedPosition $ T.pack s
         CastT ft -> mkCast ft <$> parenthesized
         OpenT -> expression <* close
+        MaxT -> maxMin MaxT
+        MinT -> maxMin MinT
         _ -> throwError $ T.concat ["Error en ", showt t, ", esperaba un comienzo de expresión"]
 
 parenthesized :: Parser Expression
@@ -145,3 +149,15 @@ close = expect CloseT "un paréntesis cerrado"
 
 colon :: Parser ()
 colon = expect ColonT "dos puntos"
+
+maxMin :: Token -> Parser Expression
+maxMin t = do
+           open
+           left <- expression
+           expect CommaT "una coma"
+           right <- expression
+           close
+           let op = case t of
+                       MaxT -> PBinaryOpInfo maxField "max"
+                       MinT -> PBinaryOpInfo minField "min"
+           return $ mkPBinary op left right

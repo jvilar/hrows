@@ -21,6 +21,8 @@ module Model.Field ( Field
                    , andField
                    , orField
                    , compareField
+                   , maxField
+                   , minField
                    , ternary
                    -- *Other
                    , (!!!)
@@ -203,6 +205,17 @@ orField _ e@(AnError _ _) = e
 orField (AInt n1 _) (AInt n2 _) | n1 > 0 || n2 > 0 = toField (1::Int)
                                 | otherwise = toField (0::Int)
 orField f1 f2 = typeError2 "o lógico" f1 f2
+
+maxField :: Field -> Field -> Field
+maxField f1 f2 = case compareField (>=) f1 f2 of
+                    err@(AnError _ _) -> err
+                    AInt 1 _ -> f1
+                    _ -> f2
+
+minField :: Field -> Field -> Field
+minField f1 f2 = case compareField (<=) f1 f2 of
+                    AInt 1 _ -> f1
+                    _ -> f2
 
 compareField :: (Field -> Field -> Bool) -> Field -> Field -> Field
 compareField _ e@(AnError _ _) _ = e
