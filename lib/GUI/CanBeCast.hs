@@ -41,6 +41,9 @@ instance CanBeCast Menu where
 instance CanBeCast MenuItem where
     doCast = unsafeCastTo MenuItem
 
+instance CanBeCast TextView where
+    doCast = unsafeCastTo TextView
+
 instance CanBeCast Window where
     doCast = unsafeCastTo Window
 

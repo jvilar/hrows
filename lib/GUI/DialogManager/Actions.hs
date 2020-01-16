@@ -398,17 +398,24 @@ getFieldFormula fieldPos fieldName mFormula dmg action parent = do
         lbl = changeFieldFormulaLabel dmg
     configureDialog parent dlg
 
+    buffer <- textViewGetBuffer entry
+    buffer `set` [ #text := fromMaybe "" mFormula ]
     #setActive btn $ isJust mFormula
-    entry `set` [ #text := fromMaybe "" mFormula
-                , #sensitive := isJust mFormula
-                , #activatesDefault := True
-                ]
+    entry `set` [ #sensitive := isJust mFormula ]
     #setText lbl $ fieldName `T.append` " = "
+    entry `on` #keyPressEvent $ \evk -> do
+      n <- get evk #keyval >>= keyvalName
+      case n of
+          Just "Return" -> return True
+          _ -> return False
 
     r <- showRunAndHide dlg
     when (isResponse r ResponseTypeOk) $ do
         active <- #getActive btn
-        f <- #getText entry
+        f <- do
+               begin <- #getStartIter buffer
+               end <- #getEndIter buffer
+               #getText buffer begin end False
         action $ if active
                  then Just f
                  else Nothing
