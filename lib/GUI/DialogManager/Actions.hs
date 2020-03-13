@@ -173,7 +173,7 @@ askImportOptions t ifs cfs m dmg action parent = do
         lbl <- addLabel grid current 0 row
         #setHalign lbl AlignStart
         btn <- addButton grid "" 1 row
-        btn `on` #activate $ do
+        btn `on` #clicked $ do
             l <- #getLabel btn
             let Just n = elemIndex l options
                 n' = (n+1) `mod` length options
@@ -202,12 +202,12 @@ askImportOptions t ifs cfs m dmg action parent = do
         action (keys, values)
 
 translateChar :: Text -> Char
-translateChar t = case T.uncons t of
-                    Nothing -> '\t'
-                    Just ('\\', t') -> if T.null t'
-                                       then '\\'
-                                       else T.head t'
-                    Just (c, _) -> c
+translateChar t = case T.unpack t of
+                     "" -> '\t'
+                     [c] -> c
+                     '\\': 't' : _ -> '\t'
+                     '\\': c : _ -> c
+                     c: _ -> c
 
 confirmExit :: Bool -> DialogFunction Bool
 confirmExit changed dmg action parent = do
