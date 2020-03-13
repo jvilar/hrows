@@ -11,7 +11,7 @@ import GI.Gtk
 import GUI.HKD
 
 data DialogManager' f = DialogManager { changeFieldFormulaDialog :: HKD f Dialog
-                                      , changeFieldFormulaEntry :: HKD f Entry
+                                      , changeFieldFormulaEntry :: HKD f TextView
                                       , changeFieldFormulaLabel :: HKD f Label
                                       , changeFieldFormulaButton :: HKD f CheckButton
                                       , confFileSaveCheckButton :: HKD f CheckButton
