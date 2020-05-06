@@ -13,6 +13,7 @@ import Presenter.File as X
 import Presenter.Movement as X
 import Presenter.Update as X
 import Presenter.Source as X
+import Presenter.Listing as X
 
 -- |The input that the presenter can receive.
 data Input = InputMove MoveCommand
@@ -21,6 +22,7 @@ data Input = InputMove MoveCommand
            | InputDialog DialogCommand
            | InputControl ControlCommand
            | InputSource SourceCommand
+           | InputListing ListingCommand
              deriving Show
 
 class IsInput t where
@@ -46,3 +48,6 @@ instance IsInput ControlCommand where
 
 instance IsInput SourceCommand where
     toInput = InputSource
+
+instance IsInput ListingCommand where
+    toInput = InputListing

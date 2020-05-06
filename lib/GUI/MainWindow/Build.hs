@@ -9,6 +9,7 @@ module GUI.MainWindow.Build (
   ) where
 
 import Control.Concurrent.Chan(Chan)
+import Control.Monad((>=>))
 import Control.Monad.IO.Class(liftIO)
 import Data.BitVector(nil, BitVector)
 import Data.IORef(readIORef, newIORef, IORef)
@@ -59,6 +60,7 @@ configureMainWindow = do
                 prepareFileMenu
                 prepareFieldMenu
                 prepareRecordMenu
+                prepareListingMenu
 
 globalKeys :: [ ((Text, [ModifierType]), Input)]
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
@@ -88,18 +90,17 @@ prepareMainWindow = do
   control <- getControl
   w <- window <$> getMainWindow
   liftIO $ do
-      w `on` #deleteEvent $ const $ do
-        liftIO $ sendInput control ExitRequested
-        return False
-      w `on` #keyPressEvent $ \evk -> -- do
-          -- showEvent evk
-          commandFromGlobalKey evk >>= \case
-              Nothing -> return False
-              Just cmd -> do
-                liftIO $ sendInput control cmd
-                -- liftIO $ print cmd
-                return True
-      widgetShowAll w
+    w `on` #deleteEvent $ const $ do
+      liftIO $ sendInput control ExitRequested
+      return True
+    w `on` #keyPressEvent $
+      (commandFromGlobalKey >=>
+       (\case
+          Nothing -> return False
+          Just cmd -> do
+            liftIO $ sendInput control cmd
+            return True))
+    widgetShowAll w
 
 showEvent :: EventKey -> IO()
 showEvent evk = do
@@ -156,6 +157,9 @@ prepareRecordMenu = mapM_ (uncurry menuItemInput)
                               ,("deleteRowMenuItem", toInput DeleteRow)
                               ,("sortRowsMenuItem", toInput SortRowsDialog)
                               ]
+
+prepareListingMenu :: BuildMonad ()
+prepareListingMenu = menuItemInput "newListingMenuItem" (toInput ShowListingRequested)
 
 fieldMenuAction :: IsInput cmd => Text -> (FieldPos -> cmd) -> BuildMonad ()
 fieldMenuAction name f = do

@@ -1,6 +1,6 @@
-{-# LANGUAGE OverloadedStrings
-           , OverloadedLabels
-#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 
 module GUI.Update (
             -- *Types
@@ -22,7 +22,7 @@ import Data.Text(Text)
 import qualified Data.Text as T
 import GHC.Int(Int32)
 import GI.Gtk hiding (MessageDialog)
-import GI.Gdk
+import GI.Gdk hiding (Window)
 import TextShow(TextShow(showt))
 
 import GUI.Command
@@ -30,6 +30,7 @@ import GUI.Control
 import GUI.DialogManager.Actions
 import GUI.MainWindow
 import GUI.MainWindow.Update
+import GUI.ListingWindow
 import Model hiding (deleteFields)
 import Model.DefaultFileNames
 import Presenter.ImportType
@@ -42,6 +43,8 @@ updateGUI (ShowFields fis) = showFields fis . mainWindow
 updateGUI (ShowNames names) = updateNames names . mainWindow
 updateGUI (ShowIteration iter) = showIteration iter
 updateGUI DisableTextViews = disableTextViews . mainWindow
+updateGUI ShowListing = widgetShowAll . (window :: ListingWindow -> Window) . listingWindow
+updateGUI HideListing = widgetHide . (window :: ListingWindow -> Window) . listingWindow
 
 dndError :: GUIControl -> IO ()
 dndError control = sendInput control $ MessageDialog (ErrorMessage "Algo está mal en el dnd")
@@ -49,7 +52,7 @@ dndError control = sendInput control $ MessageDialog (ErrorMessage "Algo está m
 dialogCall :: DialogFunction t -> (GUIControl -> DialogAction t) -> GUIControl -> IO ()
 dialogCall dlg action control = dlg (dialogManager control)
                                     (action control)
-                                    (window $ mainWindow control)
+                                    ((window :: MainWindow -> Window) $ mainWindow control)
 
 showIteration :: Iteration -> GUIControl -> IO ()
 showIteration AskReadFile = dialogCall askReadFile $
@@ -70,7 +73,7 @@ showIteration (AskRenameFields fs) = dialogCall (askRenameFields fs) $
                                      (. RenameFields) . sendInput
 showIteration (AskSortRows fs) = dialogCall (askSortRows fs) $
                 (. uncurry SortRows) . sendInput
-showIteration (DisplayMessage m) = displayMessage m . window . mainWindow
+showIteration (DisplayMessage m) = displayMessage m . (window :: MainWindow -> Window) . mainWindow
 showIteration (ConfirmExit changed) = dialogCall (confirmExit changed)
    (\control save -> do
        when save $ sendInput control WriteFile

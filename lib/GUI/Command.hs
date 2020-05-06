@@ -19,6 +19,8 @@ data GUICommand = ChangeTitle Text
                 | ShowNames [FieldName]
                 | ShowIteration Iteration
                 | DisableTextViews
+                | ShowListing
+                | HideListing
                 deriving Show
 
 data FieldInfo = FieldInfo { indexFI :: FieldPos

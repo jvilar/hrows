@@ -4,6 +4,10 @@ hrows.cabal
 Setup.hs
 .stack-work
 
+.idea/
+hrows.iml
+out/
+
 *~
 *.hi
 *.swp

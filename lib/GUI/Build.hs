@@ -27,6 +27,8 @@ import GUI.CanBeCast
 import GUI.Control
 import GUI.DialogManager.Build
 import GUI.Iteration
+import GUI.ListingWindow
+import GUI.ListingWindow.Build
 import GUI.MainWindow
 import GUI.MainWindow.Build
 import GUI.HKD
@@ -52,6 +54,7 @@ makeGUI iChan = do
   control <- prepareControl iChan builder
   runBuild  builder control $ do
     configureMainWindow
+    configureListingWindow $ listingWindow control
     configureDialogManager
   return control
 
@@ -62,6 +65,7 @@ prepareControl iChan builder = do
       getObject name = builderGetObject builder name >>= doCast . fromJust
   fromIO GUIControl {
     mainWindow = buildMainWindow iChan builder
+    , listingWindow = buildListingWindow iChan builder
     , inputChan = return iChan
     , dialogManager = buildDialogManager builder
     }

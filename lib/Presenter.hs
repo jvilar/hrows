@@ -26,6 +26,7 @@ import Presenter.Input
 import Presenter.ControlAuto
 import Presenter.DialogAuto
 import Presenter.FileAuto
+import Presenter.ListingAuto
 import Presenter.MovementAuto
 import Presenter.SourceAuto
 import Presenter.UpdateAuto
@@ -38,7 +39,7 @@ updater = proc inputs -> do
     rec
         dauto <- delay_ processInput -< auto
         (cmds, auto) <- arrM (uncurry pr) -< (dauto, inputs)
---    arrM putStrLn -< "GUI commands: " ++ show cmds
+    arrM putStrLn -< "GUI commands: " ++ show cmds
     id -< cmds
 
 pr :: PresenterAuto Input () -> [Input] -> IO ([GUICommand], PresenterAuto Input ())
@@ -58,6 +59,7 @@ processInput = proc inp -> do
              si <- processSourceCommands -< inp
              processFileCommands -< (inp, model, si)
              processDialogCommands -< (inp, model, pos)
+             processListingCommands -< inp
              processControlCommands -< (inp, changed model)
              -- arrM (liftIO . putStrLn) -< "model changed: " ++ show (changed model)
 
@@ -115,3 +117,12 @@ processSourceCommands = emitJusts getSources >>> holdWith_ si0 . perBlip (source
 getSources :: Input -> Maybe SourceCommand
 getSources (InputSource cmd) = Just cmd
 getSources _ = Nothing
+
+processListingCommands :: PresenterAuto Input ()
+processListingCommands = proc inp -> do
+                            blisting <- emitJusts getListings -< inp
+                            holdWith_ () . perBlip listingAuto -< blisting
+
+getListings :: Input -> Maybe ListingCommand
+getListings (InputListing cmd) = Just cmd
+getListings _ = Nothing
