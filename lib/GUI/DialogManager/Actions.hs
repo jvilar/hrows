@@ -430,7 +430,7 @@ useCombo dlg combo initial values dmg parent = do
 
     r <- showRunAndHide dlg
     if isResponse r ResponseTypeOk
-    then Just <$> #getActiveText combo
+    then #getActiveText combo
     else return Nothing
 
 searchField :: FieldPos -> Text -> [Text] -> DialogFunction Text
