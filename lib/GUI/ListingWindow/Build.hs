@@ -9,10 +9,11 @@ module GUI.ListingWindow.Build (
 ) where
 
 import Control.Concurrent.Chan (Chan)
-import Control.Monad((>=>))
+import Control.Monad((>=>), forM_)
 import Control.Monad.IO.Class(liftIO)
 import Data.Maybe(fromJust)
 import Data.Text (Text)
+import Foreign.Ptr(Ptr)
 import GI.Gtk
 import GI.Gdk(keyvalName, EventKey, ModifierType(..))
 
@@ -23,6 +24,7 @@ import GUI.CanBeCast
 import GUI.BuildMonad
 import GUI.ListingWindow
 import GUI.HKD (fromIO)
+import Data.GI.Base.ShortPrelude (Int32)
 
 
 buildListingWindow :: Chan Input -> Builder -> IO ListingWindow
@@ -99,3 +101,5 @@ prepareFilterEntry w = do
             return True
       _ -> return False
   return ()
+
+

@@ -13,6 +13,7 @@ import GI.Gtk
 import Presenter.Input
 
 import GUI.HKD
+import Data.IORef (IORef)
 
 data ListingWindow' f = ListingWindow { window :: HKD f Window
                                 , listingView :: HKD f TreeView

@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE RankNTypes #-}
 
 module GUI.Update (
             -- *Types
@@ -28,23 +29,29 @@ import TextShow(TextShow(showt))
 import GUI.Command
 import GUI.Control
 import GUI.DialogManager.Actions
-import GUI.MainWindow
-import GUI.MainWindow.Update
-import GUI.ListingWindow
+import GUI.MainWindow hiding (window)
+import GUI.MainWindow.Update (updatePosition, setTextField, showFields, disableTextViews)
+import GUI.ListingWindow hiding (window)
+import GUI.View
 import Model hiding (deleteFields)
 import Model.DefaultFileNames
 import Presenter.ImportType
 import Presenter.Input
 
 updateGUI :: GUICommand -> GUIControl -> IO ()
-updateGUI (ChangeTitle title) = changeTitle title . mainWindow
+updateGUI (ChangeTitle title) = inBothWindows $ changeTitle title
 updateGUI (ShowPosition pos size) = updatePosition pos size . mainWindow
 updateGUI (ShowFields fis) = showFields fis . mainWindow
-updateGUI (ShowNames names) = updateNames names . mainWindow
+updateGUI (ShowNames names) = inBothWindows $ updateNames names
 updateGUI (ShowIteration iter) = showIteration iter
 updateGUI DisableTextViews = disableTextViews . mainWindow
-updateGUI ShowListing = widgetShowAll . (window :: ListingWindow -> Window) . listingWindow
-updateGUI HideListing = widgetHide . (window :: ListingWindow -> Window) . listingWindow
+updateGUI ShowListing = widgetShowAll . window . listingWindow
+updateGUI HideListing = widgetHide . window . listingWindow
+
+inBothWindows :: (forall v. View v => v -> IO()) -> GUIControl -> IO ()
+inBothWindows f control = do
+                             f $ mainWindow control
+                             f $ listingWindow control 
 
 dndError :: GUIControl -> IO ()
 dndError control = sendInput control $ MessageDialog (ErrorMessage "Algo está mal en el dnd")
