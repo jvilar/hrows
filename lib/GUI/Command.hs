@@ -21,6 +21,7 @@ data GUICommand = ChangeTitle Text
                 | DisableTextViews
                 | ShowListing
                 | HideListing
+                | CompleteListing [[Text]]
                 deriving Show
 
 data FieldInfo = FieldInfo { indexFI :: FieldPos

@@ -3,16 +3,18 @@
 
 module GUI.ListingWindow.Update (
   changeTitle,
-  updateNames
+  updateNames,
+  showFullListing
 ) where
 
 import Control.Monad(forM_, unless)
 import Data.GI.Base.Attributes(clear)
-import Data.GI.Base.GType(gtypeInt, gtypeString)
+import Data.GI.Base.GType(gtypeDouble, gtypeInt, gtypeString)
 import Data.Text (Text)
 import GI.Gdk
 import GI.Gtk
 
+import GUI.Command
 import GUI.ListingWindow
 import Data.Int (Int32)
 import Model (FieldName)
@@ -42,46 +44,30 @@ addColumns tv ns =
   forM_ ns $ \n -> do
     col <- treeViewColumnNew
     renderer <- cellRendererTextNew
+    #packStart col renderer True
     #addAttribute col renderer "text" n
-    #packEnd col renderer True
     #setTitle col "nuevo"
     #appendColumn tv col
 
 delColumns :: TreeView -> [Int32] -> IO ()
 delColumns tv ns =
-  forM_ ns $ \n-> do
+  forM_ (reverse ns) $ \n-> do
     Just col <- #getColumn tv n
     #removeColumn tv col
     #clear col
 
--- TODO: delete
-fillTreeView :: ListingWindow -> IO ()
-fillTreeView w = do
-  ls <- listStoreNew [gtypeInt, gtypeString]
-  forM_ [(1, "uno"), (2, "dos"), (3, "tres")] $ \(n, str) -> do
-      iter <- #append ls
-      v <- toGValue (n :: Int32)
-      #setValue ls iter 0 v
-      v <- toGValue (Just str :: Maybe Text)
-      #setValue ls iter 1 v
-  let tv = listingView w
-
-  col1 <- treeViewColumnNew
-  col2 <- treeViewColumnNew
-
-  renderer1 <- cellRendererTextNew
-  renderer2 <- cellRendererTextNew
-
-  #packStart col1 renderer1 True
-  #packStart col2 renderer2 True
-
-  #addAttribute col1 renderer1 "text" 0
-  #addAttribute col2 renderer2 "text" 1
-
-  #setTitle col1 "Número"
-  #setTitle col2 "Letra"
-
-  #appendColumn tv col1
-  #appendColumn tv col2
-
-  #setModel tv $ Just ls
+showFullListing :: [[Text]] -> ListingWindow -> IO ()
+showFullListing [] lw = clear (listingView lw) #model
+showFullListing tss lw = do
+  let lv = listingView lw
+      ncols = length $ head tss
+      types = replicate ncols gtypeString
+  adjustColumns (fromIntegral ncols) lv
+  clear lv #model
+  ls <- listStoreNew types
+  forM_ tss $ \ts -> do
+    iter <- #append ls
+    forM_ (zip ts [0..]) $ \(t, i) -> do
+      v <- toGValue $ Just t
+      #setValue ls iter i v
+  #setModel lv $ Just ls

@@ -32,6 +32,7 @@ import GUI.DialogManager.Actions
 import GUI.MainWindow hiding (window)
 import GUI.MainWindow.Update (updatePosition, setTextField, showFields, disableTextViews)
 import GUI.ListingWindow hiding (window)
+import GUI.ListingWindow.Update (showFullListing)
 import GUI.View
 import Model hiding (deleteFields)
 import Model.DefaultFileNames
@@ -47,6 +48,7 @@ updateGUI (ShowIteration iter) = showIteration iter
 updateGUI DisableTextViews = disableTextViews . mainWindow
 updateGUI ShowListing = widgetShowAll . window . listingWindow
 updateGUI HideListing = widgetHide . window . listingWindow
+updateGUI (CompleteListing fiss) = showFullListing fiss . listingWindow
 
 inBothWindows :: (forall v. View v => v -> IO()) -> GUIControl -> IO ()
 inBothWindows f control = do
