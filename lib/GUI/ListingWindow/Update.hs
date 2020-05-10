@@ -10,7 +10,7 @@ module GUI.ListingWindow.Update (
 
 import Control.Monad(forM_, unless)
 import Data.GI.Base.Attributes(clear)
-import Data.GI.Base.GType(gtypeDouble, gtypeInt, gtypeString)
+import Data.GI.Base.GType(gtypeString)
 import Data.Text (Text)
 import GI.Gdk
 import GI.Gtk
@@ -54,7 +54,7 @@ delColumns :: TreeView -> [Int32] -> IO ()
 delColumns tv ns =
   forM_ (reverse ns) $ \n-> do
     Just col <- #getColumn tv n
-    #removeColumn tv col
+    _ <- #removeColumn tv col
     #clear col
 
 showFullListing :: [[Text]] -> ListingWindow -> IO ()

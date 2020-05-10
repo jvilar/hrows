@@ -9,7 +9,6 @@ module GUI.MainWindow (
 import Control.Concurrent.Chan(Chan)
 import Data.BitVector(BitVector)
 import Data.IORef(IORef)
-import Data.Text
 import GHC.Generics(Generic)
 import GI.Gtk
 

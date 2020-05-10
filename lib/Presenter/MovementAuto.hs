@@ -3,9 +3,8 @@ module Presenter.MovementAuto (
                 movementAuto
 ) where
 
-import Control.Auto(Auto, accumM_)
+import Control.Auto(accumM_)
 import Data.List(zipWith4)
-import Data.Maybe(isJust)
 
 import GUI.Command
 import Model

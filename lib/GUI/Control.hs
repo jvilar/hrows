@@ -9,14 +9,10 @@ module GUI.Control (
 ) where
 
 import Control.Concurrent.Chan(Chan, writeChan)
-import Data.IORef(IORef)
-import Data.BitVector(BitVector)
 import GHC.Generics(Generic)
-import GI.Gtk
 
 import Presenter.Input
 
-import GUI.Command
 import GUI.DialogManager
 import GUI.HKD
 import GUI.MainWindow

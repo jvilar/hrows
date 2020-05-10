@@ -7,14 +7,10 @@ module Presenter (
                  , module Presenter.Input
 ) where
 
-import Control.Arrow(arr, first, (>>>))
-import Control.Auto(Auto, accum_, accumM_, arrM, delay_, fromBlips, emitJusts, holdWith_, perBlip, stepAuto, id, (.))
-import Control.Monad(foldM)
-import Control.Monad.Trans(liftIO)
+import Control.Arrow(arr, (>>>))
+import Control.Auto(Auto, accum_, accumM_, arrM, delay_, emitJusts, holdWith_, perBlip, stepAuto, id, (.))
 import Control.Monad.Writer.Strict(runWriterT)
 import Data.Either(partitionEithers)
-import Data.Maybe(fromMaybe, isJust)
-import Data.Monoid((<>))
 import Prelude hiding((.), id)
 
 import GUI.Command

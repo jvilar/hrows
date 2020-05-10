@@ -5,14 +5,14 @@
 {-# LANGUAGE TypeOperators #-}
 
 module GUI.HKD (
-  HKD(..)
+  HKD
   , Identity
   , fromIO
   ) where
 
 import Data.Functor.Identity(Identity)
 
-import GHC.Generics(Generic, K1(..), M1(..), Rep(..), V1(..), U1(..)
+import GHC.Generics(Generic, K1(..), M1(..), Rep(..), V1, U1(..)
                    , (:*:)(..), (:+:)(..), from, to)
 
 

@@ -7,7 +7,6 @@ module Model.UpdatePlan ( UpdatePlan
                         , updateField
                         ) where
 
-import Control.Arrow(second, (***), (|||), (&&&))
 import Data.IntMap(IntMap)
 import qualified Data.IntMap.Strict as IM
 import qualified Data.IntSet as IS
@@ -16,7 +15,6 @@ import Data.List(foldl', sortOn)
 
 import Model.Expression
 import Model.TopoSort
-import Model.Parser
 import Model.Row
 
 data UpdatePlan = UpdatePlan { expressions :: [Maybe Expression]

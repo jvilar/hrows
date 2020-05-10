@@ -23,28 +23,21 @@ module GUI.DialogManager.Actions (
   , copyOther
 ) where
 
-import Control.Monad(filterM, forM, forM_, guard, unless, when)
-import Control.Monad.IO.Class(liftIO)
-import Data.Bits(Bits(..))
-import Data.BitVector(nil, BV, extract, (#), ones, (@.))
-import qualified Data.BitVector as BV
+import Control.Monad(filterM, forM, forM_, unless, when)
 import Data.Either(lefts, rights)
-import Data.IORef(IORef, modifyIORef, readIORef, writeIORef)
-import Data.List(elemIndex, sort)
-import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
+import Data.List(elemIndex)
+import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust)
 import Data.Text(Text)
 import qualified Data.Text as T
 import GHC.Int(Int32)
 import GI.Gtk hiding (MessageDialog)
 import GI.Gdk hiding (Window)
-import TextShow(TextShow(showt))
 
 import GUI.Command
 import GUI.DialogManager
 import Model hiding (deleteFields)
 import Model.DefaultFileNames
 import Presenter.ImportType
-import Presenter.Input
 
 displayMessage :: Message -> Window -> IO ()
 displayMessage (ErrorMessage m) = noResponseMessage m
@@ -97,11 +90,11 @@ runAndHide dlg = do
 noResponseMessage :: Text -> Window -> IO ()
 noResponseMessage m parent = do
     dlg <- createDialog parent
-    #addButton dlg "Ok" $ asInt32 ResponseTypeOk
+    _ <- #addButton dlg "Ok" $ asInt32 ResponseTypeOk
     content <- #getContentArea dlg
     message <- labelNew $ Just m
     #packStart content message True True 2
-    showAndRun dlg
+    _ <- showAndRun dlg
     #destroy dlg
     return ()
 
@@ -154,8 +147,8 @@ askImportFrom dmg action parent = do
         separator <- translateChar <$> #getText (importInputSeparator dmg)
         when (isJust file) $ action (fromJust file, separator)
 
-askImportOptions :: ImportType -> [FieldName] -> [FieldName] -> Model -> DialogFunction ([(FieldPos, FieldPos)], [(FieldPos, FieldPos)])
-askImportOptions t ifs cfs m dmg action parent = do
+askImportOptions :: ImportType -> [FieldName] -> [FieldName] -> DialogFunction ([(FieldPos, FieldPos)], [(FieldPos, FieldPos)])
+askImportOptions t ifs cfs dmg action parent = do
     let (dialog, grid) = case t of
           ImportFields -> (importFieldsOptionsDialog dmg, importFieldsOptionsRows dmg)
           ImportRows -> (importRowsOptionsDialog dmg, importRowsOptionsRows dmg)
@@ -173,7 +166,7 @@ askImportOptions t ifs cfs m dmg action parent = do
         lbl <- addLabel grid current 0 row
         #setHalign lbl AlignStart
         btn <- addButton grid "" 1 row
-        btn `on` #clicked $ do
+        _ <- btn `on` #clicked $ do
             l <- #getLabel btn
             let Just n = elemIndex l options
                 n' = (n+1) `mod` length options
@@ -210,7 +203,7 @@ translateChar t = case T.unpack t of
                      c: _ -> c
 
 confirmExit :: Bool -> DialogFunction Bool
-confirmExit changed dmg action parent = do
+confirmExit changed _ action parent = do
   dlg <- createDialog parent
   content <- #getContentArea dlg
   label <- labelNew $ Just $ if changed
@@ -218,13 +211,13 @@ confirmExit changed dmg action parent = do
                              else "¿Seguro que quieres salir?"
   #packStart content label True True 8
 
-  if changed
+  _ <- if changed
   then do
-         #addButton dlg "Grabar y salir" 1
-         #addButton dlg "Salir sin grabar" $ asInt32 ResponseTypeYes
+         _ <- #addButton dlg "Grabar y salir" 1
+         _ <- #addButton dlg "Salir sin grabar" $ asInt32 ResponseTypeYes
          #addButton dlg "No salir" $ asInt32 ResponseTypeNo
   else do
-         #addButton dlg "Sí" $ asInt32 ResponseTypeYes
+         _ <- #addButton dlg "Sí" $ asInt32 ResponseTypeYes
          #addButton dlg "No" $ asInt32 ResponseTypeNo
 
   r <- showRunAndDestroy dlg
@@ -232,17 +225,17 @@ confirmExit changed dmg action parent = do
   when (r == 1) $ action True
 
 askCreateField :: DialogFunction [(FieldName, FieldType)]
-askCreateField dmg action parent = do
+askCreateField _ action parent = do
     dlg <- createDialog parent
 
-    #addButton dlg "Crear" $ asInt32 ResponseTypeOk
-    #addButton dlg "Cancelar" $ asInt32 ResponseTypeCancel
+    _ <- #addButton dlg "Crear" $ asInt32 ResponseTypeOk
+    _ <- #addButton dlg "Cancelar" $ asInt32 ResponseTypeCancel
     content <- #getContentArea dlg
     labelNew (Just "Crear Campos") >>= #add content
 
     grid <- gridNew
-    addLabel grid "Nombre" 0 0
-    addLabel grid "Tipo" 1 0
+    _ <- addLabel grid "Nombre" 0 0
+    _ <- addLabel grid "Tipo" 1 0
     entries <- forM [1..10] $ \row -> (,)
                                     <$> addEntry grid 0 row
                                     <*> addComboBox grid (map snd typeLabels) 1 row
@@ -315,11 +308,11 @@ addComboBox grid options left top = do
     return cbox
 
 askDeleteFields :: [FieldName] -> DialogFunction [FieldPos]
-askDeleteFields names dmg action parent = do
+askDeleteFields names _ action parent = do
     dlg <- createDialog parent
 
-    #addButton dlg "Borrar" $ asInt32 ResponseTypeOk
-    #addButton dlg "Cancelar" $ asInt32 ResponseTypeCancel
+    _ <- #addButton dlg "Borrar" $ asInt32 ResponseTypeOk
+    _ <- #addButton dlg "Cancelar" $ asInt32 ResponseTypeCancel
     content <- #getContentArea dlg
     labelNew (Just "Borrar Campos") >>= #add content
 
@@ -339,15 +332,15 @@ askDeleteFields names dmg action parent = do
 askRenameFields :: [FieldName] -> DialogFunction [FieldName]
 askRenameFields names dmg action parent = do
     dlg <- createDialog parent
-    #addButton dlg "Cambiar" $ asInt32 ResponseTypeOk
-    #addButton dlg "Cancelar" $ asInt32  ResponseTypeCancel
+    _ <- #addButton dlg "Cambiar" $ asInt32 ResponseTypeOk
+    _ <- #addButton dlg "Cancelar" $ asInt32  ResponseTypeCancel
     content <- #getContentArea dlg
     labelNew (Just "Cambiar Nombres de Campos") >>= #add content
 
     grid <- gridNew
     #setColumnSpacing grid 4
     centries <- forM (enumerate names) $ \(row, name) -> do
-        addLabel grid name 0 row
+        _ <- addLabel grid name 0 row
         entry <- addEntry grid 1 row
         #setText entry name
         return entry
@@ -364,9 +357,9 @@ askRenameFields names dmg action parent = do
 askSortRows :: [FieldName] -> DialogFunction (FieldPos, SortDirection)
 askSortRows names dmg action parent = do
     dlg <- createDialog parent
-    #addButton dlg "Ascendente" 1
-    #addButton dlg "Descendente" 2
-    #addButton dlg "Cancelar" 3
+    _ <- #addButton dlg "Ascendente" 1
+    _ <- #addButton dlg "Descendente" 2
+    _ <- #addButton dlg "Cancelar" 3
     content <- #getContentArea dlg
     labelNew (Just "Ordenar") >>= #add content
 
@@ -391,7 +384,7 @@ askSortRows names dmg action parent = do
     #destroy dlg
 
 getFieldFormula :: FieldPos -> FieldName -> Maybe Formula -> DialogFunction (Maybe Formula)
-getFieldFormula fieldPos fieldName mFormula dmg action parent = do
+getFieldFormula _ fieldName mFormula dmg action parent = do
     let dlg = changeFieldFormulaDialog dmg
         btn = changeFieldFormulaButton dmg
         entry = changeFieldFormulaEntry dmg
@@ -403,7 +396,7 @@ getFieldFormula fieldPos fieldName mFormula dmg action parent = do
     #setActive btn $ isJust mFormula
     entry `set` [ #sensitive := isJust mFormula ]
     #setText lbl $ fieldName `T.append` " = "
-    entry `on` #keyPressEvent $ \evk -> do
+    _ <- entry `on` #keyPressEvent $ \evk -> do
       n <- get evk #keyval >>= keyvalName
       case n of
           Just "Return" -> return True
@@ -421,7 +414,7 @@ getFieldFormula fieldPos fieldName mFormula dmg action parent = do
                  else Nothing
 
 useCombo :: Dialog -> ComboBoxText -> Text -> [Text] -> DialogManager -> Window -> IO (Maybe Text)
-useCombo dlg combo initial values dmg parent = do
+useCombo dlg combo initial values _ parent = do
     configureDialog parent dlg
 
     #removeAll combo
@@ -434,7 +427,7 @@ useCombo dlg combo initial values dmg parent = do
     else return Nothing
 
 searchField :: FieldPos -> Text -> [Text] -> DialogFunction Text
-searchField fieldPos initial values dmg action parent = do
+searchField _ initial values dmg action parent = do
     let dlg = searchFieldDialog dmg
         combo = searchFieldCombo dmg
 
@@ -442,7 +435,7 @@ searchField fieldPos initial values dmg action parent = do
     forM_ mt action
 
 copyOther :: FieldPos -> Text -> [Text] -> DialogFunction Text
-copyOther fieldPos initial values dmg action parent = do
+copyOther _ initial values dmg action parent = do
     let dlg = copyOtherDialog dmg
         combo = copyOtherCombo dmg
 

@@ -10,21 +10,10 @@ module GUI.Update (
             , updateGUI
 ) where
 
-import Control.Monad(filterM, forM, forM_, guard, unless, when)
-import Control.Monad.IO.Class(liftIO)
-import Data.Bits(Bits(..))
-import Data.BitVector(nil, BV, extract, (#), ones, (@.))
-import qualified Data.BitVector as BV
-import Data.Either(lefts, rights)
-import Data.IORef(IORef, modifyIORef, readIORef, writeIORef)
-import Data.List(elemIndex, sort)
-import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
+import Control.Monad(when)
 import Data.Text(Text)
 import qualified Data.Text as T
-import GHC.Int(Int32)
 import GI.Gtk hiding (MessageDialog)
-import GI.Gdk hiding (Window)
-import TextShow(TextShow(showt))
 
 import GUI.Command
 import GUI.Control
@@ -34,8 +23,6 @@ import GUI.MainWindow.Update (updatePosition, setTextField, showFields, disableT
 import GUI.ListingWindow hiding (window)
 import GUI.ListingWindow.Update (showFullListing, showFieldsRow)
 import GUI.View
-import Model hiding (deleteFields)
-import Model.DefaultFileNames
 import Presenter.ImportType
 import Presenter.Input
 
@@ -83,7 +70,7 @@ showIteration (AskDeleteFields fs) = dialogCall (askDeleteFields fs) $
                                      (. DeleteFields) . sendInput
 showIteration (AskImportFrom t) = dialogCall askImportFrom $
                 (. uncurry (ImportFromFileName t)) . sendInput
-showIteration (AskImportOptions t ifs cfs m) = dialogCall (askImportOptions t ifs cfs m)
+showIteration (AskImportOptions t ifs cfs m) = dialogCall (askImportOptions t ifs cfs)
    (\control (keys, values) -> sendInput control $ case t of
                               ImportFields -> ImportFieldsFromModel m keys values
                               ImportRows -> ImportRowsFromModel m values)

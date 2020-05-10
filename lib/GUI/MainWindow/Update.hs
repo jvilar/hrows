@@ -13,16 +13,14 @@ module GUI.MainWindow.Update (
 ) where
 
 import Control.Concurrent.Chan(writeChan)
-import Control.Monad(filterM, forM, forM_, guard, unless, when)
+import Control.Monad(forM_, unless, when)
 import Control.Monad.IO.Class(liftIO)
 import Data.Bits(Bits(..))
 import Data.BitVector(nil, BV, extract, (#), ones, (@.))
 import qualified Data.BitVector as BV
 import qualified Data.ByteString as BS
-import Data.Either(lefts, rights)
-import Data.IORef(IORef, modifyIORef, readIORef, writeIORef)
-import Data.List(elemIndex, sort)
-import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
+import Data.IORef(modifyIORef, readIORef, writeIORef)
+import Data.Maybe(fromMaybe, isJust, isNothing)
 import Data.Text(Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -35,8 +33,6 @@ import GUI.Command
 import GUI.Control
 import GUI.MainWindow
 import Model hiding (deleteFields)
-import Model.DefaultFileNames
-import Presenter.ImportType
 import Presenter.Input
 
 changeTitle :: Text -> MainWindow -> IO ()
@@ -163,11 +159,11 @@ createFieldLabel f mWindow = do
          #dragSourceSetTargetList ebox (Just $ targetList mWindow)
          #dragDestSet ebox [DestDefaultsAll] Nothing [DragActionMove] -- Ditto for Nothing
          #dragDestSetTargetList ebox (Just $ targetList mWindow)
-         ebox `on` #dragDataGet $ \_ sdata _ _ -> do
+         _ <- ebox `on` #dragDataGet $ \_ sdata _ _ -> do
                                    let (t,l) = (showt f, fromIntegral $ T.length t)
                                    ok <- selectionDataSetText sdata t l
                                    unless ok (liftIO $ dndError mWindow)
-         ebox `on` #dragDataReceived $ \_ _ _ sdata _ _ -> do
+         _ <- ebox `on` #dragDataReceived $ \_ _ _ sdata _ _ -> do
                                t <- selectionDataGetText sdata
                                liftIO $ case (t :: Maybe Text) of
                                           Nothing -> dndError mWindow
@@ -203,7 +199,7 @@ createFieldTextView f mWindow = do
                       ]
          buffer <- textViewGetBuffer textView
 
-         buffer `on` #changed $ liftIO $ do
+         _ <- buffer `on` #changed $ liftIO $ do
              isActive <- (@. f) <$> readIORef (textBufferActive mWindow)
              when isActive $ do
                  begin <- #getStartIter buffer
@@ -211,7 +207,7 @@ createFieldTextView f mWindow = do
                  text <- #getText buffer begin end False
                  sendInputMW mWindow $ UpdateField f (toField text)
 
-         textView `on` #buttonPressEvent $ \event -> do
+         _ <- textView `on` #buttonPressEvent $ \event -> do
              button <- get event #button
              if button == 3
              then liftIO $ do
@@ -228,57 +224,6 @@ deleteFields grid fields mWindow = do
                              Just w <- #getChildAt grid c f
                              #destroy w
                       deleteTextBufferActive fields mWindow
-
-addLabel :: Grid -> Text -> Int32 -> Int32 -> IO Label
-addLabel grid text left top = do
-    lbl <- labelNew $ Just text
-    lbl `set` [ #halign := AlignStart ]
-    #attach grid lbl left top 1 1
-    return lbl
-
-addButton :: Grid -> Text -> Int32 -> Int32 -> IO Button
-addButton grid label left top = do
-    btn <- buttonNewWithLabel label
-    #attach grid btn left top 1 1
-    return btn
-
-addRadioButton :: Grid -> Text -> Int32 -> Int32 -> IO RadioButton
-addRadioButton grid label left top = do
-    btn <- radioButtonNewWithLabel ([] :: [RadioButton]) label
-    #attach grid btn left top 1 1
-    return btn
-
-addRadioButtonFromWidget :: Grid -> RadioButton -> Text -> Int32 -> Int32 -> IO RadioButton
-addRadioButtonFromWidget grid other label left top = do
-    btn <- radioButtonNewWithLabelFromWidget (Just other) label
-    #attach grid btn left top 1 1
-    return btn
-
-addCheckButton :: Grid -> Text -> Int32 -> Int32 -> IO CheckButton
-addCheckButton grid label left top = do
-    btn <- checkButtonNewWithLabel label
-    #attach grid btn left top 1 1
-    return btn
-
-addSimpleCheckButton :: Grid -> Int32 -> Int32 -> IO CheckButton
-addSimpleCheckButton grid left top = do
-    btn <- checkButtonNew
-    #attach grid btn left top 1 1
-    return btn
-
-addEntry :: Grid -> Int32 -> Int32 -> IO Entry
-addEntry grid left top = do
-    entry <- entryNew
-    #attach grid entry left top 1 1
-    return entry
-
-addComboBox :: Grid -> [Text] -> Int32 -> Int32 -> IO ComboBoxText
-addComboBox grid options left top = do
-    cbox <- comboBoxTextNew
-    forM_ options $ #append cbox Nothing
-    #setActive cbox 0
-    #attach grid cbox left top 1 1
-    return cbox
 
 setTextField :: FieldPos -> Text -> MainWindow -> IO ()
 setTextField fieldPos t mWindow = do

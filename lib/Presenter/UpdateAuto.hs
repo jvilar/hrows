@@ -5,9 +5,7 @@ module Presenter.UpdateAuto (
 ) where
 
 import Control.Arrow(first)
-import Control.Auto(Auto, accumM_)
-import Control.Monad.Trans(liftIO)
-import Data.Maybe(fromMaybe)
+import Control.Auto(accumM_)
 import qualified Data.Text as T
 
 import GUI.Command
@@ -49,19 +47,19 @@ undoOrUpdate zm (Undo, _) = case back zm of
                                     return zm
                                 Just zm' -> do
                                     let (model, pos) = current zm'
-                                    completeRefresh pos model
+                                    _ <- completeRefresh pos model
                                     return zm'
-undoOrUpdate zm (Redo, pos) = case forward zm of
+undoOrUpdate zm (Redo, _) = case forward zm of
                                 Nothing -> do
                                     message $ InformationMessage "No puedo rehacer"
                                     return zm
                                 Just zm' -> do
                                     let (model, pos) = current zm'
-                                    completeRefresh pos model
+                                    _ <- completeRefresh pos model
                                     return zm'
 undoOrUpdate zm (BlockUndo, _) = return $ UndoZipper [] (current zm) []
 undoOrUpdate zm (DoNothing, _) = return zm
-undoOrUpdate zm p@(command, pos) = push zm . (,pos) <$> update (fst $ current zm) p
+undoOrUpdate zm p@(_, pos) = push zm . (,pos) <$> update (fst $ current zm) p
 
 update :: Model -> (UpdateCommand, RowPos) -> PresenterM Model
 update model (UpdateField fpos v, pos) = do

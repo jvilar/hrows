@@ -44,7 +44,7 @@ import Control.Monad.Reader(Reader, ask, runReader)
 import Control.Monad.Writer(Writer, tell, runWriter)
 import Data.Char(isAlphaNum)
 import Data.Function((&))
-import Data.List(foldr1, elemIndex)
+import Data.List(elemIndex)
 import Data.Maybe(fromMaybe)
 import Data.Monoid(Any(..))
 import Data.Text(Text)
@@ -61,9 +61,6 @@ type Priority = Int
 
 -- |The associativity of a binary operator
 data Associativity = LeftAssoc | RightAssoc | TrueAssoc | NoAssoc
-
-data WithNames
-data WithNoNames
 
 -- |The Expression is the internal representation of the Formula.
 type Expression = Fix Node
@@ -195,7 +192,7 @@ toFormula = para tf
                                       TrueAssoc -> (prioB info, prioB info)
                                       NoAssoc -> (prioB info + 1, prioB info + 1)
                      in T.concat [parent pe1 (prio e1) f1, formulaB info, parent pe2 (prio e2) f2]
-          tf (In (PrefixBinary info e1 e2)) (PrefixBinary _ f1 f2) =
+          tf (In (PrefixBinary info _ _)) (PrefixBinary _ f1 f2) =
                     T.concat [formulaPB info, "(", f1, ", ", f2, ")"]
           tf _ (Cast ft f) = T.concat [typeOperator ft, "(", f, ")"]
           tf (In (Ternary e1 e2 e3)) (Ternary f1 f2 f3) = let
@@ -268,7 +265,7 @@ getPositions = cata gp
     where
         gp (Position n) = [n]
         gp (NamedPosition name) = error $ "Expresión con variable: " ++ T.unpack name
-        gp (Constant f) = []
+        gp (Constant _) = []
         gp (Unary _ ps) = ps
         gp (Binary _ ps1 ps2) = merge ps1 ps2
         gp (PrefixBinary _ ps1 ps2) = merge ps1 ps2

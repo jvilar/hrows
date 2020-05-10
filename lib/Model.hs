@@ -61,7 +61,6 @@ import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import Data.Ord(Down(..))
 import Data.Text(Text)
 import qualified Data.Text as T
-import Debug.Trace
 import TextShow(TextShow(showt))
 
 import Model.Expression
@@ -232,7 +231,7 @@ fieldValues :: FieldPos -> Model -> [Text]
 fieldValues f = unique . sort . IM.foldr (\r l -> toString (r !!! f) : l) [] . _rows
                 where unique [] = []
                       unique [x] = [x]
-                      unique (x:r@(y:l)) | x == y = unique r
+                      unique (x:r@(y:_)) | x == y = unique r
                                          | otherwise = x : unique r
 
 -- |The position of the next appearance of a value

@@ -11,11 +11,10 @@ module GUI.MainWindow.Build (
 import Control.Concurrent.Chan(Chan)
 import Control.Monad((>=>))
 import Control.Monad.IO.Class(liftIO)
-import Data.BitVector(nil, BitVector)
-import Data.IORef(readIORef, newIORef, IORef)
+import Data.BitVector(nil)
+import Data.IORef(newIORef, readIORef)
 import Data.Maybe(fromJust)
 import Data.Text(Text)
-import GHC.Generics(Generic)
 import GI.Gtk
 import GI.Gdk(keyvalName, EventKey, ModifierType(..))
 
@@ -90,10 +89,10 @@ prepareMainWindow = do
   control <- getControl
   w <- window <$> getMainWindow
   liftIO $ do
-    w `on` #deleteEvent $ const $ do
+    _ <- w `on` #deleteEvent $ const $ do
       liftIO $ sendInput control ExitRequested
       return True
-    w `on` #keyPressEvent $
+    _ <- w `on` #keyPressEvent $
       (commandFromGlobalKey >=>
        (\case
           Nothing -> return False

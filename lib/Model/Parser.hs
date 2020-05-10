@@ -8,7 +8,6 @@ import Control.Monad(unless)
 import Control.Monad.Except(ExceptT, runExceptT, throwError)
 import Control.Monad.State.Strict(evalState, gets, State, modify)
 import Control.Monad.Trans(lift)
-import Data.List(foldl')
 import Data.Maybe(isNothing)
 import Data.Text(Text)
 import qualified Data.Text as T

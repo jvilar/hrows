@@ -146,7 +146,7 @@ convert t f | typeOf f == baseType t = f
 doConvert :: Field -> FieldType -> Field
 doConvert (AnError _ m) t = AnError t m
 
-doConvert (ADouble d str) TypeInt = AInt i $ showt i
+doConvert (ADouble d _) TypeInt = AInt i $ showt i
                                   where i = truncate d
 doConvert (AString str) TypeInt = case signed decimal str of
                                         Right (n, "") -> AInt n str

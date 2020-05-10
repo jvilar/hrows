@@ -5,9 +5,9 @@ module Presenter.FileAuto (
               fileAuto
 ) where
 
-import Control.Auto(Auto, arrM)
+import Control.Auto(arrM)
 import Control.Exception(SomeException(..), try)
-import Control.Monad(unless, void, when)
+import Control.Monad(when)
 import Control.Monad.Trans(liftIO)
 import Data.Default(def)
 import Data.Maybe(fromJust, isJust)

@@ -21,4 +21,4 @@ processCommand (CompleteListingGranted, model) = let
      cells = [[toString field | field <- row] | row <- rows model]
    in sendGUIM $ CompleteListing cells
 
-processCommand (ListingFilterChanged t, _) = undefined
+processCommand (ListingFilterChanged _, _) = undefined

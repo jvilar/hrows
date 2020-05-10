@@ -2,7 +2,7 @@ module Presenter.SourceAuto (
     sourceAuto
 ) where
 
-import Control.Auto(Auto, accumM_)
+import Control.Auto(accumM_)
 import Data.Maybe(fromMaybe)
 import qualified Data.Text as T
 

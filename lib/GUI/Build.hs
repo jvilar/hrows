@@ -8,16 +8,12 @@ module GUI.Build (
             , makeGUI
 ) where
 
-import Control.Concurrent.Chan(Chan, writeChan)
-import Control.Monad(forM_, void, when)
-import Data.BitVector(nil)
-import Data.Functor.Identity(Identity)
-import Data.IORef(IORef, newIORef, readIORef, writeIORef)
-import Data.Maybe(isJust, fromJust)
+import Control.Concurrent.Chan(Chan)
+import Data.Maybe(fromJust)
 import Data.Text(Text)
 import qualified Data.Text as T
 
-import GI.Gdk (screenGetDefault, EventKey, keyvalName, ModifierType(..))
+import GI.Gdk (screenGetDefault)
 import GI.Gtk hiding (MessageDialog)
 
 import Paths_hrows(getDataFileName)
@@ -27,22 +23,18 @@ import GUI.CanBeCast
 import GUI.Control
 import GUI.DialogManager.Build
 import GUI.Iteration
-import GUI.ListingWindow
 import GUI.ListingWindow.Build
-import GUI.MainWindow
 import GUI.MainWindow.Build
 import GUI.HKD
-import Model.Field
-import Presenter.ImportType
 import Presenter.Input
 
 makeGUI :: Chan Input -> IO GUIControl
 makeGUI iChan = do
-  GI.Gtk.init Nothing
+  _ <- GI.Gtk.init Nothing
 
   builder <- builderNew
   gladefn <- getDataFileName "src/hrows.glade"
-  builderAddFromFile builder $ T.pack gladefn
+  _ <- builderAddFromFile builder $ T.pack gladefn
 
   styleFile <- getDataFileName "src/hrows.css"
 

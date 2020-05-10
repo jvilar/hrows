@@ -17,7 +17,7 @@ module GUI.BuildMonad (
   , menuItemAction
   , menuItemInput
   -- *Rexported
-  , GUIControl(..)
+  , GUIControl
 ) where
 
 import Control.Monad.Reader(void, liftIO, asks, ReaderT, runReaderT)
@@ -72,7 +72,6 @@ menuItemInput name input = do
 
 menuItemAction :: Text -> IO () -> BuildMonad ()
 menuItemAction name io = do
-    control <- getControl
     itm <- getObject name
     ioVoid ((itm :: MenuItem) `on` #activate $ io)
 

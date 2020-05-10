@@ -7,7 +7,6 @@ module Model.ListatabFile (
 ) where
 
 import Control.Exception (displayException, IOException, try, throwIO)
-import Control.Monad (mapM_)
 import qualified Data.ByteString.Lazy as BS
 import Data.Aeson(decode)
 import Data.Aeson.Encode.Pretty(encodePretty)
@@ -16,7 +15,7 @@ import Data.Text(Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Void(Void)
-import System.IO (Handle, hClose, hPutStrLn, openFile, readFile, IOMode(ReadMode, WriteMode))
+import System.IO (Handle, hClose, hPutStrLn, openFile, IOMode(WriteMode))
 import Text.Megaparsec (many, sepBy, endBy, between, noneOf, optional, parse, Parsec, errorBundlePretty, (<|>))
 import Text.Megaparsec.Char(char)
 import qualified Text.Megaparsec as TM

@@ -9,11 +9,10 @@ module GUI.ListingWindow.Build (
 ) where
 
 import Control.Concurrent.Chan (Chan)
-import Control.Monad((>=>), forM_)
+import Control.Monad((>=>))
 import Control.Monad.IO.Class(liftIO)
 import Data.Maybe(fromJust)
 import Data.Text (Text)
-import Foreign.Ptr(Ptr)
 import GI.Gtk
 import GI.Gdk(keyvalName, EventKey, ModifierType(..))
 
@@ -24,7 +23,6 @@ import GUI.CanBeCast
 import GUI.BuildMonad
 import GUI.ListingWindow
 import GUI.HKD (fromIO)
-import Data.GI.Base.ShortPrelude (Int32)
 
 
 buildListingWindow :: Chan Input -> Builder -> IO ListingWindow
@@ -72,8 +70,8 @@ prepareListingWindow :: ListingWindow -> BuildMonad()
 prepareListingWindow lw = do
   control <- getControl
   let w = window lw
-  liftIO $ do
-    w `on` #deleteEvent $ const $ do
+  _ <- liftIO $ do
+    _ <- w `on` #deleteEvent $ const $ do
       liftIO $ sendInput control CloseListingRequested
       return True
     w `on` #keyPressEvent $
@@ -89,7 +87,7 @@ prepareFilterEntry :: ListingWindow -> BuildMonad ()
 prepareFilterEntry w = do
   control <- getControl
   let entry = listingFilterEntry w
-  entry `on` #keyPressEvent $ \evk -> do
+  _ <- entry `on` #keyPressEvent $ \evk -> do
     n <- get evk #keyval >>= keyvalName
     case n of
       Just "Return" -> do

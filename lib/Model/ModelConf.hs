@@ -9,7 +9,6 @@ import Data.Text(Text)
 import GHC.Generics
 
 import Model.Expression
-import Model.Field
 
 newtype ModelConf = ModelConf [ FieldConf ] deriving (Generic, Show)
 

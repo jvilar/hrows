@@ -6,12 +6,9 @@ module GUI.Command(
 
 
 import Data.Text(Text)
-import GHC.Int(Int32)
 import GUI.Iteration
 
 import Model
-import Model.Expression
-import Model.Field
 
 data GUICommand = ChangeTitle Text
                 | ShowPosition Int Int

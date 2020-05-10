@@ -40,7 +40,7 @@ go (n:ns) succs preds = let
       sn = succs IM.! n
       np = filter ((==1).length.(preds IM.!)) sn
       preds' = foldr (IM.update $ update n) preds sn
-      update n [_] = Nothing
+      update _ [_] = Nothing
       update n l = Just $ delete n l
       (good, cycle) = go (np ++ ns) succs preds'
     in (n:good, cycle)
