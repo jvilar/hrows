@@ -32,7 +32,7 @@ import GUI.DialogManager.Actions
 import GUI.MainWindow hiding (window)
 import GUI.MainWindow.Update (updatePosition, setTextField, showFields, disableTextViews)
 import GUI.ListingWindow hiding (window)
-import GUI.ListingWindow.Update (showFullListing)
+import GUI.ListingWindow.Update (showFullListing, showFieldsRow)
 import GUI.View
 import Model hiding (deleteFields)
 import Model.DefaultFileNames
@@ -42,21 +42,27 @@ import Presenter.Input
 updateGUI :: GUICommand -> GUIControl -> IO ()
 updateGUI (ChangeTitle title) = inBothWindows $ changeTitle title
 updateGUI (ShowPosition pos size) = updatePosition pos size . mainWindow
-updateGUI (ShowFields _ fis) = showFields fis . mainWindow
+updateGUI (ShowFields pos fis) = \control -> do
+                                    showFields fis $ mainWindow control
+                                    ifListingVisible (showFieldsRow pos fis) control
 updateGUI (ShowNames names) = inBothWindows $ updateNames names
 updateGUI (ShowIteration iter) = showIteration iter
 updateGUI DisableTextViews = disableTextViews . mainWindow
 updateGUI ShowListing = widgetShowAll . window . listingWindow
 updateGUI HideListing = widgetHide . window . listingWindow
-updateGUI CompleteListingWanted = \control -> do
-    visible <- #isVisible . window $ listingWindow control
-    when visible $ sendInput control CompleteListingGranted
+updateGUI CompleteListingWanted = \control -> ifListingVisible (const $ sendInput control CompleteListingGranted) control
 updateGUI (CompleteListing fiss) = showFullListing fiss . listingWindow
+
+ifListingVisible :: (ListingWindow -> IO ()) -> GUIControl -> IO ()
+ifListingVisible f control = do
+                                 let lw = listingWindow control
+                                 visible <- #isVisible $ window lw
+                                 when visible $ f lw
 
 inBothWindows :: (forall v. View v => v -> IO()) -> GUIControl -> IO ()
 inBothWindows f control = do
                              f $ mainWindow control
-                             f $ listingWindow control 
+                             f $ listingWindow control
 
 dndError :: GUIControl -> IO ()
 dndError control = sendInput control $ MessageDialog (ErrorMessage "Algo está mal en el dnd")

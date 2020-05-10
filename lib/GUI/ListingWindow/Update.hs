@@ -4,7 +4,8 @@
 module GUI.ListingWindow.Update (
   changeTitle,
   updateNames,
-  showFullListing
+  showFullListing,
+  showFieldsRow
 ) where
 
 import Control.Monad(forM_, unless)
@@ -17,7 +18,7 @@ import GI.Gtk
 import GUI.Command
 import GUI.ListingWindow
 import Data.Int (Int32)
-import Model (FieldName)
+import Model (FieldName, RowPos)
 
 
 changeTitle :: Text -> ListingWindow -> IO ()
@@ -71,3 +72,18 @@ showFullListing tss lw = do
       v <- toGValue $ Just t
       #setValue ls iter i v
   #setModel lv $ Just ls
+
+showFieldsRow :: RowPos -> [FieldInfo] -> ListingWindow -> IO ()
+showFieldsRow pos fis lw = do
+  let lv = listingView lw
+  Just model <- #getModel lv
+  Just listStore <- castTo ListStore model
+  path <- treePathNew
+  #appendIndex path $ fromIntegral pos
+  (True, iter) <- #getIter model path
+  forM_ fis $ \fi -> do
+    let col = indexFI fi
+        text = textFI fi
+    v <- toGValue $ Just text
+    #setValue listStore iter col v
+  #rowChanged model path iter
