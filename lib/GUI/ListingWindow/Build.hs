@@ -9,7 +9,7 @@ module GUI.ListingWindow.Build (
 ) where
 
 import Control.Concurrent.Chan (Chan)
-import Control.Monad((>=>))
+import Control.Monad(void, (>=>))
 import Control.Monad.IO.Class(liftIO)
 import Data.Maybe(fromJust)
 import Data.Text (Text)
@@ -41,6 +41,7 @@ configureListingWindow :: ListingWindow -> BuildMonad ()
 configureListingWindow w = do
                 prepareListingWindow w
                 prepareFilterEntry w
+                prepareCursorBindings w
 
 globalKeys :: [ ((Text, [ModifierType]), Input)]
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
@@ -100,4 +101,11 @@ prepareFilterEntry w = do
       _ -> return False
   return ()
 
-
+prepareCursorBindings :: ListingWindow -> BuildMonad ()
+prepareCursorBindings w = do
+  let lv = listingView w
+  control <- getControl
+  void $ after lv #cursorChanged $
+    getCurrentRow w >>= \case
+      Nothing -> return ()
+      Just r -> liftIO . sendInput control $ MoveHere r

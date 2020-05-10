@@ -19,7 +19,7 @@ import GUI.Command
 import GUI.Control
 import GUI.DialogManager.Actions
 import GUI.MainWindow hiding (window)
-import GUI.MainWindow.Update (updatePosition, setTextField, showFields, disableTextViews)
+import GUI.MainWindow.Update (setTextField, showFields, disableTextViews)
 import GUI.ListingWindow hiding (window)
 import GUI.ListingWindow.Update (showFullListing, showFieldsRow)
 import GUI.View
@@ -28,7 +28,7 @@ import Presenter.Input
 
 updateGUI :: GUICommand -> GUIControl -> IO ()
 updateGUI (ChangeTitle title) = inBothWindows $ changeTitle title
-updateGUI (ShowPosition pos size) = updatePosition pos size . mainWindow
+updateGUI (ShowPosition pos size) = inBothWindows $ updatePosition pos size
 updateGUI (ShowFields pos fis) = \control -> do
                                     showFields fis $ mainWindow control
                                     ifListingVisible (showFieldsRow pos fis) control

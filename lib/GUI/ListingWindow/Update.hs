@@ -5,7 +5,8 @@ module GUI.ListingWindow.Update (
   changeTitle,
   updateNames,
   showFullListing,
-  showFieldsRow
+  showFieldsRow,
+  updatePosition
 ) where
 
 import Control.Monad(forM_, unless)
@@ -78,8 +79,7 @@ showFieldsRow pos fis lw = do
   let lv = listingView lw
   Just model <- #getModel lv
   Just listStore <- castTo ListStore model
-  path <- treePathNew
-  #appendIndex path $ fromIntegral pos
+  path <- rowPos2Path pos
   (True, iter) <- #getIter model path
   forM_ fis $ \fi -> do
     let col = indexFI fi
@@ -87,3 +87,17 @@ showFieldsRow pos fis lw = do
     v <- toGValue $ Just text
     #setValue listStore iter col v
   #rowChanged model path iter
+
+rowPos2Path :: RowPos -> IO TreePath
+rowPos2Path pos = do
+  path <- treePathNew
+  #appendIndex path $ fromIntegral pos
+  return path
+
+updatePosition :: RowPos -> ListingWindow -> IO ()
+updatePosition pos lw = do
+  cRow <- getCurrentRow lw
+  unless (cRow == Just pos) $ do
+    let lv = listingView lw
+    path <- rowPos2Path pos
+    #setCursor lv path noTreeViewColumn False
