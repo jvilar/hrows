@@ -42,7 +42,7 @@ import Presenter.Input
 updateGUI :: GUICommand -> GUIControl -> IO ()
 updateGUI (ChangeTitle title) = inBothWindows $ changeTitle title
 updateGUI (ShowPosition pos size) = updatePosition pos size . mainWindow
-updateGUI (ShowFields fis) = showFields fis . mainWindow
+updateGUI (ShowFields _ fis) = showFields fis . mainWindow
 updateGUI (ShowNames names) = inBothWindows $ updateNames names
 updateGUI (ShowIteration iter) = showIteration iter
 updateGUI DisableTextViews = disableTextViews . mainWindow

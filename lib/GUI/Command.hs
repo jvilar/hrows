@@ -15,7 +15,7 @@ import Model.Field
 
 data GUICommand = ChangeTitle Text
                 | ShowPosition Int Int
-                | ShowFields [FieldInfo]
+                | ShowFields RowPos [FieldInfo]
                 | ShowNames [FieldName]
                 | ShowIteration Iteration
                 | DisableTextViews
@@ -26,8 +26,9 @@ data GUICommand = ChangeTitle Text
                 deriving Show
 
 data FieldInfo = FieldInfo { indexFI :: FieldPos
-                           , textFI :: Maybe Text
+                           , textFI :: Text
                            , formulaFI :: Maybe Formula
                            , typeFI :: FieldType
                            , isErrorFI :: Bool
+                           , mustWriteFI :: Bool
                            } deriving Show

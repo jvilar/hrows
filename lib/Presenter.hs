@@ -83,7 +83,7 @@ getFileCommands :: Input -> Maybe FileCommand
 getFileCommands (InputFile cmd) = Just cmd
 getFileCommands _ = Nothing
 
-processMoveCommands :: PresenterAuto (Input, Model) Int
+processMoveCommands :: PresenterAuto (Input, Model) RowPos
 processMoveCommands = proc (inp, model) -> do
                         bmoves <- emitJusts getMoves -< inp
                         holdWith_ 0 . perBlip movementAuto -< (, model) <$> bmoves

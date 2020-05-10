@@ -42,7 +42,7 @@ message = sendGUIM . ShowIteration . DisplayMessage
 updateAuto :: PresenterAuto (UpdateCommand, RowPos) Model
 updateAuto = fst . current <$> accumM_ undoOrUpdate initialZM
 
-undoOrUpdate :: ZM -> (UpdateCommand, Int) -> PresenterM ZM
+undoOrUpdate :: ZM -> (UpdateCommand, RowPos) -> PresenterM ZM
 undoOrUpdate zm (Undo, _) = case back zm of
                                 Nothing -> do
                                     message $ InformationMessage "No puedo deshacer"
@@ -63,21 +63,19 @@ undoOrUpdate zm (BlockUndo, _) = return $ UndoZipper [] (current zm) []
 undoOrUpdate zm (DoNothing, _) = return zm
 undoOrUpdate zm p@(command, pos) = push zm . (,pos) <$> update (fst $ current zm) p
 
-update :: Model -> (UpdateCommand, Int) -> PresenterM Model
+update :: Model -> (UpdateCommand, RowPos) -> PresenterM Model
 update model (UpdateField fpos v, pos) = do
     let r = row pos model'
         (model', changed) = changeField pos fpos v model
-    sendGUIM . ShowFields $ do
+    sendGUIM . ShowFields pos $ do
                              c <- changed
                              let f = r !!! c
-                                 text = if c /= fpos
-                                        then Just $ toString f
-                                        else Nothing
                              return $ FieldInfo { indexFI = c
-                                                , textFI = text
+                                                , textFI = toString f
                                                 , formulaFI = fieldFormula c model'
                                                 , typeFI = fieldType c model'
                                                 , isErrorFI = isError f
+                                                , mustWriteFI = c /= fpos
                                                 }
     return model'
 update _ (ChangeModel model, _) =
@@ -88,7 +86,7 @@ update model (NewRow, _) = do
     return $ addEmptyRow model
 update model (DeleteRow, pos) =
     partialRefresh pos $ deleteRow pos model
-update model (SortRows f dir, _) = do
+update model (SortRows f dir, _) =
     partialRefresh 0 $ sortRows f dir model
 update model (NewFields l, pos) =
     completeRefresh pos $ newFields (map (first Just) l) model
@@ -100,7 +98,7 @@ update model (ImportFieldsFromModel m keys values, pos) =
     partialRefresh pos $ importFields m keys values model
 update model (ImportRowsFromModel m values, pos) =
     partialRefresh pos $ importRows m values model
-update model (MoveField f t, pos) = do
+update model (MoveField f t, pos) =
     completeRefresh pos $ moveField f t model
 update model (ChangeFieldType t f, pos) =
     partialRefresh pos $ changeFieldType t f model
@@ -120,6 +118,4 @@ partialRefresh pos model = do
 completeRefresh :: Int -> Model -> PresenterM Model
 completeRefresh pos model = do
     sendGUIM $ ShowNames (cnames model)
-    sendInputM $ MoveHere pos
-    sendGUIM CompleteListingWanted
-    return model
+    partialRefresh pos model
