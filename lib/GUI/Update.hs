@@ -48,6 +48,9 @@ updateGUI (ShowIteration iter) = showIteration iter
 updateGUI DisableTextViews = disableTextViews . mainWindow
 updateGUI ShowListing = widgetShowAll . window . listingWindow
 updateGUI HideListing = widgetHide . window . listingWindow
+updateGUI CompleteListingWanted = \control -> do
+    visible <- #isVisible . window $ listingWindow control
+    when visible $ sendInput control CompleteListingGranted
 updateGUI (CompleteListing fiss) = showFullListing fiss . listingWindow
 
 inBothWindows :: (forall v. View v => v -> IO()) -> GUIControl -> IO ()

@@ -59,7 +59,7 @@ processInput = proc inp -> do
              si <- processSourceCommands -< inp
              processFileCommands -< (inp, model, si)
              processDialogCommands -< (inp, model, pos)
-             processListingCommands -< inp
+             processListingCommands -< (inp, model)
              processControlCommands -< (inp, changed model)
              -- arrM (liftIO . putStrLn) -< "model changed: " ++ show (changed model)
 
@@ -118,10 +118,10 @@ getSources :: Input -> Maybe SourceCommand
 getSources (InputSource cmd) = Just cmd
 getSources _ = Nothing
 
-processListingCommands :: PresenterAuto Input ()
-processListingCommands = proc inp -> do
+processListingCommands :: PresenterAuto (Input, Model) ()
+processListingCommands = proc (inp, model) -> do
                             blisting <- emitJusts getListings -< inp
-                            holdWith_ () . perBlip listingAuto -< blisting
+                            holdWith_ () . perBlip listingAuto -< (, model) <$> blisting
 
 getListings :: Input -> Maybe ListingCommand
 getListings (InputListing cmd) = Just cmd

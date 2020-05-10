@@ -21,6 +21,7 @@ data GUICommand = ChangeTitle Text
                 | DisableTextViews
                 | ShowListing
                 | HideListing
+                | CompleteListingWanted
                 | CompleteListing [[Text]]
                 deriving Show
 

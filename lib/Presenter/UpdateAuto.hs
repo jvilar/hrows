@@ -114,17 +114,12 @@ cnames = map (`T.append` ": ") . fnames
 partialRefresh :: Int -> Model -> PresenterM Model
 partialRefresh pos model = do
     sendInputM $ MoveHere pos
-    refreshFullListing model
+    sendGUIM CompleteListingWanted
     return model
 
 completeRefresh :: Int -> Model -> PresenterM Model
 completeRefresh pos model = do
     sendGUIM $ ShowNames (cnames model)
     sendInputM $ MoveHere pos
-    refreshFullListing model
+    sendGUIM CompleteListingWanted
     return model
-
-refreshFullListing :: Model -> PresenterM ()
-refreshFullListing model = do
-    let cells = [[toString field | field <- row] | row <- rows model]
-    sendGUIM $ CompleteListing cells

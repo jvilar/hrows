@@ -7,4 +7,5 @@ import Data.Text(Text)
 
 data ListingCommand = ShowListingRequested
                     | CloseListingRequested
+                    | CompleteListingGranted
                     | ListingFilterChanged Text deriving Show
