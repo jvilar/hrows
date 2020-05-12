@@ -63,15 +63,16 @@ undoOrUpdate zm p@(_, pos) = push zm . (,pos) <$> update (fst $ current zm) p
 
 update :: Model -> (UpdateCommand, RowPos) -> PresenterM Model
 update model (UpdateField fpos v, pos) = do
-    let r = row pos model'
-        (model', changed) = changeField pos fpos v model
+    let (rst', changed) = changeField pos fpos v <@ model
+        model' = setStore rst' model
+        r = row pos rst'
     sendGUIM . ShowFields pos $ do
                              c <- changed
                              let f = r !!! c
                              return $ FieldInfo { indexFI = c
                                                 , textFI = toString f
-                                                , formulaFI = fieldFormula c model'
-                                                , typeFI = fieldType c model'
+                                                , formulaFI = fieldFormula c rst'
+                                                , typeFI = fieldType c rst'
                                                 , isErrorFI = isError f
                                                 , mustWriteFI = c /= fpos
                                                 }
@@ -81,30 +82,30 @@ update _ (ChangeModel model, _) =
 update model (DoNothing, _) = return model
 update model (NewRow, _) = do
     sendInputM MoveEnd
-    return $ addEmptyRow model
+    return $ addEmptyRow `inside` model
 update model (DeleteRow, pos) =
-    partialRefresh pos $ deleteRow pos model
+    partialRefresh pos $ deleteRow pos `inside` model
 update model (SortRows f dir, _) =
-    partialRefresh 0 $ sortRows f dir model
+    partialRefresh 0 $ sortRows f dir `inside` model
 update model (NewFields l, pos) =
-    completeRefresh pos $ newFields (map (first Just) l) model
+    completeRefresh pos $ newFields (map (first Just) l) `inside` model
 update model (DeleteFields fs, pos) =
-    completeRefresh pos $ deleteFields fs model
+    completeRefresh pos $ deleteFields fs `inside` model
 update model (RenameFields names, pos) =
-    completeRefresh pos $ renameFields names model
-update model (ImportFieldsFromModel m keys values, pos) =
-    partialRefresh pos $ importFields m keys values model
-update model (ImportRowsFromModel m values, pos) =
-    partialRefresh pos $ importRows m values model
+    completeRefresh pos $ renameFields names `inside` model
+update model (ImportFieldsFromRowStore m keys values, pos) =
+    partialRefresh pos $ importFields m keys values `inside` model
+update model (ImportRowsFromRowStore m values, pos) =
+    partialRefresh pos $ importRows m values `inside` model
 update model (MoveField f t, pos) =
-    completeRefresh pos $ moveField f t model
+    completeRefresh pos $ moveField f t `inside` model
 update model (ChangeFieldType t f, pos) =
-    partialRefresh pos $ changeFieldType t f model
+    partialRefresh pos $ changeFieldType t f `inside` model
 update model (ChangeFieldFormula mf f, pos) =
-    partialRefresh pos $ changeFieldFormula mf f model
-update model (SetUnchanged, _) = return $ setUnchanged model
+    partialRefresh pos $ changeFieldFormula mf f `inside` model
+update model (SetUnchanged, _) = return $ setUnchanged `inside` model
 
-cnames :: Model -> [FieldName]
+cnames :: RowStore -> [FieldName]
 cnames = map (`T.append` ": ") . fnames
 
 partialRefresh :: Int -> Model -> PresenterM Model
@@ -115,5 +116,5 @@ partialRefresh pos model = do
 
 completeRefresh :: Int -> Model -> PresenterM Model
 completeRefresh pos model = do
-    sendGUIM $ ShowNames (cnames model)
+    sendGUIM $ ShowNames (cnames <@ model)
     partialRefresh pos model

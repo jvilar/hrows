@@ -37,8 +37,8 @@ applyCommand LoadFile _ (SourceInfo Nothing _ _) = message $ ErrorMessage "No pu
 applyCommand LoadFile _ info@(SourceInfo (Just fp) conffp (ListatabFormat format)) = do
     r <- liftIO $ try $ fromListatab format fp conffp
     case r of
-        Right model -> do
-            sendInputM $ ChangeModel model
+        Right listaTab -> do
+            sendInputM $ ChangeModel $ fromRowStore listaTab
             sendInputM $ SetSource info
         Left (HRowsException mess) -> message $ ErrorMessage mess
 applyCommand (LoadFileFromName n conf) model info = do
@@ -52,21 +52,21 @@ applyCommand (WriteFileFromName fp conf) model info = doWrite fp conf model info
 applyCommand (ImportFromFileName t fp separator) _ _ = do
     r <- liftIO $ try $ fromListatab def { ltInputSeparator = separator} fp Nothing
     case r of
-        Right m -> sendInputM $ ChooseImportDialog t m
+        Right rst -> sendInputM $ ChooseImportDialog t rst
         Left (HRowsException m) -> message $ ErrorMessage m
 
 applyCommand WriteBackup model info = do
     let ListatabFormat ltinfo = siFormat info
         fp = defaultBackupFileName <$> siFilePath info
         conf = defaultBackupFileName <$> siConfFile info
-    when (isJust fp && changed model) $ do
-        r <- liftIO $ try $ toListatab ltinfo (fromJust fp) conf model
+    when (isJust fp && changed `from` model) $ do
+        r <- liftIO $ try $ toListatab ltinfo (fromJust fp) conf <@ model
         case r of
             Right _ -> return ()
             Left (HRowsException m) -> message $ ErrorMessage ("Error al hacer la copia de seguridad: " `T.append` m)
 
 applyCommand BackupOnExit model info
-    | changed model = applyCommand WriteBackup model info
+    | changed `from` model = applyCommand WriteBackup model info
     | otherwise = do
                     let fp = defaultBackupFileName <$> siFilePath info
                         conf = defaultBackupFileName <$> siConfFile info
@@ -78,7 +78,7 @@ applyCommand BackupOnExit model info
 doWrite :: FilePath -> (Maybe FilePath) -> Model -> SourceInfo -> Bool -> PresenterM ()
 doWrite fp conf model info changedSource = do
         let ListatabFormat ltinfo = siFormat info
-        r <- liftIO $ try $ toListatab ltinfo fp conf model
+        r <- liftIO $ try $ toListatab ltinfo fp conf <@ model
         case r of
             Right _ -> do
                           message $ InformationMessage "Fichero escrito correctamente."
@@ -86,9 +86,3 @@ doWrite fp conf model info changedSource = do
                           sendInputM SetUnchanged
             Left (HRowsException m) -> message $ ErrorMessage m
 
-withListatab :: FilePath -> Char -> (Model -> DialogCommand) -> PresenterM ()
-withListatab fp separator command = do
-    r <- liftIO $ try $ fromListatab def { ltInputSeparator = separator} fp Nothing
-    case r of
-        Right m -> sendInputM $ command m
-        Left (HRowsException m) -> message $ ErrorMessage m

@@ -21,7 +21,7 @@ import Text.Megaparsec.Char(char)
 import qualified Text.Megaparsec as TM
 
 import HRowsException
-import Model
+import Model.RowStore
 import Model.ModelConf
 import Model.SourceInfo
 
@@ -29,8 +29,8 @@ import Model.SourceInfo
 hRowsException :: String -> HRowsException
 hRowsException = HRowsException . T.pack
 
--- |Creates a `Model` from a listatab file.
-fromListatab :: ListatabInfo -> FilePath -> Maybe FilePath -> IO Model
+-- |Creates a `RowStore` from a listatab file.
+fromListatab :: ListatabInfo -> FilePath -> Maybe FilePath -> IO RowStore
 fromListatab info fp mconf = do
   conf <- case mconf of
              Nothing -> return Nothing
@@ -64,7 +64,7 @@ exception e = throwIO $ hRowsException $ "Exception: " ++ displayException e
 
 type Parser = Parsec Void Text
 
-analyze :: Char -> Maybe ModelConf -> Parser Model
+analyze :: Char -> Maybe ModelConf -> Parser RowStore
 analyze sep mconf = do
   h <-  optional $
           between (char '#') (char '\n')
@@ -92,8 +92,8 @@ stringParser sep = T.pack <$> ((char '"' *> (many inStringChar <* char '"'))
                                        <|> noneOf ("\n\"" ::String)))
                          <|> noneOf ("\n\"" :: String)
 
--- |Writes a model to a listatab file.
-toListatab :: ListatabInfo -> FilePath -> Maybe FilePath -> Model -> IO ()
+-- |Writes a `RowStore` to a listatab file.
+toListatab :: ListatabInfo -> FilePath -> Maybe FilePath -> RowStore -> IO ()
 toListatab info fp mconf model = do
     mh <- try (openFile fp WriteMode)
     case mh of

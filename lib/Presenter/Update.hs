@@ -17,8 +17,8 @@ data UpdateCommand = UpdateField FieldPos Field
                    | NewFields [(FieldName, FieldType)]
                    | DeleteFields [FieldPos]
                    | RenameFields [FieldName]
-                   | ImportFieldsFromModel Model [(FieldPos, FieldPos)] [(FieldPos, FieldPos)] -- ^Model, keys, fields to replace
-                   | ImportRowsFromModel Model [(FieldPos, FieldPos)] -- ^Model, fields to load from the model
+                   | ImportFieldsFromRowStore RowStore [(FieldPos, FieldPos)] [(FieldPos, FieldPos)] -- ^Model, keys, fields to replace
+                   | ImportRowsFromRowStore RowStore [(FieldPos, FieldPos)] -- ^Model, fields to load from the model
                    | MoveField FieldPos FieldPos
                    | ChangeFieldType FieldType FieldPos
                    | ChangeFieldFormula (Maybe Formula) FieldPos

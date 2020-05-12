@@ -7,7 +7,7 @@ import Control.Auto (arrM)
 import GUI.Command
 import Presenter.Auto (PresenterAuto, PresenterM, sendGUIM)
 import Presenter.Listing (ListingCommand(..))
-import Model (Model, rows, toString)
+import Model (Model, from, rows, toString)
 
 listingAuto :: PresenterAuto (ListingCommand, Model) ()
 listingAuto = arrM processCommand
@@ -18,7 +18,7 @@ processCommand (ShowListingRequested, _) = do
                                              sendGUIM CompleteListingWanted
 processCommand (CloseListingRequested, _) = sendGUIM HideListing
 processCommand (CompleteListingGranted, model) = let
-     cells = [[toString field | field <- row] | row <- rows model]
+     cells = [[toString field | field <- row] | row <- rows `from` model]
    in sendGUIM $ CompleteListing cells
 
 processCommand (ListingFilterChanged _, _) = undefined

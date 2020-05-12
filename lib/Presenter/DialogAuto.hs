@@ -12,16 +12,18 @@ import Presenter.Auto
 import Presenter.Input
 
 dialogAuto :: PresenterAuto (DialogCommand, Model, RowPos) ()
-dialogAuto = arrM $ \(input, model, pos) -> sendGUIM . ShowIteration $ case input of
+dialogAuto = arrM $ \(input, model, pos) -> let
+                           fieldNames = fnames <@ model
+                        in sendGUIM . ShowIteration $ case input of
                                              LoadFileDialog -> AskReadFile
                                              SaveAsFileDialog -> AskWriteFile
                                              CreateFieldsDialog -> AskCreateField
-                                             DeleteFieldsDialog -> AskDeleteFields $ fnames model
+                                             DeleteFieldsDialog -> AskDeleteFields fieldNames
                                              ImportFromDialog t -> AskImportFrom t
-                                             ChooseImportDialog t m -> AskImportOptions t (fnames m) (fnames model) m
-                                             ChangeNamesDialog -> AskRenameFields $ fnames model
-                                             SortRowsDialog -> AskSortRows $ fnames model
+                                             ChooseImportDialog t rst -> AskImportOptions t (fnames rst) fieldNames rst
+                                             ChangeNamesDialog -> AskRenameFields fieldNames
+                                             SortRowsDialog -> AskSortRows fieldNames
                                              MessageDialog m -> DisplayMessage m
-                                             ChangeFieldFormulaDialog f -> GetFieldFormula f (fnames model !!! f) (formulas model !!! f)
-                                             SearchFieldDialog f -> SearchField f (toString $ row pos model !!! f) (fieldValues f model)
-                                             CopyOtherDialog f -> CopyOtherField f (toString $ row pos model !!! f) (fieldValues f model)
+                                             ChangeFieldFormulaDialog f -> GetFieldFormula f (fieldNames !!! f) (formulas `from` model !!! f)
+                                             SearchFieldDialog f -> SearchField f (toString $ row pos `from` model !!! f) (fieldValues f `from` model)
+                                             CopyOtherDialog f -> CopyOtherField f (toString $ row pos `from` model !!! f) (fieldValues f `from` model)

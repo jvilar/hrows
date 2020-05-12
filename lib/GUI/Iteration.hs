@@ -18,7 +18,7 @@ data Iteration = NoIteration -- ^No need to iterate.
                | AskCreateField -- ^Ask for fields to create.
                | AskDeleteFields [FieldName] -- ^Ask for fields to delete.
                | AskImportFrom ImportType -- ^Ask for a file to import from.
-               | AskImportOptions ImportType [FieldName] [FieldName] Model -- ^Ask for the pairing of fields in an import.
+               | AskImportOptions ImportType [FieldName] [FieldName] RowStore -- ^Ask for the pairing of fields in an import.
                | AskRenameFields [FieldName] -- ^Ask for fields to rename.
                | AskSortRows [FieldName] -- ^Ask the field for sorting.
                | DisplayMessage Message -- ^Display a message.

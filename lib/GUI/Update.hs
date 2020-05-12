@@ -70,10 +70,10 @@ showIteration (AskDeleteFields fs) = dialogCall (askDeleteFields fs) $
                                      (. DeleteFields) . sendInput
 showIteration (AskImportFrom t) = dialogCall askImportFrom $
                 (. uncurry (ImportFromFileName t)) . sendInput
-showIteration (AskImportOptions t ifs cfs m) = dialogCall (askImportOptions t ifs cfs)
+showIteration (AskImportOptions t ifs cfs rst) = dialogCall (askImportOptions t ifs cfs)
    (\control (keys, values) -> sendInput control $ case t of
-                              ImportFields -> ImportFieldsFromModel m keys values
-                              ImportRows -> ImportRowsFromModel m values)
+                              ImportFields -> ImportFieldsFromRowStore rst keys values
+                              ImportRows -> ImportRowsFromRowStore rst values)
 showIteration (AskRenameFields fs) = dialogCall (askRenameFields fs) $
                                      (. RenameFields) . sendInput
 showIteration (AskSortRows fs) = dialogCall (askSortRows fs) $

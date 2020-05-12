@@ -56,7 +56,7 @@ processInput = proc inp -> do
              processFileCommands -< (inp, model, si)
              processDialogCommands -< (inp, model, pos)
              processListingCommands -< (inp, model)
-             processControlCommands -< (inp, changed model)
+             processControlCommands -< (inp, changed <@ model)
              -- arrM (liftIO . putStrLn) -< "model changed: " ++ show (changed model)
 
 
