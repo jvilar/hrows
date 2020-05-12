@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Presenter.DialogAuto (
               -- *Functions
               dialogAuto
@@ -5,6 +6,7 @@ module Presenter.DialogAuto (
 
 
 import Control.Auto(arrM)
+import qualified Data.Text as T
 
 import GUI.Command
 import Model
@@ -27,3 +29,5 @@ dialogAuto = arrM $ \(input, model, pos) -> let
                                              ChangeFieldFormulaDialog f -> GetFieldFormula f (fieldNames !!! f) (formulas `from` model !!! f)
                                              SearchFieldDialog f -> SearchField f (toString $ row pos `from` model !!! f) (fieldValues f `from` model)
                                              CopyOtherDialog f -> CopyOtherField f (toString $ row pos `from` model !!! f) (fieldValues f `from` model)
+                                             AddSourceDialog -> AskAddSource
+                                             d -> DisplayMessage . ErrorMessage $ T.concat ["Error: ", T.pack $ show d, " not implemented"] 

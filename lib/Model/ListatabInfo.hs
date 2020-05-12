@@ -4,6 +4,7 @@ module Model.ListatabInfo ( ListatabInfo(..)
 
 import Data.Default(Default(..))
 
+-- |The information needed to read or write in listatab format
 data ListatabInfo = ListatabInfo { ltInputSeparator :: Char
                                  , ltOutputSeparator :: Char
                                  , ltHeaderType :: HeaderType

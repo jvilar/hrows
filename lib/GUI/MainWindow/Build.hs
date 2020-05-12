@@ -60,6 +60,7 @@ configureMainWindow = do
                 prepareFieldMenu
                 prepareRecordMenu
                 prepareListingMenu
+                prepareSourceMenu
 
 globalKeys :: [ ((Text, [ModifierType]), Input)]
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
@@ -159,6 +160,12 @@ prepareRecordMenu = mapM_ (uncurry menuItemInput)
 
 prepareListingMenu :: BuildMonad ()
 prepareListingMenu = menuItemInput "newListingMenuItem" (toInput ShowListingRequested)
+
+prepareSourceMenu :: BuildMonad ()
+prepareSourceMenu = mapM_ (uncurry menuItemInput)
+                               [("addSourceMenuItem", toInput AddSourceDialog)
+                               , ("deleteSourceMenuItem", toInput DeleteSourceDialog)
+                               ]
 
 fieldMenuAction :: IsInput cmd => Text -> (FieldPos -> cmd) -> BuildMonad ()
 fieldMenuAction name f = do

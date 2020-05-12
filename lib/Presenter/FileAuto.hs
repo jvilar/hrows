@@ -7,7 +7,7 @@ module Presenter.FileAuto (
 
 import Control.Auto(arrM)
 import Control.Exception(SomeException(..), try)
-import Control.Monad(when)
+import Control.Monad(void, when)
 import Control.Monad.Trans(liftIO)
 import Data.Default(def)
 import Data.Maybe(fromJust, isJust)
@@ -39,7 +39,7 @@ applyCommand LoadFile _ info@(SourceInfo (Just fp) conffp (ListatabFormat format
     case r of
         Right listaTab -> do
             sendInputM $ ChangeModel $ fromRowStore listaTab
-            sendInputM $ SetSource info
+            sendInputM $ SetMainSource info
         Left (HRowsException mess) -> message $ ErrorMessage mess
 applyCommand (LoadFileFromName n conf) model info = do
     let info' = changeFileName n $
@@ -53,6 +53,12 @@ applyCommand (ImportFromFileName t fp separator) _ _ = do
     r <- liftIO $ try $ fromListatab def { ltInputSeparator = separator} fp Nothing
     case r of
         Right rst -> sendInputM $ ChooseImportDialog t rst
+        Left (HRowsException m) -> message $ ErrorMessage m
+
+applyCommand (AddSourceFromFileName fp separator) _ _  = do
+    r <- liftIO . try $ fromListatab def { ltInputSeparator = separator } fp Nothing
+    case r of
+        Right rst -> sendInputM $ AddNewSource (T.pack fp) rst
         Left (HRowsException m) -> message $ ErrorMessage m
 
 applyCommand WriteBackup model info = do
@@ -70,19 +76,18 @@ applyCommand BackupOnExit model info
     | otherwise = do
                     let fp = defaultBackupFileName <$> siFilePath info
                         conf = defaultBackupFileName <$> siConfFile info
-                    r <- liftIO $ try $ do
+                    void . liftIO $ ((try $ do
                               maybe (return ()) removeFile fp
-                              maybe (return ()) removeFile conf
-                    return $ const () (r :: Either SomeException ())
+                              maybe (return ()) removeFile conf) :: IO (Either SomeException ()))
 
-doWrite :: FilePath -> (Maybe FilePath) -> Model -> SourceInfo -> Bool -> PresenterM ()
+doWrite :: FilePath -> Maybe FilePath -> Model -> SourceInfo -> Bool -> PresenterM ()
 doWrite fp conf model info changedSource = do
         let ListatabFormat ltinfo = siFormat info
         r <- liftIO $ try $ toListatab ltinfo fp conf <@ model
         case r of
             Right _ -> do
                           message $ InformationMessage "Fichero escrito correctamente."
-                          when changedSource $ sendInputM $ SetSource (changeFileName fp info)
+                          when changedSource $ sendInputM $ SetMainSource (changeFileName fp info)
                           sendInputM SetUnchanged
             Left (HRowsException m) -> message $ ErrorMessage m
 

@@ -9,6 +9,7 @@ module Model (
               , (<@)
               , inside
               , fromRowStore
+              , addSource
               -- *Rexported
               , module Model.RowStore
 ) where
@@ -18,10 +19,14 @@ import Data.Text(Text)
 import Model.RowStore hiding (empty)
 import qualified Model.RowStore as RS
 
--- |Holds the rows.
+-- |A `Model` contains a `RowStore` with the data of the application
+-- and a list of `Source`.
 data Model = Model { _rowStore :: RowStore
-                   , _sources :: [(Text, RowStore)]
+                   , _sources :: [Source]
                    } deriving Show
+                   
+-- |A `Source` is used to provide data to the main `RowStore`
+type Source = (Text, RowStore)
                    
 -- |Change the `RowStore` of the model
 setStore :: RowStore -> Model -> Model
@@ -49,3 +54,7 @@ from = (. _rowStore)
 -- |Another utility function, this changes the `RowStore` of the `Model`.
 inside :: (RowStore -> RowStore) -> Model -> Model
 inside f m = setStore (f $ _rowStore m) m
+
+-- |Adds a new source to the `Model`
+addSource :: Source -> Model -> Model
+addSource s m = m { _sources = s : _sources m}

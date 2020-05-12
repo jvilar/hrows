@@ -1,10 +1,12 @@
 module Presenter.Update (
                -- *Types
                UpdateCommand(..)
-               -- *Rexportso
+               -- *Rexports
                , FieldPos
                , SortDirection(..)
 ) where
+
+import Data.Text(Text)
 
 import Model
 
@@ -23,6 +25,7 @@ data UpdateCommand = UpdateField FieldPos Field
                    | ChangeFieldType FieldType FieldPos
                    | ChangeFieldFormula (Maybe Formula) FieldPos
                    | SetUnchanged
+                   | AddNewSource Text RowStore 
                    | Undo
                    | Redo
                    | BlockUndo

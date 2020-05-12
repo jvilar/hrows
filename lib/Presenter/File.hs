@@ -10,6 +10,7 @@ data FileCommand = LoadFile
                  | WriteFile
                  | WriteFileFromName FilePath (Maybe FilePath)
                  | ImportFromFileName ImportType FilePath Char
+                 | AddSourceFromFileName FilePath Char
                  | WriteBackup
                  | BackupOnExit
                  deriving Show

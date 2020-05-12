@@ -109,7 +109,7 @@ main = do
                             presenter
   forkIO $ backupLoop inputChan
   writeList2Chan inputChan [ toInput MoveBegin
-                           , toInput $ SetSource sinfo
+                           , toInput $ SetMainSource sinfo
                            , toInput LoadFile]
   Gtk.main
 

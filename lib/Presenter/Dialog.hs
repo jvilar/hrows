@@ -21,4 +21,6 @@ data DialogCommand = LoadFileDialog
                    | ChangeFieldFormulaDialog FieldPos
                    | SearchFieldDialog FieldPos
                    | CopyOtherDialog FieldPos
+                   | AddSourceDialog
+                   | DeleteSourceDialog
                      deriving Show

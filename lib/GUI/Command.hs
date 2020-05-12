@@ -10,18 +10,22 @@ import GUI.Iteration
 
 import Model
 
-data GUICommand = ChangeTitle Text
-                | ShowPosition Int Int
-                | ShowFields RowPos [FieldInfo]
-                | ShowNames [FieldName]
-                | ShowIteration Iteration
-                | DisableTextViews
-                | ShowListing
-                | HideListing
-                | CompleteListingWanted
-                | CompleteListing [[Text]]
+-- |The commands that are interpreted by the GUI
+data GUICommand = ChangeTitle Text -- ^Change the title of the window
+                | ShowPosition Int Int -- ^Show he position and the number of rows
+                | ShowFields RowPos [FieldInfo] -- ^Show the position and the fields in that position
+                | ShowNames [FieldName] -- ^Show the names of the fields
+                | ShowIteration Iteration -- ^Open an iteration with the user
+                | DisableTextViews -- ^Do not allow text input
+                | ShowListing -- ^Show the listing window
+                | HideListing -- ^Hide the listing window
+                | CompleteListingWanted -- ^Hint the GUI that the listing needs to be completely refreshed.
+                                        --  If the listing window is not hidden, the GUI will send a `CompleteListingGranted`
+                                        --  message
+                | CompleteListing [[Text]] -- ^The complete listing information, sent when a `CompleteListingGranted` is received
                 deriving Show
 
+-- |The information need to show the field
 data FieldInfo = FieldInfo { indexFI :: FieldPos
                            , textFI :: Text
                            , formulaFI :: Maybe Formula

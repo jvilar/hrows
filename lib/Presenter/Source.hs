@@ -4,5 +4,5 @@ module Presenter.Source (
 
 import Model.SourceInfo
 
-data SourceCommand = SetSource SourceInfo
+data SourceCommand = SetMainSource SourceInfo
                    deriving Show

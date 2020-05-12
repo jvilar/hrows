@@ -91,6 +91,7 @@ showIteration (SearchField fpos initial l) = dialogCall (searchField fpos initia
                                              (. MoveToValue fpos) . sendInput
 showIteration (CopyOtherField fpos initial l) = dialogCall (copyOther fpos initial l)
                                                 (\control t -> setTextField fpos t $ mainWindow control)
+showIteration AskAddSource = dialogCall askImportFrom $ (. uncurry AddSourceFromFileName) . sendInput
 showIteration it = unimplemented (T.pack $ show it)
 
 
