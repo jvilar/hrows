@@ -17,6 +17,7 @@ module Model.Field ( Field
                    , mkError
                    , isError
                    , convert
+                   , toInt
                    -- **Operators
                    , andField
                    , orField
@@ -42,7 +43,7 @@ import GHC.Generics
 -- empty. The special constructor AnError stores an erroneous string
 -- for the type. It is useful for converting without loosing the
 -- original value.
-data Field = AInt Int Text
+data Field = AnInt Int Text
            | ADouble Double Text
            | AString Text
            | AnError FieldType Text
@@ -61,7 +62,7 @@ class ToField t where
     toField :: t -> Field
 
 instance ToField Int where
-    toField n = AInt n $ showt n
+    toField n = AnInt n $ showt n
 
 instance ToField Double where
     toField d = ADouble d $ showt d
@@ -102,7 +103,7 @@ typeOperator = fromJust . flip lookup typeOperators
 
 -- |The string associated to a `Field`.
 toString :: Field -> Text
-toString (AInt _ s) = s
+toString (AnInt _ s) = s
 toString (ADouble _ s) = s
 toString (AString s) = s
 toString (AnError _ s) = s
@@ -122,15 +123,15 @@ instance ToJSON FieldType where
 instance FromJSON FieldType
 
 typeOf :: Field -> FieldType
-typeOf (AInt _ _) = TypeInt
+typeOf (AnInt _ _) = TypeInt
 typeOf (ADouble _ _) = TypeDouble
 typeOf (AString _) = TypeString
 typeOf (AnError t _) = t
 typeOf Empty = TypeEmpty
 
 defaultValue :: FieldType -> Field
-defaultValue TypeInt = AInt 0 "0"
-defaultValue TypeInt0 = AInt 0 ""
+defaultValue TypeInt = AnInt 0 "0"
+defaultValue TypeInt0 = AnInt 0 ""
 defaultValue TypeDouble = ADouble 0 "0.0"
 defaultValue TypeDouble0 = ADouble 0 ""
 defaultValue TypeString = AString ""
@@ -146,25 +147,25 @@ convert t f | typeOf f == baseType t = f
 doConvert :: Field -> FieldType -> Field
 doConvert (AnError _ m) t = AnError t m
 
-doConvert (ADouble d _) TypeInt = AInt i $ showt i
+doConvert (ADouble d _) TypeInt = AnInt i $ showt i
                                   where i = truncate d
 doConvert (AString str) TypeInt = case signed decimal str of
-                                        Right (n, "") -> AInt n str
+                                        Right (n, "") -> AnInt n str
                                         _ -> AnError TypeInt (str `T.append` " no es un entero")
 
-doConvert (ADouble d _) TypeInt0 = AInt i $ showt i
+doConvert (ADouble d _) TypeInt0 = AnInt i $ showt i
                                    where i = truncate d
-doConvert (AString str) TypeInt0 = AInt (case signed decimal str of
+doConvert (AString str) TypeInt0 = AnInt (case signed decimal str of
                                                 Right (n, "") -> n
                                                 _ -> 0) str
 
-doConvert (AInt n _) TypeDouble = ADouble f $ showt f
+doConvert (AnInt n _) TypeDouble = ADouble f $ showt f
                        where f = fromIntegral n
 doConvert (AString str) TypeDouble = case signed double str of
                                          Right (d, "") -> ADouble d str
                                          _ -> AnError TypeDouble (str `T.append` " no es un flotante")
 
-doConvert (AInt n _) TypeDouble0 = ADouble f $ showt f
+doConvert (AnInt n _) TypeDouble0 = ADouble f $ showt f
                        where f = fromIntegral n
 doConvert (AString str) TypeDouble0 = ADouble (case signed double str of
                                                     Right (d, "") -> d
@@ -188,33 +189,33 @@ typeError2 :: Text -> Field -> Field -> Field
 typeError2 op f1 f2 = AnError TypeEmpty $ T.concat ["Error de tipos en ", op, ": ", typeLabel $ typeOf f1, " y ", typeLabel $ typeOf f2]
 
 nmap :: Text -> (forall a. Num a => a -> a) -> (Field -> Field)
-nmap _ op (AInt n _) = toField $ op n
+nmap _ op (AnInt n _) = toField $ op n
 nmap _ op (ADouble d _) = toField $ op d
 nmap name _ f = typeError name f
 
 andField :: Field -> Field -> Field
 andField e@(AnError _ _) _ = e
 andField _ e@(AnError _ _) = e
-andField (AInt n1 _) (AInt n2 _) | n1 > 0 && n2 > 0 = toField (1::Int)
+andField (AnInt n1 _) (AnInt n2 _) | n1 > 0 && n2 > 0 = toField (1::Int)
                                  | otherwise = toField (0::Int)
 andField f1 f2 = typeError2 "y lógico" f1 f2
 
 orField :: Field -> Field -> Field
 orField e@(AnError _ _) _ = e
 orField _ e@(AnError _ _) = e
-orField (AInt n1 _) (AInt n2 _) | n1 > 0 || n2 > 0 = toField (1::Int)
+orField (AnInt n1 _) (AnInt n2 _) | n1 > 0 || n2 > 0 = toField (1::Int)
                                 | otherwise = toField (0::Int)
 orField f1 f2 = typeError2 "o lógico" f1 f2
 
 maxField :: Field -> Field -> Field
 maxField f1 f2 = case compareField (>=) f1 f2 of
                     err@(AnError _ _) -> err
-                    AInt 1 _ -> f1
+                    AnInt 1 _ -> f1
                     _ -> f2
 
 minField :: Field -> Field -> Field
 minField f1 f2 = case compareField (<=) f1 f2 of
-                    AInt 1 _ -> f1
+                    AnInt 1 _ -> f1
                     _ -> f2
 
 compareField :: (Field -> Field -> Bool) -> Field -> Field -> Field
@@ -232,17 +233,17 @@ compareField cmp f1 f2 | not $ comparable (typeOf f1) (typeOf f2) = AnError Type
 
 ternary :: Field -> Field -> Field -> Field
 ternary e@(AnError _ _) _ _ = e
-ternary (AInt n1 _) e2 e3 | n1 > 0 = e2
+ternary (AnInt n1 _) e2 e3 | n1 > 0 = e2
                           | otherwise = e3
 ternary e1 _ _ = typeError "operador ?" e1
 
 instance Num Field where
     f@(AnError _ _) + _ = f
     _ + f@(AnError _ _) = f
-    AInt n1 _ + AInt n2 _ = toField $ n1 + n2
-    AInt n _ + ADouble d _ = toField $ fromIntegral n + d
+    AnInt n1 _ + AnInt n2 _ = toField $ n1 + n2
+    AnInt n _ + ADouble d _ = toField $ fromIntegral n + d
 
-    ADouble d _ + AInt n _ = toField $ d + fromIntegral n
+    ADouble d _ + AnInt n _ = toField $ d + fromIntegral n
     ADouble d1 _ + ADouble d2 _ = toField $ d1 + d2
 
     AString s1 + AString s2 = AString $ T.append s1 s2
@@ -251,20 +252,20 @@ instance Num Field where
 
     f@(AnError _ _) * _ = f
     _ * f@(AnError _ _) = f
-    AInt n1 _ * AInt n2 _ = toField $ n1 * n2
-    AInt n _ * ADouble d _ = toField $ fromIntegral n * d
+    AnInt n1 _ * AnInt n2 _ = toField $ n1 * n2
+    AnInt n _ * ADouble d _ = toField $ fromIntegral n * d
 
-    ADouble d _ * AInt n _ = toField $ d * fromIntegral n
+    ADouble d _ * AnInt n _ = toField $ d * fromIntegral n
     ADouble d1 _ * ADouble d2 _ = toField $ d1 * d2
 
-    AString s * AInt n _ = AString $ T.replicate n s
-    AInt n _ * AString s = AString $ T.replicate n s
+    AString s * AnInt n _ = AString $ T.replicate n s
+    AnInt n _ * AString s = AString $ T.replicate n s
 
     f1 * f2 = typeError2 "producto" f1 f2
 
     abs = nmap "valor absoluto" abs
 
-    fromInteger v = AInt (fromInteger v) (showt v)
+    fromInteger v = AnInt (fromInteger v) (showt v)
 
     negate = nmap "negación" negate
 
@@ -274,21 +275,21 @@ instance Real Field where
     toRational = undefined
 
 instance Ord Field where
-    compare (AInt n1 _) (AInt n2 _) = compare n1 n2
-    compare (AInt n _) (ADouble d _) = compare (fromIntegral n) d
-    compare (AInt _ _) _ = LT
+    compare (AnInt n1 _) (AnInt n2 _) = compare n1 n2
+    compare (AnInt n _) (ADouble d _) = compare (fromIntegral n) d
+    compare (AnInt _ _) _ = LT
 
-    compare (ADouble d _) (AInt n _) = compare d (fromIntegral n)
+    compare (ADouble d _) (AnInt n _) = compare d (fromIntegral n)
     compare (ADouble d1 _) (ADouble d2 _) = compare d1 d2
     compare (ADouble _ _) _ = LT
 
     compare (AString s1) (AString s2) = compare s1 s2
-    compare (AString _) (AInt _ _) = GT
+    compare (AString _) (AnInt _ _) = GT
     compare (AString _) (ADouble _ _) = GT
     compare (AString _) _ = LT
 
     compare (AnError _ s1) (AnError _ s2) = compare s1 s2
-    compare (AnError _ _) (AInt _ _) = GT
+    compare (AnError _ _) (AnInt _ _) = GT
     compare (AnError _ _) (ADouble _ _) = GT
     compare (AnError _ _) (AString _) = GT
     compare (AnError _ _) Empty = LT
@@ -297,45 +298,50 @@ instance Ord Field where
     compare Empty _ = GT
 
 instance Enum Field where
-    toEnum v = AInt v $ showt v
+    toEnum v = AnInt v $ showt v
 
-    fromEnum (AInt n _) = n
+    fromEnum (AnInt n _) = n
     fromEnum _ = error "fromEnum de un no entero"
 
 instance Integral Field where
-    quot (AInt n1 _) (AInt n2 _) = toField $ quot n1 n2
+    quot (AnInt n1 _) (AnInt n2 _) = toField $ quot n1 n2
     quot f1 f2 = typeError2 "división entera" f1 f2
 
-    rem (AInt n1 _) (AInt n2 _) = toField $ rem n1 n2
+    rem (AnInt n1 _) (AnInt n2 _) = toField $ rem n1 n2
     rem f1 f2 = typeError2 "resto" f1 f2
 
-    div (AInt n1 _) (AInt n2 _) = toField $ div n1 n2
+    div (AnInt n1 _) (AnInt n2 _) = toField $ div n1 n2
     div f1 f2 = typeError2 "división entera" f1 f2
 
-    mod (AInt n1 _) (AInt n2 _) = toField $ mod n1 n2
+    mod (AnInt n1 _) (AnInt n2 _) = toField $ mod n1 n2
     mod f1 f2 = typeError2 "resto" f1 f2
 
-    quotRem (AInt n1 _) (AInt n2 _) = (toField q, toField r)
+    quotRem (AnInt n1 _) (AnInt n2 _) = (toField q, toField r)
         where (q, r) = quotRem n1 n2
     quotRem f1 f2 = ( typeError2 "división entera" f1 f2
                     , typeError2 "resto" f1 f2)
 
-    divMod (AInt n1 _) (AInt n2 _) = (toField d, toField m)
+    divMod (AnInt n1 _) (AnInt n2 _) = (toField d, toField m)
         where (d, m) = divMod n1 n2
     divMod f1 f2 = ( typeError2 "división entera" f1 f2
                     , typeError2 "resto" f1 f2)
 
-    toInteger (AInt n _) = toInteger n
-    toInteger f = error $ "toInteger de un " ++ T.unpack (typeLabel $ typeOf f)
+    toInteger = toInteger . toInt
+
+-- |Recover the Int from an integer expression or error
+toInt :: Field -> Int
+toInt (AnInt n _) = n
+toInt f = error $ "toInt de un " ++ T.unpack (typeLabel $ typeOf f)
+
 
 instance Fractional Field where
-    (AInt n1 _) / (AInt n2 _) = toField ((fromIntegral n1 / fromIntegral n2)::Double)
-    (AInt n _) / (ADouble d _) = toField $ fromIntegral n / d
-    (ADouble d _) / (AInt n _) = toField $ d / fromIntegral n
+    (AnInt n1 _) / (AnInt n2 _) = toField ((fromIntegral n1 / fromIntegral n2)::Double)
+    (AnInt n _) / (ADouble d _) = toField $ fromIntegral n / d
+    (ADouble d _) / (AnInt n _) = toField $ d / fromIntegral n
     (ADouble d1 _) / (ADouble d2 _) = toField $ d1/d2
     f1 / f2 = typeError2 "división" f1 f2
 
-    recip (AInt n _) = toField ((recip $ fromIntegral n) :: Double)
+    recip (AnInt n _) = toField ((recip $ fromIntegral n) :: Double)
     recip (ADouble d _) = toField $ recip d
     recip f = typeError "recíproco" f
 

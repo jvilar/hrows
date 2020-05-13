@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
-module Model.Lexer ( Token (..)
-                   , tokenize
-                   ) where
+module Model.Expression.Lexer ( Token (..)
+                              , tokenize
+                              ) where
 
 import Control.Arrow(first)
 import Control.Monad(void, when)

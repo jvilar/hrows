@@ -1,8 +1,6 @@
-{-# LANGUAGE OverloadedStrings
-           , TupleSections #-}
+{-# LANGUAGE OverloadedStrings #-}
 
-module Model.Parser ( parse
-                    ) where
+module Model.Expression.Parser ( parse ) where
 
 import Control.Monad(unless)
 import Control.Monad.Except(ExceptT, runExceptT, throwError)
@@ -13,7 +11,7 @@ import Data.Text(Text)
 import qualified Data.Text as T
 import TextShow(fromString, TextShow(..))
 
-import Model.Lexer
+import Model.Expression.Lexer
 import Model.Expression
 
 type Parser = ExceptT Text (State [Token])

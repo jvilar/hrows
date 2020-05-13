@@ -14,6 +14,7 @@ import Data.Maybe(fromJust, isJust)
 import Data.List(foldl', sortOn)
 
 import Model.Expression
+import Model.Expression.Evaluation
 import Model.TopoSort
 import Model.Row
 
@@ -58,25 +59,25 @@ closureUpdates isParameterOf = let
         in IM.insert n (sortOn (orderMap IM.!) deps) cl
     in IM.map (map fromIntegral) $ foldr updateClosure initial order
 
-updateAll :: UpdatePlan -> Row -> Row
-updateAll up r = foldr (changeRow $ mkError "Fórmula con dependencias circulares")
-                 (foldl' (evaluateField up) r (updateOrder up)) (cycled up)
+updateAll :: UpdatePlan -> [DataSource] -> Row -> Row
+updateAll up dss r = foldr (changeRow $ mkError "Fórmula con dependencias circulares")
+                 (foldl' (evaluateField up dss) r (updateOrder up)) (cycled up)
 
 -- |Changes a 'Field' and Updates a 'Row'. Returns the new 'Row'
 -- and a list of the positions of the fields that changed, including
 -- the one responsible of the change.
-updateField :: UpdatePlan -> Field -> FieldPos -> Row -> (Row, [FieldPos])
-updateField up f n r = let
+updateField :: UpdatePlan -> Field -> FieldPos -> [DataSource] -> Row -> (Row, [FieldPos])
+updateField up f n dss r = let
     deps = influences up IM.! fromIntegral n
-    in (foldl' (evaluateField up) (changeRow f n r) deps, n:deps)
+    in (foldl' (evaluateField up dss) (changeRow f n r) deps, n:deps)
 
 changeRow :: Field -> FieldPos -> Row -> Row
 changeRow f n r = let
     (h, _:t) = splitAt (fromIntegral n) r
     in h ++ f : t
 
-evaluateField :: UpdatePlan -> Row -> FieldPos -> Row
-evaluateField up r f = let
-    v = evaluate r (fromJust $ expressions up !! fromIntegral f)
+evaluateField :: UpdatePlan -> [DataSource] -> Row -> FieldPos -> Row
+evaluateField up dss r f = let
+    v = evaluate r dss (fromJust $ expressions up !! fromIntegral f)
     in changeRow v f r
 

@@ -66,7 +66,8 @@ import TextShow(TextShow(showt))
 import Model.Expression
 import Model.Field
 import Model.ModelConf
-import Model.Parser
+import Model.Expression.Parser
+import Model.Expression.Evaluation
 import Model.Row
 import Model.UpdatePlan
 
@@ -81,6 +82,8 @@ type FieldName = Text
 
 -- |Holds the rows.
 data RowStore = RowStore { _rows :: IntMap Row
+                         , _dataSources :: [DataSource]
+                         , _dataWithNames :: Map Text RowStore
                          , _fieldInfo :: [FieldInfo]
                          , _updatePlan :: UpdatePlan
                          , _nfields :: Int
@@ -131,12 +134,14 @@ changed = _changed
 -- |An empty `RowStore`.
 empty :: RowStore
 empty = RowStore { _rows = IM.empty
-              , _fieldInfo = []
-              , _updatePlan = mkUpdatePlan []
-              , _nfields = 0
-              , _size = 0
-              , _changed = False
-              }
+                 , _dataSources = []
+                 , _dataWithNames = M.empty
+                 , _fieldInfo = []
+                 , _updatePlan = mkUpdatePlan []
+                 , _nfields = 0
+                 , _size = 0
+                 , _changed = False
+                 }
 
 -- |Get the current configuration.
 getConf :: RowStore -> ModelConf
@@ -145,12 +150,14 @@ getConf = ModelConf . map toConf . _fieldInfo
 -- |An empty `RowStore` that has a configuration.
 emptyConf :: ModelConf -> RowStore
 emptyConf (ModelConf fcs) = addPlan RowStore { _rows = IM.empty
-                                          , _fieldInfo = map fromConf fcs
-                                          , _updatePlan = undefined
-                                          , _nfields = length fcs
-                                          , _size = 0
-                                          , _changed = False
-                                          }
+                                             , _dataSources = []
+                                             , _dataWithNames = M.empty
+                                             , _fieldInfo = map fromConf fcs
+                                             , _updatePlan = undefined
+                                             , _nfields = length fcs
+                                             , _size = 0
+                                             , _changed = False
+                                             }
 
 fillEmpty :: Row -> Row
 fillEmpty = (++ repeat (toField()))
@@ -158,7 +165,7 @@ fillEmpty = (++ repeat (toField()))
 -- |Adds a `Row` to a `RowStore`.
 addRow :: RowStore -> Row -> RowStore
 addRow m r = let
-               r' = updateAll (_updatePlan m) $ zipWith convert (types m) (fillEmpty r)
+               r' = updateAll (_updatePlan m) (_dataSources m) $ zipWith convert (types m) (fillEmpty r) 
              in m { _rows = IM.insert (_size m) r' (_rows m)
                   , _size = _size m + 1
                   , _changed = True
@@ -182,10 +189,10 @@ fromRows :: [Row] -> RowStore
 fromRows rs = let
     infos = foldl' combine [] rs
     combine xs r = xs ++ map inferInfo (drop (length xs) r)
-    m = addPlan empty { _nfields = length infos
-                      , _fieldInfo = infos
-                      }
-    in (foldl' addRow m rs) { _changed = False }
+    rst = addPlan empty { _nfields = length infos
+                        , _fieldInfo = infos
+                        }
+    in (foldl' addRow rst rs) { _changed = False }
 
 -- |Creates a `RowStore` from a list of `Row`s and a list of names.
 fromRowsNames :: [FieldName] -> [Row] -> RowStore
@@ -193,13 +200,13 @@ fromRowsNames l rs = (setNames l $ fromRows rs) { _changed = False }
 
 -- |Creates a `RowStore` from a list of `Row`s and a `ModelConf`
 fromRowsConf :: ModelConf -> [Row] -> RowStore
-fromRowsConf conf  m = (foldl' addRow  (emptyConf conf) m) { _changed = False }
+fromRowsConf conf rs = (foldl' addRow  (emptyConf conf) rs) { _changed = False }
 
 -- |Sets the names of the fields.
 setNames :: [FieldName] -> RowStore -> RowStore
-setNames l m = m { _fieldInfo = zipWith (\i n -> i { _name = Just n }) (_fieldInfo m) l
-                 , _changed = True
-                 }
+setNames l rst = rst { _fieldInfo = zipWith (\i n -> i { _name = Just n }) (_fieldInfo rst) l
+                     , _changed = True
+                     }
 
 -- |Returns one row of the `RowStore`.
 row :: RowPos -> RowStore -> Row
@@ -286,7 +293,7 @@ changeField :: RowPos -> FieldPos -> Field -> RowStore -> (RowStore, [FieldPos])
 changeField r c field rst = let
       row = _rows rst IM.! r
       field' = convert (_type $ _fieldInfo rst !!! c) field
-      (row', poss) = updateField (_updatePlan rst) field' c row
+      (row', poss) = updateField (_updatePlan rst) field' c (_dataSources rst) row
     in if row !!! c /= field'
        then (rst { _rows = IM.insert r row' (_rows rst), _changed = True }, poss)
        else (rst, [])
@@ -309,11 +316,11 @@ newFields l rst = let
                  }
 
 addPlan :: RowStore -> RowStore
-addPlan m = let
-    exps = map prepare $ _fieldInfo m
-    prepare fi = eliminateNames (fnames m) . addCast (_type fi) <$> _expression fi
+addPlan rst = let
+    exps = map prepare $ _fieldInfo rst
+    prepare fi = eliminateNames (fnames rst) . addCast (_type fi) <$> _expression fi
     up = mkUpdatePlan exps
-  in m { _updatePlan = up, _rows = IM.map (updateAll up) (_rows m), _changed = True }
+  in rst { _updatePlan = up, _rows = IM.map (updateAll up $ _dataSources rst) (_rows rst), _changed = True }
 
 adjustNames :: RowStore -> [Maybe FieldName] -> [Maybe FieldName]
 adjustNames m newNames = zipWith (flip maybe Just . Just) defNames (map _name (_fieldInfo m) ++ newNames)
