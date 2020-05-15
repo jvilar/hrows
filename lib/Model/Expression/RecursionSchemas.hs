@@ -1,6 +1,6 @@
 module Model.Expression.RecursionSchemas where
 
-import Control.Arrow(second, (>>>), (<<<))
+import Control.Arrow((>>>), (<<<))
 import Data.Function((&))
 
 

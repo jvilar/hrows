@@ -104,7 +104,7 @@ update model (ChangeFieldType t f, pos) =
 update model (ChangeFieldFormula mf f, pos) =
     partialRefresh pos $ changeFieldFormula mf f `inside` model
 update model (SetUnchanged, _) = return $ setUnchanged `inside` model
-update model (AddNewSource name rst, _) = return $ addSource (name, rst) model
+update model (AddNewSource rst, _) = return $ addSource rst model
 
 cnames :: RowStore -> [FieldName]
 cnames = map (`T.append` ": ") . fnames

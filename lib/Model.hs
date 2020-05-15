@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Model (
               -- *Types
               Model
@@ -14,19 +16,14 @@ module Model (
               , module Model.RowStore
 ) where
 
-import Data.Text(Text)
-
 import Model.RowStore hiding (empty)
-import qualified Model.RowStore as RS
+import qualified Model.RowStore.Update as RS
 
 -- |A `Model` contains a `RowStore` with the data of the application
 -- and a list of `Source`.
 data Model = Model { _rowStore :: RowStore
-                   , _sources :: [Source]
+                   , _sources :: [RowStore]
                    } deriving Show
-                   
--- |A `Source` is used to provide data to the main `RowStore`
-type Source = (Text, RowStore)
                    
 -- |Change the `RowStore` of the model
 setStore :: RowStore -> Model -> Model
@@ -34,7 +31,7 @@ setStore rst m = m { _rowStore = rst }
                    
 -- |An empty `Model`
 empty :: Model
-empty = fromRowStore RS.empty
+empty = fromRowStore (RS.empty "vacía")
 
 -- |An alias of `Bool` to indicate if the model has changed
 type ModelChanged = Bool
@@ -56,5 +53,8 @@ inside :: (RowStore -> RowStore) -> Model -> Model
 inside f m = setStore (f $ _rowStore m) m
 
 -- |Adds a new source to the `Model`
-addSource :: Source -> Model -> Model
-addSource s m = m { _sources = s : _sources m}
+addSource :: RowStore -> Model -> Model
+addSource rst m = m {
+                      _rowStore = addRowStore rst $ _rowStore m 
+                      , _sources = rst : _sources m
+                    }

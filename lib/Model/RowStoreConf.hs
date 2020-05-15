@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Model.ModelConf ( ModelConf(..)
-                       , FieldConf(..)
-                       ) where
+module Model.RowStoreConf ( RowStoreConf(..)
+                          , FieldConf(..)
+                          ) where
 
 import Data.Aeson
 import Data.Text(Text)
@@ -10,17 +10,17 @@ import GHC.Generics
 
 import Model.Expression
 
-newtype ModelConf = ModelConf [ FieldConf ] deriving (Generic, Show)
+newtype RowStoreConf = RowStoreConf [ FieldConf ] deriving (Generic, Show)
 
 data FieldConf = FieldConf { nameFC :: Maybe Text
                            , typeFC :: FieldType
                            , formulaFC :: Maybe Formula
                            } deriving (Generic, Show)
 
-instance ToJSON ModelConf where
+instance ToJSON RowStoreConf where
     toEncoding = genericToEncoding defaultOptions
 
-instance FromJSON ModelConf
+instance FromJSON RowStoreConf
 
 instance ToJSON FieldConf where
     toEncoding = genericToEncoding defaultOptions

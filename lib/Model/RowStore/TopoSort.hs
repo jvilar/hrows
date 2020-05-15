@@ -1,10 +1,10 @@
-module Model.TopoSort ( Graph
-                      , emptyGraph
-                      , addEdge
-                      , mkGraph
-                      , toposort
-                      , dfs
-                      ) where
+module Model.RowStore.TopoSort ( Graph
+                               , emptyGraph
+                               , addEdge
+                               , mkGraph
+                               , toposort
+                               , dfs
+                               ) where
 
 import Control.Monad(unless)
 import Control.Monad.State.Strict(evalStateT, gets, modify, StateT)

@@ -58,7 +58,7 @@ applyCommand (ImportFromFileName t fp separator) _ _ = do
 applyCommand (AddSourceFromFileName fp separator) _ _  = do
     r <- liftIO . try $ fromListatab def { ltInputSeparator = separator } fp Nothing
     case r of
-        Right rst -> sendInputM $ AddNewSource (T.pack fp) rst
+        Right rst -> sendInputM $ AddNewSource rst
         Left (HRowsException m) -> message $ ErrorMessage m
 
 applyCommand WriteBackup model info = do

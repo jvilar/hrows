@@ -28,25 +28,20 @@ module Model.Expression ( -- *Types
                         , mkTernary
                         , mkCast
                         , mkErrorExpr
+                        -- *Querying
+                        , getPositions
                         -- *Other functions
                         , addCast
                         , toFormula
-                        -- *Rexported modules
+                        -- *Rexported
                         , module Model.Field
                         ) where
 
-import Control.Monad(when)
-import Control.Monad.Reader(Reader, ask, runReader)
-import Control.Monad.Writer(Writer, tell, runWriter)
 import Data.Char(isAlphaNum)
-import Data.List(elemIndex)
-import Data.Maybe(fromMaybe)
-import Data.Monoid(Any(..))
 import Data.Text(Text)
 import qualified Data.Text as T
 import TextShow(TextShow(showt))
 import Model.Field
-import Model.Row
 import Model.Expression.RecursionSchemas
 
 -- |The Formula is the expression as written by the user.
@@ -190,4 +185,25 @@ addCast :: FieldType -> Expression -> Expression
 addCast ft exp@(In (Cast ft' e)) | ft == ft' = exp
                                  | otherwise = In (Cast ft e)
 addCast ft exp = In (Cast ft exp)
+
+getPositions :: Expression -> [Int]
+getPositions = cata gp
+    where
+        gp (Position n) = [n]
+        gp (NamedPosition name) = error $ "Expresión con variable: " ++ T.unpack name
+        gp (Constant _) = []
+        gp (Unary _ ps) = ps
+        gp (Binary _ ps1 ps2) = merge ps1 ps2
+        gp (PrefixBinary _ ps1 ps2) = merge ps1 ps2
+        gp (Cast _ ps) = ps
+        gp (Ternary ps1 ps2 ps3) = ps1 `merge` ps2 `merge` ps3
+        gp (Error _) = []
+
+merge :: [Int] -> [Int] -> [Int]
+merge [] l = l
+merge l@(_:_) [] = l
+merge (x:xs) (y:ys) = case compare x y of
+                          LT -> x : merge xs (y:ys)
+                          EQ -> x : merge xs ys
+                          GT -> y : merge (x:xs) ys
 

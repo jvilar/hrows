@@ -25,7 +25,7 @@ data UpdateCommand = UpdateField FieldPos Field
                    | ChangeFieldType FieldType FieldPos
                    | ChangeFieldFormula (Maybe Formula) FieldPos
                    | SetUnchanged
-                   | AddNewSource Text RowStore 
+                   | AddNewSource RowStore 
                    | Undo
                    | Redo
                    | BlockUndo

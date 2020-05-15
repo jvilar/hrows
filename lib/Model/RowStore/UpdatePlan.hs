@@ -1,28 +1,17 @@
 {-# LANGUAGE OverloadedStrings
            , TupleSections #-}
 
-module Model.UpdatePlan ( UpdatePlan
-                        , mkUpdatePlan
-                        , updateAll
-                        , updateField
-                        ) where
+module Model.RowStore.UpdatePlan ( mkUpdatePlan ) where
 
 import Data.IntMap(IntMap)
 import qualified Data.IntMap.Strict as IM
 import qualified Data.IntSet as IS
-import Data.Maybe(fromJust, isJust)
+import Data.Maybe(isJust)
 import Data.List(foldl', sortOn)
 
 import Model.Expression
-import Model.Expression.Evaluation
-import Model.TopoSort
-import Model.Row
-
-data UpdatePlan = UpdatePlan { expressions :: [Maybe Expression]
-                             , influences :: IntMap [FieldPos]
-                             , updateOrder :: [FieldPos]
-                             , cycled :: [FieldPos]
-                             } deriving Show
+import Model.RowStore.Base
+import Model.RowStore.TopoSort
 
 enumerate :: [a] -> [(Int, a)]
 enumerate = zip [0..]
@@ -58,26 +47,4 @@ closureUpdates isParameterOf = let
           deps = tail $ dfs graph n
         in IM.insert n (sortOn (orderMap IM.!) deps) cl
     in IM.map (map fromIntegral) $ foldr updateClosure initial order
-
-updateAll :: UpdatePlan -> [DataSource] -> Row -> Row
-updateAll up dss r = foldr (changeRow $ mkError "Fórmula con dependencias circulares")
-                 (foldl' (evaluateField up dss) r (updateOrder up)) (cycled up)
-
--- |Changes a 'Field' and Updates a 'Row'. Returns the new 'Row'
--- and a list of the positions of the fields that changed, including
--- the one responsible of the change.
-updateField :: UpdatePlan -> Field -> FieldPos -> [DataSource] -> Row -> (Row, [FieldPos])
-updateField up f n dss r = let
-    deps = influences up IM.! fromIntegral n
-    in (foldl' (evaluateField up dss) (changeRow f n r) deps, n:deps)
-
-changeRow :: Field -> FieldPos -> Row -> Row
-changeRow f n r = let
-    (h, _:t) = splitAt (fromIntegral n) r
-    in h ++ f : t
-
-evaluateField :: UpdatePlan -> [DataSource] -> Row -> FieldPos -> Row
-evaluateField up dss r f = let
-    v = evaluate r dss (fromJust $ expressions up !! fromIntegral f)
-    in changeRow v f r
 

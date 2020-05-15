@@ -21,8 +21,10 @@ import Text.Megaparsec.Char(char)
 import qualified Text.Megaparsec as TM
 
 import HRowsException
+import Model.Row
 import Model.RowStore
-import Model.ModelConf
+import Model.RowStore.Update
+import Model.RowStoreConf
 import Model.SourceInfo
 
 -- Auxiliary function to help creating the exceptions from string
@@ -53,7 +55,7 @@ fromListatab info fp mconf = do
   rows <- case mr of
               Right r -> return r
               Left e -> exception e
-  case parse (analyze (ltInputSeparator info) conf) fp rows of
+  case parse (analyze (T.pack fp) (ltInputSeparator info) conf) fp rows of
       Right m -> return m
       Left e -> throwIO $ hRowsException $
                        "Error reading file " ++ fp ++ ":\n"
@@ -64,8 +66,8 @@ exception e = throwIO $ hRowsException $ "Exception: " ++ displayException e
 
 type Parser = Parsec Void Text
 
-analyze :: Char -> Maybe ModelConf -> Parser RowStore
-analyze sep mconf = do
+analyze :: RowStoreName -> Char -> Maybe RowStoreConf -> Parser RowStore
+analyze n sep mconf = do
   h <-  optional $
           between (char '#') (char '\n')
                     ( many ( between (char '<')
@@ -78,9 +80,9 @@ analyze sep mconf = do
             (toField <$> stringParser sep)
   return $ case mconf of
                   Nothing -> case h of
-                                 Nothing -> fromRows rs
-                                 Just names -> fromRowsNames (map T.pack names) rs
-                  Just cnf -> fromRowsConf cnf rs
+                                 Nothing -> fromRows n rs
+                                 Just names -> fromRowsNames n (map T.pack names) rs
+                  Just cnf -> fromRowsConf n cnf rs
 
 stringParser :: Char -> Parser Text
 stringParser sep = T.pack <$> ((char '"' *> (many inStringChar <* char '"'))
