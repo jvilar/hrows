@@ -59,3 +59,12 @@ executables:
     - haskeline
     - hrows
     - text
+
+tests:
+  expression-test:
+    main: Expression.hs
+    source-dirs: test
+    dependencies:
+    - hrows
+    - hspec
+    - text

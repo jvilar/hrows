@@ -26,7 +26,7 @@ eliminateNames rst (In (NamedPosition name)) = In $ case fieldIndex rst name of
                                                  Just i -> Position i
 eliminateNames rst (In (FromSource s inr ins gets)) = In $ case identifySource rst s of
     Nothing -> Error "Mal nombre de fuente"
-    Just (rst', s') -> let 
+    Just (rst', s') -> let
                          inr' = eliminateNames rst inr
                          ins' = eliminateNames rst' ins
                          gets' = eliminateNames rst' gets
