@@ -78,7 +78,7 @@ data Node a = Position Int -- ^A position in the row
             | PrefixBinary PBinaryOpInfo a a -- ^Aplication of a prefix binary operator (max or min) 
             | Ternary a a a -- ^Application of the ternary operator
             | Cast FieldType a -- ^Application of cast
-            | FromSource a a a a -- ^Recover from a source. Parameters: source, position in the row to compare with
+            | FromSource a a a a -- ^Recover from a source. Parameters: source, position in the row to compare with,
                                  -- position in the source, position in the source to get the value from 
             | Error Text -- ^An error
             deriving (Foldable, Functor, Show, Traversable)

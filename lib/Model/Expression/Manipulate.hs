@@ -19,12 +19,27 @@ import Model.Expression
 import Model.Expression.RecursionSchemas
 import Model.RowStore.Base
 
+-- |Changes all the `NamedPosition` in a `Expression` to the corresponding `Position`.
 eliminateNames :: RowStore -> Expression -> Expression
-eliminateNames rst = bottomUp noNames
-    where noNames (In (NamedPosition name)) = In $ case fieldIndex rst name of
+eliminateNames rst (In (NamedPosition name)) = In $ case fieldIndex rst name of
                                                  Nothing -> Error $ "Mal nombre de campo: " `T.append` name
                                                  Just i -> Position i
-          noNames n = n
+eliminateNames rst (In (FromSource s inr ins gets)) = In $ case identifySource rst s of
+    Nothing -> Error "Mal nombre de fuente"
+    Just (rst', s') -> let 
+                         inr' = eliminateNames rst inr
+                         ins' = eliminateNames rst' ins
+                         gets' = eliminateNames rst' gets
+                       in FromSource s' inr' ins' gets'
+eliminateNames rst n = In (fmap (eliminateNames rst) (out n))
+
+identifySource :: RowStore -> Expression -> Maybe (RowStore, Expression)
+identifySource rst e@(In (Position n)) = Just (getRowStore rst n, e)
+identifySource rst (In (NamedPosition name)) = do
+    n <- getRowStoreIndex rst name
+    return (getRowStore rst n, In (Position n))
+identifySource _ _ = Nothing
+
 
 type Changed = Bool
 

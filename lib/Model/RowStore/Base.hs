@@ -12,6 +12,8 @@ module Model.RowStore.Base (
                 , SortDirection(..)
                    -- *Functions
                 , addRowStore
+                , getRowStore
+                , getRowStoreIndex
                 , changed
                 , names
                 , fnames
@@ -96,6 +98,14 @@ addRowStore r rst = rst {
     _dataSources = rows r : _dataSources rst
     , _rowStores = r : _rowStores rst
 }
+
+-- |Recovers a `RowStore` from the store
+getRowStore :: RowStore -> Int -> RowStore
+getRowStore = (!!) . _rowStores
+
+-- |Finds the position of the `RowStore` with the given name
+getRowStoreIndex :: RowStore -> Text -> Maybe Int
+getRowStoreIndex rst name = findIndex ((== name) . _nameRS) $ _rowStores rst
 
 -- |Whether the store has changed.
 changed :: RowStore -> RowsChanged
