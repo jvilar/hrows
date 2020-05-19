@@ -40,6 +40,8 @@ data Token = IntT Int
            | QuestionMarkT
            | ColonT
            | CommaT
+           | AtT
+           | ArrowT
            | CastT FieldType
            | EOFT
            | ErrorT String
@@ -150,7 +152,7 @@ tokenizer =
                        , (isSpace c, omit)
                        , (c == '"' , string)
                        , (c == '$' , position)
-                       , (c == '@' , named)
+                       , (c == '@' , at)
                        , (otherwise , emitl ErrorT)
                        ]
                 tokenizer
@@ -206,7 +208,10 @@ equal = ifChar (== '=')
 less :: Tokenizer ()
 less = ifChar (== '=')
            (emit LessOrEqualT)
-           (emit LessThanT)
+           (ifChar(=='-')
+                (emit ArrowT)
+                (emit LessThanT)
+           )
 
 greater :: Tokenizer ()
 greater = ifChar (== '=')
@@ -224,14 +229,15 @@ ampersand = needChar (== '&') $ emit AndT
 bar :: Tokenizer ()
 bar = needChar (== '|') $ emit OrT
 
-named :: Tokenizer ()
-named = needChar (== '{')
+at :: Tokenizer ()
+at = ifChar (== '{')
         ( many1 (/= '}')
           (emitl ErrorT)
           (needChar (== '}')
            (emitl $ NameT . init . drop 2)
           )
         )
+        (emit AtT)
 
 reservedWords :: [(String, Token)]
 reservedWords = [("max", MaxT), ("min", MinT)] ++
