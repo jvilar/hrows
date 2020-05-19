@@ -80,9 +80,9 @@ testNames = describe "Test names" $ do
 testSearch :: Spec
 testSearch = describe "Test search" $ do
                         it "Adds one plus one" $
-                          evalNames [1, 2] mainRst "fist + value @ child <- name == \"one\"" `shouldBeI` 2
+                          evalNames [1, 2] mainRst "first + value @ child <- name <-> \"one\"" `shouldBeI` 2
                         it "Adds one plus two" $
-                          evalNames [1, 2] mainRst "fist + value @ child <- name == \"two\"" `shouldBeI` 3
+                          evalNames [1, 2] mainRst "first + value @ child <- name <-> \"two\"" `shouldBeI` 3
 
 
 testLexer :: Spec
@@ -90,7 +90,16 @@ testLexer = describe "Test the lexer" $ do
               it "Checks the @ symbol" $
                 tokenize "@ @{name}" `shouldBe` [AtT, NameT "name", EOFT]
               it "Checks the < symbol" $
-                tokenize "< <= <-" `shouldBe` [LessThanT, LessOrEqualT, ArrowT, EOFT]
+                tokenize "< <= <- <->" `shouldBe` [LessThanT, LessOrEqualT, ArrowT, DoubleArrowT, EOFT]
+
+testParser :: Spec
+testParser = describe "Test the parser" $
+               it "Checks a from source expression" $
+                 parse "value @ child <- name <-> name2" `shouldBe` mkFromSource (mkNamedPosition "child")
+                                                                                (mkNamedPosition "name")
+                                                                                (mkNamedPosition "name2")
+                                                                                (mkNamedPosition "value")
+               
 
 main:: IO ()
 main = hspec $ do
@@ -99,3 +108,4 @@ main = hspec $ do
   testNames
   testSearch
   testLexer
+  testParser

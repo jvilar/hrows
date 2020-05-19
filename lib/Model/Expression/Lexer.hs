@@ -42,6 +42,7 @@ data Token = IntT Int
            | CommaT
            | AtT
            | ArrowT
+           | DoubleArrowT
            | CastT FieldType
            | EOFT
            | ErrorT String
@@ -209,7 +210,10 @@ less :: Tokenizer ()
 less = ifChar (== '=')
            (emit LessOrEqualT)
            (ifChar(=='-')
-                (emit ArrowT)
+                (ifChar(== '>')
+                     (emit DoubleArrowT)
+                     (emit ArrowT)
+                )
                 (emit LessThanT)
            )
 

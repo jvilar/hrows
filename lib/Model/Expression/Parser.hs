@@ -41,6 +41,15 @@ expect t message = do
     unless (t == c) $ throwError $ T.concat ["Error en ", showt c, ", esperaba ", message]
     advance
 
+expectName :: Text -> Parser Expression
+expectName message = do
+    c <- current
+    case c of
+      NameT s -> do
+           advance
+           return $ mkNamedPosition $ T.pack s
+      _ -> throwError $ T.concat ["Error en ", showt c, ", se esperaba un nombre"]
+
 match :: [(Token, a)] -> Parser (Maybe a)
 match l = do
     t <- current
@@ -117,7 +126,7 @@ multiplicative = binaryLevel base
                          ]
                  )
 
--- base -> IntT | DoubleT | StringT | PositionT | NameT | CastT parenthesized | OpenT expression CloseT
+-- base -> IntT | DoubleT | StringT | PositionT | NameT name | CastT parenthesized | OpenT expression CloseT
 --         | MaxT OpenT expression CommaT expression CloseT
 --         | MinT OpenT expression CommaT expression CloseT
 base :: Parser Expression
@@ -128,13 +137,28 @@ base = do
         DoubleT d -> return . mkConstant $ toField d
         StringT s -> return . mkConstant $ toField $ T.pack s
         PositionT n -> return (mkPosition $ n - 1)
-        NameT s -> return $ mkNamedPosition $ T.pack s
+        NameT s -> name s
         CastT ft -> mkCast ft <$> parenthesized
         OpenT -> expression <* close
         MaxT -> maxMin MaxT
         MinT -> maxMin MinT
         _ -> throwError $ T.concat ["Error en ", showt t, ", esperaba un comienzo de expresión"]
 
+-- name --> (AtT NameT ArrowT NameT EqualT NameT)?
+name :: String -> Parser Expression
+name s = do
+        let pos = mkNamedPosition $ T.pack s
+        at <- check AtT
+        if at
+        then do
+                advance
+                source <- expectName "El nombre de la fuente"
+                expect ArrowT "una flecha"
+                fHere <- expression
+                expect DoubleArrowT "una flecha doble"
+                fThere <- expression
+                return $ mkFromSource source fHere fThere pos 
+        else return pos
 parenthesized :: Parser Expression
 parenthesized = open >> expression <* close
 

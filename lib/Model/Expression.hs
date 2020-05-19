@@ -27,6 +27,7 @@ module Model.Expression ( -- *Types
                         , mkPBinary
                         , mkTernary
                         , mkCast
+                        , mkFromSource
                         , mkErrorExpr
                         -- *Querying
                         , getPositions
@@ -56,6 +57,9 @@ data Associativity = LeftAssoc | RightAssoc | TrueAssoc | NoAssoc
 -- |The Expression is the internal representation of the Formula.
 type Expression = Fix Node
 
+instance Eq Expression where
+  (In n) == (In m) = n == m
+
 instance Show Expression where
     show = cata gshow
              where gshow (Position i) = "Position " ++ show i
@@ -81,7 +85,7 @@ data Node a = Position Int -- ^A position in the row
             | FromSource a a a a -- ^Recover from a source. Parameters: source, position in the row to compare with,
                                  -- position in the source, position in the source to get the value from 
             | Error Text -- ^An error
-            deriving (Foldable, Functor, Show, Traversable)
+            deriving (Eq, Foldable, Functor, Show, Traversable)
 
 
 mkPosition :: Int -> Expression
@@ -124,6 +128,9 @@ data UnaryOpInfo = UnaryOpInfo { opU :: UnaryOp
 instance Show UnaryOpInfo where
     show = T.unpack . formulaU
 
+instance Eq UnaryOpInfo where
+    a == b = formulaU a == formulaU b
+
 type BinaryOp = Field -> Field -> Field
 
 -- |The information stored about a binary operation.
@@ -136,6 +143,9 @@ data BinaryOpInfo = BinaryOpInfo { opB :: BinaryOp
 instance Show BinaryOpInfo where
     show = T.unpack . formulaB
 
+instance Eq BinaryOpInfo where
+    a == b = formulaB a == formulaB b
+
 -- |The information stored about a prefix binary operation.
 data PBinaryOpInfo = PBinaryOpInfo { opPB :: BinaryOp
                                    , formulaPB :: Formula
@@ -143,6 +153,9 @@ data PBinaryOpInfo = PBinaryOpInfo { opPB :: BinaryOp
 
 instance Show PBinaryOpInfo where
     show = T.unpack . formulaPB
+
+instance Eq PBinaryOpInfo where
+    a == b = formulaPB a == formulaPB b
 
 
 toFormula :: Expression -> Formula
