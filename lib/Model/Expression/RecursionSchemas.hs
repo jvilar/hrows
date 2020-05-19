@@ -26,6 +26,9 @@ type AlgebraM m f a = f a -> m a
 cataM :: (Traversable f, Monad m) => AlgebraM m f a -> Fix f -> m a
 cataM f v = mapM (cataM f) (out v) >>= f
 
+hookedCataM :: (Traversable f, Monad m) => (f (Fix f) -> m a -> m a) -> AlgebraM m f a -> Fix f -> m a
+hookedCataM hook f (In v) = hook v $ mapM (hookedCataM hook f) v >>= f
+
 type RAlgebra f a = Fix f -> f a -> a
 
 para :: Functor f => RAlgebra f a -> Fix f -> a

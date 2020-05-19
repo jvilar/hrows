@@ -7,6 +7,7 @@ module Model.RowStore (
              , changed
              , names
              , fnames
+             , getDataSources
              , row
              , rows
              , nFields

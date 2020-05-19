@@ -16,6 +16,7 @@ mainRst = emptyConf "main" conf & addRowStore childRst
   where conf = RowStoreConf [
                  FieldConf (Just "first") TypeInt Nothing
                , FieldConf (Just "second") TypeInt Nothing
+               , FieldConf (Just "third") TypeString Nothing
                ]
 
 
@@ -32,11 +33,14 @@ shouldBeI = shouldBeF
 childRst :: RowStore
 childRst = emptyConf "child" conf & ins "one" 1 & ins "two" 2
   where conf = RowStoreConf [
-                 FieldConf (Just "name") TypeString Nothing
+                 FieldConf (Just "initial") TypeString Nothing
+               , FieldConf (Just "name") TypeString Nothing
                , FieldConf (Just "value") TypeInt Nothing
+               , FieldConf (Just "other") TypeInt Nothing
                ]
         ins :: Text -> Int -> RowStore -> RowStore 
-        ins n v rst = addRow rst [toField n, toField v]
+        ins n v rst = addRow rst [toField ("Initial" :: Text),
+                                  toField n, toField v, toField ("Other" :: Text)]
 
 
 
@@ -67,22 +71,41 @@ testAbsolutePositions = describe "Test absolute positions" $
                        evalNoNames [1, 2, 3] "$1 + $2" `shouldBeI` 3
 
 evalNames :: [Int] -> RowStore -> Text -> Field
-evalNames xs rst = evalInts xs . eliminateNames rst . parse
-
+evalNames xs rst = let
+    fs = map toField xs
+    dss = getDataSources rst
+  in evaluate fs dss . eliminateNames mainRst . parse
 
 testNames :: Spec
 testNames = describe "Test names" $ do
-                        it "Subtracts 2 from 3" $
+                        it "Simple arithmetic with names" $ do
                           evalNames [3, 2] mainRst "first - second" `shouldBeI` 1
-                        it "Divides 6 by 3 (long names)" $
                           evalNames [6, 3] mainRst "@{first} / @{second}" `shouldBeF` (2 :: Double)
+                        it "Checks the substitution of names" $ do
+                          eliminateNames mainRst (parse "first") `shouldBe` mkPosition 0
+                          eliminateNames mainRst (parse "second") `shouldBe` mkPosition 1
+                          eliminateNames mainRst (parse "other @ child <- second <-> value")
+                             `shouldBe` mkFromSource (mkConstant $ toField (0 :: Int))
+                                                     (mkPosition 1)
+                                                     (mkPosition 2)
+                                                     (mkPosition 3)
+                          eliminateNames mainRst (parse "first + value @ child <- \"one\" <-> name")
+                             `shouldBe` mkBinary (BinaryOpInfo (+) "+" 4 TrueAssoc)
+                                                 (mkPosition 0)
+                                                 (mkFromSource (mkConstant $ toField (0 :: Int))
+                                                               (mkConstant $ toField ("one" :: Text))
+                                                               (mkPosition 1)
+                                                               (mkPosition 2)
+                                                 )
+                                                                                                                                    
+                                                                               
 
 testSearch :: Spec
 testSearch = describe "Test search" $ do
-                        it "Adds one plus one" $
-                          evalNames [1, 2] mainRst "first + value @ child <- name <-> \"one\"" `shouldBeI` 2
-                        it "Adds one plus two" $
-                          evalNames [1, 2] mainRst "first + value @ child <- name <-> \"two\"" `shouldBeI` 3
+                        it "Adds ten plus one" $
+                          evalNames [10, 20] mainRst "first + value @ child <- \"one\" <-> name" `shouldBeI` 11
+                        it "Adds ten plus two" $
+                          evalNames [10, 20] mainRst "first + value @ child <- \"two\" <-> name" `shouldBeI` 12
 
 
 testLexer :: Spec
@@ -99,7 +122,7 @@ testParser = describe "Test the parser" $
                                                                                 (mkNamedPosition "name")
                                                                                 (mkNamedPosition "name2")
                                                                                 (mkNamedPosition "value")
-               
+
 
 main:: IO ()
 main = hspec $ do

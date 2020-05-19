@@ -10,6 +10,7 @@
 module Model.Expression.Evaluation ( evaluate
                                    ) where
 
+import Control.Monad(msum)
 import Control.Monad.Reader(Reader, ask, runReader)
 import Data.List(find)
 import qualified Data.Text as T
@@ -20,12 +21,12 @@ import Model.Expression.RecursionSchemas
 import Model.Row
 
 evaluate :: Row -> [DataSource] -> Expression -> Field
-evaluate r rsts exp = runReader (eval exp) (r, rsts)
+evaluate r dss exp = runReader (eval exp) (r, dss)
 
 type Eval = Reader (Row, [DataSource])
 
 eval :: Expression -> Eval Field
-eval = cataM ev
+eval = hookedCataM hook ev
     where
       ev (Position n) = evalIndex n
       ev (NamedPosition name) = return . mkError $ "Expresión con variable: " `T.append` name
@@ -35,8 +36,11 @@ eval = cataM ev
       ev (PrefixBinary info v1 v2) = return $ opPB info v1 v2
       ev (Cast ft v) = return $ convert ft v
       ev (Ternary v1 v2 v3) = return $ ternary v1 v2 v3
-      ev (FromSource si n1 n2 n3) = evalFromSource si n1 n2 n3
+      ev (FromSource si n1 n2 n3) = undefined
       ev (Error m) = return $ mkError m
+
+      hook (FromSource si n1 n2 n3) _ = evalFromSource si n1 n2 n3
+      hook _ v = v
 
 evalIndex :: Int -> Eval Field
 evalIndex n = do
@@ -55,15 +59,21 @@ posEqual _ _ [] = False
 posEqual 0 a (x:_) = a == x
 posEqual n a (_:xs) = posEqual (n-1) a xs
 
-evalFromSource :: Field -> Field -> Field -> Field -> Eval Field
+evalFromSource :: Expression -> Expression -> Expression -> Expression -> Eval Field
 evalFromSource si n1 n2 n3 = do
-    (r, rsts) <- ask
+    source <- toInt <$> eval si
+    v1 <- eval n1
+    (_, dss) <- ask
     let t = do
-                rst <- recover rsts (toInt si) "Fuente errónea"
-                v <- recover r (toInt n1) "Índice de búsqueda erróneo"
-                case find (posEqual (toInt n2) v) rst of 
-                  Nothing -> Left "No encontrado"
-                  Just r -> recover r (toInt n3) "Índice en recuperación erróneo"
+              ds <- recover dss source $ "Fuente errónea: " `T.append` showt source
+              case msum [
+                     if v1 == evaluate row [] n2
+                     then Just $ evaluate row [] n3
+                     else Nothing 
+                     | row <- ds
+                    ] of
+                 Just v -> Right v
+                 Nothing -> Left $ "No encontrado " `T.append` (T.pack $ show v1)    
     return $ case t of
         Right v -> v
         Left e -> mkError e

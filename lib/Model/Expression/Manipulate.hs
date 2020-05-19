@@ -34,10 +34,9 @@ eliminateNames rst (In (FromSource s inr ins gets)) = In $ case identifySource r
 eliminateNames rst n = In (fmap (eliminateNames rst) (out n))
 
 identifySource :: RowStore -> Expression -> Maybe (RowStore, Expression)
-identifySource rst e@(In (Position n)) = Just (getRowStore rst n, e)
 identifySource rst (In (NamedPosition name)) = do
     n <- getRowStoreIndex rst name
-    return (getRowStore rst n, In (Position n))
+    return (getRowStore rst n, mkConstant $ toField n)
 identifySource _ _ = Nothing
 
 

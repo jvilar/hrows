@@ -14,6 +14,7 @@ module Model.RowStore.Base (
                 , addRowStore
                 , getRowStore
                 , getRowStoreIndex
+                , getDataSources
                 , changed
                 , names
                 , fnames
@@ -124,6 +125,10 @@ setNames :: [FieldName] -> RowStore -> RowStore
 setNames l rst = rst { _fieldInfo = zipWith (\i n -> i { _name = Just n }) (_fieldInfo rst) l
                      , _changed = True
                      }
+
+-- |The `DataSource` s of the `RowStore`
+getDataSources :: RowStore -> [DataSource]
+getDataSources = _dataSources
 
 -- |Number of rows of the `RowStore`.
 size :: RowStore -> Int
