@@ -15,6 +15,7 @@ module Model.RowStore.Base (
                 , getRowStore
                 , getRowStoreIndex
                 , getDataSources
+                , getName
                 , changed
                 , names
                 , fnames
@@ -34,6 +35,7 @@ module Model.RowStore.Base (
                 , sortRows
                 , setUnchanged
                 , fieldIndex
+                , setName
                 , setNames
                 , size
                 , types
@@ -84,6 +86,14 @@ data FieldInfo = FieldInfo { _name :: Maybe FieldName
                            , _expression :: Maybe Expression
                            , _formula :: Maybe Formula
                            } deriving Show
+
+-- |The name of the `RowStore`
+getName :: RowStore -> RowStoreName
+getName = _nameRS
+
+-- |Change the name of the `RowStore`
+setName :: RowStoreName -> RowStore -> RowStore
+setName n rst = rst { _nameRS = n } 
 
 -- |Determines the order in which updates must take place when a
 -- `Field` changes

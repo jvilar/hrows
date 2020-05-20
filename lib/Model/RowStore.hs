@@ -7,6 +7,7 @@ module Model.RowStore (
              , changed
              , names
              , fnames
+             , getName
              , getDataSources
              , row
              , rows
@@ -21,13 +22,16 @@ module Model.RowStore (
              , fieldValues
              , nextPos
              -- **Updating
+             , setName
              , sortRows
              , setUnchanged
+             -- * Types
              , FieldName
              , RowStore
              , RowStoreName
              , RowPos
              , SortDirection(..)
+             -- *Modules
              , module Model.Field
              , module Model.Expression
              , module Model.RowStore.Update

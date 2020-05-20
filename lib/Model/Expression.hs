@@ -199,6 +199,8 @@ addCast ft exp@(In (Cast ft' e)) | ft == ft' = exp
                                  | otherwise = In (Cast ft e)
 addCast ft exp = In (Cast ft exp)
 
+-- |The positions referenced in the expression. They are sorted, without repetions and
+--  only include those positions that refer to the current row, not to other data sources.
 getPositions :: Expression -> [Int]
 getPositions = cata gp
     where
@@ -210,6 +212,7 @@ getPositions = cata gp
         gp (PrefixBinary _ ps1 ps2) = merge ps1 ps2
         gp (Cast _ ps) = ps
         gp (Ternary ps1 ps2 ps3) = ps1 `merge` ps2 `merge` ps3
+        gp (FromSource _ ps _ _) = ps
         gp (Error _) = []
 
 merge :: [Int] -> [Int] -> [Int]

@@ -14,6 +14,7 @@ import Control.Monad(when)
 import Data.Text(Text)
 import qualified Data.Text as T
 import GI.Gtk hiding (MessageDialog)
+import System.FilePath(takeFileName)
 
 import GUI.Command
 import GUI.Control
@@ -91,7 +92,10 @@ showIteration (SearchField fpos initial l) = dialogCall (searchField fpos initia
                                              (. MoveToValue fpos) . sendInput
 showIteration (CopyOtherField fpos initial l) = dialogCall (copyOther fpos initial l)
                                                 (\control t -> setTextField fpos t $ mainWindow control)
-showIteration AskAddSource = dialogCall askImportFrom $ (. uncurry AddSourceFromFileName) . sendInput
+showIteration AskAddSource = dialogCall askImportFrom $ 
+                                                \control (fp, c) -> let
+                                                      name = T.pack $ takeFileName fp
+                                                    in sendInput control $ AddSourceFromFileName name fp c
 showIteration it = unimplemented (T.pack $ show it)
 
 

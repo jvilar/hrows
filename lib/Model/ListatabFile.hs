@@ -23,7 +23,6 @@ import qualified Text.Megaparsec as TM
 import HRowsException
 import Model.Row
 import Model.RowStore
-import Model.RowStore.Update
 import Model.RowStoreConf
 import Model.SourceInfo
 
