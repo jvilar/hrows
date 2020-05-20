@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+import Data.Function((&))
 import Data.Text(Text)
 import Test.Hspec
 
@@ -21,8 +22,6 @@ mainRst = emptyConf "main" conf & addRowStore childRst
 
 
 -- Convenience functions
-(&) = flip id
-
 shouldBeF :: ToField f => Field -> f -> Expectation
 shouldBeF l r = l `shouldBe` toField r
 
