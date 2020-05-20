@@ -26,21 +26,19 @@ evaluate r dss exp = runReader (eval exp) (r, dss)
 type Eval = Reader (Row, [DataSource])
 
 eval :: Expression -> Eval Field
-eval = hookedCataM hook ev
+eval = para ev
     where
-      ev (Position n) = evalIndex n
-      ev (NamedPosition name) = return . mkError $ "Expresión con variable: " `T.append` name
-      ev (Constant f) = return f
-      ev (Unary info v) = return $ opU info v
-      ev (Binary info v1 v2) = return $ opB info v1 v2
-      ev (PrefixBinary info v1 v2) = return $ opPB info v1 v2
-      ev (Cast ft v) = return $ convert ft v
-      ev (Ternary v1 v2 v3) = return $ ternary v1 v2 v3
-      ev (FromSource si n1 n2 n3) = undefined
-      ev (Error m) = return $ mkError m
-
-      hook (FromSource si n1 n2 n3) _ = evalFromSource si n1 n2 n3
-      hook _ v = v
+      ev :: RAlgebra Node (Eval Field)
+      ev _ (Position n) = evalIndex n
+      ev _ (NamedPosition name) = return . mkError $ "Expresión con variable: " `T.append` name
+      ev _ (Constant f) = return f
+      ev _ (Unary info v) = opU info <$> v
+      ev _ (Binary info v1 v2) = opB info <$> v1 <*> v2
+      ev _ (PrefixBinary info v1 v2) = opPB info <$> v1 <*> v2
+      ev _ (Cast ft v) = convert ft <$> v
+      ev _ (Ternary v1 v2 v3) = ternary <$> v1 <*> v2 <*> v3
+      ev (In (FromSource si n1 n2 n3)) _ =  evalFromSource si n1 n2 n3
+      ev _ (Error m) = return $ mkError m
 
 evalIndex :: Int -> Eval Field
 evalIndex n = do
