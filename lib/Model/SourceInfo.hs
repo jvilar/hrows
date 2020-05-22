@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Model.SourceInfo ( SourceInfo(..)
                         , FormatInfo(..)
                         , FormatInfoClass(..)
@@ -10,18 +12,30 @@ module Model.SourceInfo ( SourceInfo(..)
                         ) where
 
 import Model.ListatabInfo
+import GHC.Generics (Generic)
+import Data.Aeson (defaultOptions, genericToEncoding, FromJSON, ToJSON(..))
 
 -- |The information about the source of the model. It contains
 -- the possible file path and the options related to te format.
 data SourceInfo = SourceInfo { siFilePath :: Maybe FilePath
                              , siConfFile :: Maybe FilePath
                              , siFormat :: FormatInfo
-                             } deriving Show
+                             } deriving (Generic, Show)
+
+instance ToJSON SourceInfo where
+  toEncoding = genericToEncoding defaultOptions
+  
+instance FromJSON SourceInfo
 
 -- |The information about the format of the model.
 data FormatInfo = NoFormatInfo
                 | ListatabFormat ListatabInfo
-                deriving Show
+                deriving (Generic, Show)
+                
+instance ToJSON FormatInfo where
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON FormatInfo
 
 changeFileName :: FilePath -> SourceInfo -> SourceInfo
 changeFileName p s = s { siFilePath = Just p }

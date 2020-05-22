@@ -5,8 +5,8 @@ module Model.RowStore.Update (
   , addRow
   , addEmptyRow
   , deleteRow
-  , empty
   , emptyConf
+  , emptyName
   , fromRows
   , fromRowsNames
   , fromRowsConf
@@ -87,10 +87,11 @@ deleteRow pos m = m { _rows = IM.mapKeys f (_rows m)
 
 -- |An empty `RowStore` that has a configuration.
 emptyConf :: RowStoreName -> RowStoreConf -> RowStore
-emptyConf n (RowStoreConf fcs) = addPlan (empty n) { _fieldInfo = map fromConf fcs
-                                                   , _nFields = length fcs
-                                                   }
-                                                   
+emptyConf n conf = addPlan (emptyName n) { _fieldInfo = map fromConf fcs
+                                     , _nFields = length fcs
+                                     }
+                              where fcs = fieldConf conf
+
 -- |Transforms the `FieldConf` into `FieldInfo`.
 fromConf :: FieldConf -> FieldInfo
 fromConf cnf = FieldInfo { _name = nameFC cnf
@@ -100,25 +101,25 @@ fromConf cnf = FieldInfo { _name = nameFC cnf
                          , _formula = formulaFC cnf
                          }
 
--- |An empty `RowStore`.
-empty :: RowStoreName -> RowStore
-empty name = RowStore { _nameRS = name
-                      , _rows = IM.empty
-                      , _dataSources = []
-                      , _rowStores = []
-                      , _fieldInfo = []
-                      , _updatePlan = mkUpdatePlan []
-                      , _nFields = 0
-                      , _size = 0
-                      , _changed = False
-                      }
+-- |An empty `RowStore` with a name.
+emptyName :: RowStoreName -> RowStore
+emptyName name = RowStore { _nameRS = name
+                          , _rows = IM.empty
+                          , _dataSources = []
+                          , _rowStores = []
+                          , _fieldInfo = []
+                          , _updatePlan = mkUpdatePlan []
+                          , _nFields = 0
+                          , _size = 0
+                          , _changed = False
+                          }
 
 -- |Creates a `RowStore` from a list of `Row`s.
 fromRows :: RowStoreName -> [Row] -> RowStore
 fromRows name rs = let
     infos = foldl' combine [] rs
     combine xs r = xs ++ map inferInfo (drop (length xs) r)
-    rst = addPlan (empty name) { _nFields = length infos
+    rst = addPlan (emptyName name) { _nFields = length infos
                                , _fieldInfo = infos
                                }
     in (foldl' addRow rst rs) { _changed = False }

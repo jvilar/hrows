@@ -55,10 +55,15 @@ applyCommand (ImportFromFileName t fp separator) _ _ = do
         Right rst -> sendInputM $ ChooseImportDialog t rst
         Left (HRowsException m) -> message $ ErrorMessage m
 
-applyCommand (AddSourceFromFileName name fp separator) _ _  = do
-    r <- liftIO . try $ fromListatab def { ltInputSeparator = separator } fp Nothing
+applyCommand (AddSourceFromSourceInfo name si) _ _  = do
+    let ltformat = case siFormat si of
+                      ListatabFormat f -> f
+                      NoFormatInfo -> def
+        Just fp = siFilePath si
+        -- TODO: add reading of the configuration file
+    r <- liftIO . try $ fromListatab ltformat fp Nothing
     case r of
-        Right rst -> sendInputM . AddNewSource $ setName name rst
+        Right rst -> sendInputM . AddNewSource si $ setName name rst
         Left (HRowsException m) -> message $ ErrorMessage m
 
 applyCommand WriteBackup model info = do

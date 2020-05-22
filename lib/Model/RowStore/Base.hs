@@ -155,7 +155,7 @@ toConf inf = FieldConf { nameFC = _name inf
 
 -- |Get the current configuration.
 getConf :: RowStore -> RowStoreConf
-getConf = RowStoreConf . map toConf . _fieldInfo
+getConf = fromFieldConf . map toConf . _fieldInfo
 
 
 -- |Returns one row of the `RowStore`.

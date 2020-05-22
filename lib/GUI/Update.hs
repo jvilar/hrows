@@ -24,6 +24,7 @@ import GUI.MainWindow.Update (setTextField, showFields, disableTextViews)
 import GUI.ListingWindow hiding (window)
 import GUI.ListingWindow.Update (showFullListing, showFieldsRow)
 import GUI.View
+import Model.SourceInfo (FormatInfo(..), HeaderType(..), ListatabInfo(..), SourceInfo(..))
 import Presenter.ImportType
 import Presenter.Input
 
@@ -95,7 +96,18 @@ showIteration (CopyOtherField fpos initial l) = dialogCall (copyOther fpos initi
 showIteration AskAddSource = dialogCall askImportFrom $ 
                                                 \control (fp, c) -> let
                                                       name = T.pack $ takeFileName fp
-                                                    in sendInput control $ AddSourceFromFileName name fp c
+                                                      lti = ListatabInfo {
+                                                              ltInputSeparator = c
+                                                              , ltOutputSeparator = c
+                                                              , ltHeaderType = Comment
+                                                            }
+                                                      si = SourceInfo {
+                                                               siFilePath = Just fp
+                                                               -- TODO: retrieve configuration file
+                                                               , siConfFile = Nothing
+                                                               , siFormat = ListatabFormat lti
+                                                           }
+                                                    in sendInput control $ AddSourceFromSourceInfo name si
 showIteration it = unimplemented (T.pack $ show it)
 
 

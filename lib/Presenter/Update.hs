@@ -9,6 +9,7 @@ module Presenter.Update (
 import Data.Text(Text)
 
 import Model
+import Model.SourceInfo (SourceInfo)
 
 data UpdateCommand = UpdateField FieldPos Field
                    | ChangeModel Model
@@ -25,7 +26,7 @@ data UpdateCommand = UpdateField FieldPos Field
                    | ChangeFieldType FieldType FieldPos
                    | ChangeFieldFormula (Maybe Formula) FieldPos
                    | SetUnchanged
-                   | AddNewSource RowStore 
+                   | AddNewSource SourceInfo RowStore 
                    | Undo
                    | Redo
                    | BlockUndo

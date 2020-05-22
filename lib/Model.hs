@@ -5,8 +5,8 @@ module Model (
               Model
               , ModelChanged
               -- *Functions
-              , setStore
               , empty
+              , setStore
               , from
               , (<@)
               , inside
@@ -16,22 +16,23 @@ module Model (
               , module Model.RowStore
 ) where
 
-import Model.RowStore hiding (empty)
+import Model.Empty
+import Model.RowStore
+import Model.SourceInfo
 import qualified Model.RowStore.Update as RS
 
 -- |A `Model` contains a `RowStore` with the data of the application
 -- and a list of `Source`.
 data Model = Model { _rowStore :: RowStore
-                   , _sources :: [RowStore]
+                   , _sources :: [SourceInfo]
                    } deriving Show
                    
 -- |Change the `RowStore` of the model
 setStore :: RowStore -> Model -> Model
 setStore rst m = m { _rowStore = rst } 
-                   
--- |An empty `Model`
-empty :: Model
-empty = fromRowStore (RS.empty "vacía")
+
+instance Empty Model where
+    empty = fromRowStore $ emptyName "vacía"
 
 -- |An alias of `Bool` to indicate if the model has changed
 type ModelChanged = Bool
@@ -53,8 +54,8 @@ inside :: (RowStore -> RowStore) -> Model -> Model
 inside f m = setStore (f $ _rowStore m) m
 
 -- |Adds a new source to the `Model`
-addSource :: RowStore -> Model -> Model
-addSource rst m = m {
-                      _rowStore = addRowStore rst $ _rowStore m 
-                      , _sources = rst : _sources m
-                    }
+addSource :: SourceInfo -> RowStore -> Model -> Model
+addSource si rst m = m {
+                         _rowStore = addRowStore rst $ _rowStore m 
+                         , _sources = si : _sources m
+                       }
