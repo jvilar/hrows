@@ -71,7 +71,7 @@ showIteration AskCreateField = dialogCall askCreateField $
 showIteration (AskDeleteFields fs) = dialogCall (askDeleteFields fs) $
                                      (. DeleteFields) . sendInput
 showIteration (AskImportFrom t) = dialogCall askImportFrom $
-                (. uncurry (ImportFromFileName t)) . sendInput
+                                    \control -> sendInput control . ImportFromFile t . uncurry sourceInfoFromDialogResult
 showIteration (AskImportOptions t ifs cfs rst) = dialogCall (askImportOptions t ifs cfs)
    (\control (keys, values) -> sendInput control $ case t of
                               ImportFields -> ImportFieldsFromRowStore rst keys values
@@ -96,20 +96,25 @@ showIteration (CopyOtherField fpos initial l) = dialogCall (copyOther fpos initi
 showIteration AskAddSource = dialogCall askImportFrom $ 
                                                 \control (fp, c) -> let
                                                       name = T.pack $ takeFileName fp
-                                                      lti = ListatabInfo {
-                                                              ltInputSeparator = c
-                                                              , ltOutputSeparator = c
-                                                              , ltHeaderType = Comment
-                                                            }
-                                                      si = SourceInfo {
-                                                               siFilePath = Just fp
-                                                               -- TODO: retrieve configuration file
-                                                               , siConfFile = Nothing
-                                                               , siFormat = ListatabFormat lti
-                                                           }
+                                                      si = sourceInfoFromDialogResult fp c
                                                     in sendInput control $ AddSourceFromSourceInfo name si
 showIteration it = unimplemented (T.pack $ show it)
 
 
 unimplemented :: Text -> GUIControl -> IO ()
 unimplemented func control = sendInput control . MessageDialog . ErrorMessage $ T.concat ["Función ", func, " no implementada"]
+
+sourceInfoFromDialogResult :: FilePath -> Char -> SourceInfo
+sourceInfoFromDialogResult fp c = let
+  lti = ListatabInfo {
+          ltInputSeparator = c
+          , ltOutputSeparator = c
+          , ltHeaderType = Comment
+        }
+  in SourceInfo {
+           siFilePath = Just fp
+           -- TODO: retrieve configuration file
+           , siConfFile = Nothing
+           , siFormat = ListatabFormat lti
+       }
+  

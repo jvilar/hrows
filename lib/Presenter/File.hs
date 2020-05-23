@@ -11,7 +11,7 @@ data FileCommand = LoadFile
                  | LoadFileFromName FilePath (Maybe FilePath)
                  | WriteFile
                  | WriteFileFromName FilePath (Maybe FilePath)
-                 | ImportFromFileName ImportType FilePath Char
+                 | ImportFromFile ImportType SourceInfo
                  | AddSourceFromSourceInfo RowStoreName SourceInfo
                  | WriteBackup
                  | BackupOnExit

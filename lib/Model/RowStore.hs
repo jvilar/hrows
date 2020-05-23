@@ -21,6 +21,9 @@ module Model.RowStore (
              , fieldType
              , fieldValues
              , nextPos
+             -- ** IO
+             , readRowStore
+             , writeRowStore
              -- **Updating
              , setName
              , sortRows
@@ -38,14 +41,7 @@ module Model.RowStore (
 ) where
 
 import Model.RowStore.Base
+import Model.RowStore.IO
 import Model.RowStore.Update
 import Model.Field
 import Model.Expression
-
-
-
-
-
-
-
-

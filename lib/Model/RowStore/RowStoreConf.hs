@@ -1,9 +1,9 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Model.RowStoreConf ( RowStoreConf(..)
-                          , FieldConf(..)
-                          , fromFieldConf
-                          ) where
+module Model.RowStore.RowStoreConf ( RowStoreConf(..)
+                                   , FieldConf(..)
+                                   , fromFieldConf
+                                   ) where
 
 import Data.Aeson
 import Data.Text(Text)

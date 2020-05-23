@@ -1,9 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Model.ListatabFile (
+module Model.RowStore.ListatabFile (
    -- *Functions
    fromListatab,
-   toListatab
+   toListatab,
+   -- *Reexported
+   module Model.RowStore.ListatabInfo
 ) where
 
 import Control.Exception (displayException, IOException, try, throwIO)
@@ -21,10 +23,12 @@ import Text.Megaparsec.Char(char)
 import qualified Text.Megaparsec as TM
 
 import HRowsException
+import Model.Field
 import Model.Row
-import Model.RowStore
-import Model.RowStoreConf
-import Model.SourceInfo
+import Model.RowStore.Base
+import Model.RowStore.ListatabInfo
+import Model.RowStore.RowStoreConf
+import Model.RowStore.Update
 
 -- Auxiliary function to help creating the exceptions from string
 hRowsException :: String -> HRowsException

@@ -15,6 +15,7 @@ import Prelude hiding((.), id)
 
 import GUI.Command
 import Model
+import Model.Empty
 import Model.SourceInfo
 import Presenter.Auto
 import Presenter.Input
@@ -108,7 +109,7 @@ getControls _ = Nothing
 
 processSourceCommands :: PresenterAuto Input SourceInfo
 processSourceCommands = emitJusts getSources >>> holdWith_ si0 . perBlip (sourceAuto si0)
-                        where si0 = emptySourceInfo
+                        where si0 = empty
 
 getSources :: Input -> Maybe SourceCommand
 getSources (InputSource cmd) = Just cmd

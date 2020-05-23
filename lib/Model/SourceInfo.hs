@@ -7,11 +7,11 @@ module Model.SourceInfo ( SourceInfo(..)
                         , changeConfFileName
                         , changeFormatInfo
                         , mkSourceInfo
-                        , emptySourceInfo
-                        , module Model.ListatabInfo
+                        , module Model.RowStore.ListatabInfo
                         ) where
 
-import Model.ListatabInfo
+import Model.Empty
+import Model.RowStore.ListatabInfo
 import GHC.Generics (Generic)
 import Data.Aeson (defaultOptions, genericToEncoding, FromJSON, ToJSON(..))
 
@@ -21,6 +21,9 @@ data SourceInfo = SourceInfo { siFilePath :: Maybe FilePath
                              , siConfFile :: Maybe FilePath
                              , siFormat :: FormatInfo
                              } deriving (Generic, Show)
+
+instance Empty SourceInfo where
+  empty = mkSourceInfo Nothing Nothing ()
 
 instance ToJSON SourceInfo where
   toEncoding = genericToEncoding defaultOptions
@@ -48,9 +51,6 @@ changeFormatInfo f s = s { siFormat = f }
 
 mkSourceInfo :: FormatInfoClass i => Maybe FilePath -> Maybe FilePath -> i -> SourceInfo
 mkSourceInfo p o = SourceInfo p o . toFormatInfo
-
-emptySourceInfo :: SourceInfo
-emptySourceInfo = mkSourceInfo Nothing Nothing ()
 
 class FormatInfoClass t where
     toFormatInfo :: t -> FormatInfo

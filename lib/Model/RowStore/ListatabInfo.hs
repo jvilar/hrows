@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Model.ListatabInfo ( ListatabInfo(..)
-                          , HeaderType(..)
-                          ) where
+module Model.RowStore.ListatabInfo ( ListatabInfo(..)
+                                   , HeaderType(..)
+                                   ) where
 
 import Data.Default(Default(..))
 import GHC.Generics (Generic)

@@ -53,7 +53,7 @@ import TextShow(TextShow(showt))
 
 import Model.Expression
 import Model.Row
-import Model.RowStoreConf
+import Model.RowStore.RowStoreConf
 
 -- |The position of a `Row`.
 type RowPos = Int

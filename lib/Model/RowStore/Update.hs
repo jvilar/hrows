@@ -38,7 +38,7 @@ import Model.Expression.Manipulate
 import Model.Expression.Parser
 import Model.Row
 import Model.RowStore.Base
-import Model.RowStoreConf
+import Model.RowStore.RowStoreConf
 import Model.RowStore.UpdatePlan
 
 updateAll :: UpdatePlan -> [DataSource] -> Row -> Row
