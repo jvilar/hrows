@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Model.RowStore.ListatabFile (
    -- *Functions
@@ -10,7 +11,6 @@ module Model.RowStore.ListatabFile (
 
 import Control.Exception (displayException, IOException, try, throwIO)
 import qualified Data.ByteString.Lazy as BS
-import Data.Aeson(decode)
 import Data.Aeson.Encode.Pretty(encodePretty)
 import Data.List(intercalate)
 import Data.Text(Text)
@@ -27,65 +27,41 @@ import Model.Field
 import Model.Row
 import Model.RowStore.Base
 import Model.RowStore.ListatabInfo
-import Model.RowStore.RowStoreConf
-import Model.RowStore.Update
 
--- Auxiliary function to help creating the exceptions from string
-hRowsException :: String -> HRowsException
-hRowsException = HRowsException . T.pack
+-- |Reads a listatab file. Returns (possibly) the list of names and the rows.
+fromListatab :: ListatabInfo -> FilePath -> IO (Maybe [Text], DataSource)
+fromListatab ltInfo fp = do
+  text <- readText fp
+  case parse (analyze ltInfo) fp text of
+     Right r -> return r
+     Left e -> throwIO $ hRowsException $
+                   "Error reading file " ++ fp ++ ":\n"
+                    ++ errorBundlePretty e
 
--- |Creates a `RowStore` from a listatab file.
-fromListatab :: ListatabInfo -> FilePath -> Maybe FilePath -> IO RowStore
-fromListatab info fp mconf = do
-  conf <- case mconf of
-             Nothing -> return Nothing
-             Just fp -> do
-                 mf <- try $ do
-                               l <- BS.readFile fp
-                               if BS.length l > 0
-                                   then return l
-                                   else throwIO $ hRowsException $ "Empty config file: " ++ fp
-                 case mf of
-                     Right s -> case decode s of
-                                    Nothing -> throwIO $ hRowsException $ "Bad config file: " ++ fp
-                                    Just c -> return $ Just c
-                     Left e -> exception e
-  mr <- try $ do
-             l <- T.readFile fp
-             if T.length l > 0
-                 then return l
-                 else throwIO $ hRowsException $ "Empty rows file: " ++ fp
-  rows <- case mr of
-              Right r -> return r
-              Left e -> exception e
-  case parse (analyze (T.pack fp) (ltInputSeparator info) conf) fp rows of
-      Right m -> return m
-      Left e -> throwIO $ hRowsException $
-                       "Error reading file " ++ fp ++ ":\n"
-                        ++ errorBundlePretty e
-
-exception :: IOException -> IO a
-exception e = throwIO $ hRowsException $ "Exception: " ++ displayException e
+readText :: FilePath -> IO Text
+readText fp = try (T.readFile fp) >>= \case
+      Right l -> return l
+      Left e -> exception e
 
 type Parser = Parsec Void Text
 
-analyze :: RowStoreName -> Char -> Maybe RowStoreConf -> Parser RowStore
-analyze n sep mconf = do
-  h <-  optional $
-          between (char '#') (char '\n')
-                    ( many ( between (char '<')
-                                     (char '>')
-                                     $ many (noneOf (">":: String))
-                           )
-                    )
+analyze :: ListatabInfo -> Parser (Maybe [Text], DataSource)
+analyze ltInfo = do
+  let sep = ltInputSeparator ltInfo
+  h <- case ltHeaderType ltInfo of
+          NoHeader -> return Nothing
+          FirstLine -> Just <$> sepBy (stringParser sep) (char sep)
+          Comment -> optional $
+                         between (char '#') (char '\n')
+                                   ( many ( T.pack <$> between (char '<')
+                                                    (char '>')
+                                                    (many $ noneOf (">":: String))
+                                          )
+                                   )
   rs <- flip endBy (char '\n') $
           flip sepBy (char sep)
             (toField <$> stringParser sep)
-  return $ case mconf of
-                  Nothing -> case h of
-                                 Nothing -> fromRows n rs
-                                 Just names -> fromRowsNames n (map T.pack names) rs
-                  Just cnf -> fromRowsConf n cnf rs
+  return (h, rs)
 
 stringParser :: Char -> Parser Text
 stringParser sep = T.pack <$> ((char '"' *> (many inStringChar <* char '"'))
