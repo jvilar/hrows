@@ -3,15 +3,13 @@
 
 module Model.RowStore.ListatabFile (
    -- *Functions
-   fromListatab,
-   toListatab,
+   readListatab,
+   writeListatab,
    -- *Reexported
    module Model.RowStore.ListatabInfo
 ) where
 
-import Control.Exception (displayException, IOException, try, throwIO)
-import qualified Data.ByteString.Lazy as BS
-import Data.Aeson.Encode.Pretty(encodePretty)
+import Control.Exception (try, throwIO)
 import Data.List(intercalate)
 import Data.Text(Text)
 import qualified Data.Text as T
@@ -25,12 +23,11 @@ import qualified Text.Megaparsec as TM
 import HRowsException
 import Model.Field
 import Model.Row
-import Model.RowStore.Base
 import Model.RowStore.ListatabInfo
 
 -- |Reads a listatab file. Returns (possibly) the list of names and the rows.
-fromListatab :: ListatabInfo -> FilePath -> IO (Maybe [Text], DataSource)
-fromListatab ltInfo fp = do
+readListatab :: ListatabInfo -> FilePath -> IO (Maybe [Text], DataSource)
+readListatab ltInfo fp = do
   text <- readText fp
   case parse (analyze ltInfo) fp text of
      Right r -> return r
@@ -74,30 +71,28 @@ stringParser sep = T.pack <$> ((char '"' *> (many inStringChar <* char '"'))
                          <|> noneOf ("\n\"" :: String)
 
 -- |Writes a `RowStore` to a listatab file.
-toListatab :: ListatabInfo -> FilePath -> Maybe FilePath -> RowStore -> IO ()
-toListatab info fp mconf model = do
+-- |Writes a `DataSource` to a listatab file.
+writeListatab :: ListatabInfo -> FilePath -> Maybe [Text] -> DataSource -> IO ()
+writeListatab info fp mNames ds = do
+    let sep = ltOutputSeparator info
     mh <- try (openFile fp WriteMode)
     case mh of
         Right h -> do
-                     case names model of
+                     case mNames of
                         Nothing -> return ()
                         Just ns -> case ltHeaderType info of
                                      NoHeader -> return ()
-                                     FirstLine -> T.hPutStrLn h $ T.intercalate (T.singleton $ ltOutputSeparator info) ns
+                                     FirstLine -> writeSeparated sep h ns
                                      Comment -> T.hPutStrLn h $ T.concat ["#<", T.intercalate "><" ns, ">"]
-                     mapM_ (writeRow (ltOutputSeparator info) h) $ rows model
+                     mapM_ (writeRow sep h) ds
                      hClose h
         Left e -> exception e
-    case mconf of
-        Nothing -> return ()
-        Just conf -> do
-            r <- try (BS.writeFile conf . encodePretty $ getConf model)
-            case r of
-                Right () -> return ()
-                Left e -> exception e
 
 writeRow :: Char -> Handle -> Row -> IO ()
-writeRow sep h = hPutStrLn h . intercalate [sep] . map (encodeString sep . T.unpack . toString)
+writeRow sep h = writeSeparated sep h . map toString
+
+writeSeparated :: Char -> Handle -> [Text] -> IO ()
+writeSeparated sep h = hPutStrLn h . intercalate [sep] . map (encodeString sep . T.unpack)
 
 encodeString :: Char -> String -> String
 encodeString sep s = case preprocess s of

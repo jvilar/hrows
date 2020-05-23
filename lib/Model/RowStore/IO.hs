@@ -7,6 +7,7 @@ module Model.RowStore.IO (
 
 import Control.Exception (throwIO, try)
 import Data.Aeson(decode)
+import Data.Aeson.Encode.Pretty(encodePretty)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Text as T
 
@@ -27,7 +28,7 @@ readRowStore (SourceInfo (Just fp) mconfFp (ListatabFormat ltInfo)) = do
                 Just NoFormatInfo -> ltInfo
                 Just (ListatabFormat li) -> li
       fpt = T.pack fp
-  (h, rs) <- fromListatab info fp
+  (h, rs) <- readListatab info fp
   return $ case mconf of
              Nothing -> case h of
                             Nothing -> fromRows fpt rs
@@ -36,8 +37,16 @@ readRowStore (SourceInfo (Just fp) mconfFp (ListatabFormat ltInfo)) = do
 
 -- /Writes a `RowStore` using a `SourceInfo`
 writeRowStore :: SourceInfo -> RowStore -> IO ()
-writeRowStore (SourceInfo Nothing _ _) = const (throwIO $ HRowsException "No puedo escribir si no sé el nombre del fichero")
-writeRowStore (SourceInfo (Just fp) conffp (ListatabFormat ltInfo)) = toListatab ltInfo fp conffp
+writeRowStore (SourceInfo Nothing _ _) _ = throwIO $ HRowsException "No puedo escribir si no sé el nombre del fichero"
+writeRowStore (SourceInfo (Just fp) mconfFp (ListatabFormat ltInfo)) rs = do
+  writeListatab ltInfo fp (names rs) (rows rs)
+  case mconfFp of
+      Nothing -> return ()
+      Just conf -> do
+          r <- try (BS.writeFile conf . encodePretty $ getConf rs)
+          case r of
+              Right () -> return ()
+              Left e -> exception e
 
 
 readConf :: Maybe FilePath -> IO (Maybe RowStoreConf)
