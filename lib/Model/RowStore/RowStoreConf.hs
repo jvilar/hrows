@@ -3,6 +3,7 @@
 module Model.RowStore.RowStoreConf ( RowStoreConf(..)
                                    , FieldConf(..)
                                    , fromFieldConf
+                                   , setSourceInfos
                                    ) where
 
 import Data.Aeson
@@ -29,6 +30,9 @@ data FieldConf = FieldConf { nameFC :: Maybe Text
 
 fromFieldConf :: [FieldConf] -> RowStoreConf
 fromFieldConf fc = empty { fieldConf = fc }
+
+setSourceInfos :: [SourceInfo] -> RowStoreConf -> RowStoreConf
+setSourceInfos si cnf = cnf { sourceInfos = si }
 
 instance ToJSON RowStoreConf where
     toEncoding = genericToEncoding defaultOptions

@@ -69,7 +69,7 @@ applyCommand WriteBackup model si = do
     when (isJust fp && changed `from` model) $ do
         let conf = defaultBackupFileName <$> siConfFile si
             si' = changeConfFileName conf $ changeFileName (fromJust fp) si
-        r <- liftIO $ try $ writeRowStore si' <@ model
+        r <- liftIO $ try $ writeRowStore si' (getSourceInfos model) <@ model
         case r of
             Right _ -> return ()
             Left (HRowsException m) -> message $ ErrorMessage ("Error al hacer la copia de seguridad: " `T.append` m)
@@ -85,7 +85,7 @@ applyCommand BackupOnExit model si
 
 doWrite :: Model -> SourceInfo -> Bool -> PresenterM ()
 doWrite model si changedSource = do
-        r <- liftIO $ try $ writeRowStore si <@ model
+        r <- liftIO $ try $ writeRowStore si (getSourceInfos model) <@ model
         case r of
             Right _ -> do
                           message $ InformationMessage "Fichero escrito correctamente."

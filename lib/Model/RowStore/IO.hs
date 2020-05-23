@@ -36,14 +36,14 @@ readRowStore (SourceInfo (Just fp) mconfFp (ListatabFormat ltInfo)) = do
              Just cnf -> fromRowsConf fpt cnf rs
 
 -- /Writes a `RowStore` using a `SourceInfo`
-writeRowStore :: SourceInfo -> RowStore -> IO ()
-writeRowStore (SourceInfo Nothing _ _) _ = throwIO $ HRowsException "No puedo escribir si no sé el nombre del fichero"
-writeRowStore (SourceInfo (Just fp) mconfFp (ListatabFormat ltInfo)) rs = do
+writeRowStore :: SourceInfo -> [SourceInfo] -> RowStore -> IO ()
+writeRowStore (SourceInfo Nothing _ _) _ _ = throwIO $ HRowsException "No puedo escribir si no sé el nombre del fichero"
+writeRowStore (SourceInfo (Just fp) mconfFp (ListatabFormat ltInfo)) sInfos rs = do
   writeListatab ltInfo fp (names rs) (rows rs)
   case mconfFp of
       Nothing -> return ()
       Just conf -> do
-          r <- try (BS.writeFile conf . encodePretty $ getConf rs)
+          r <- try (BS.writeFile conf . encodePretty . setSourceInfos sInfos $ getConf rs)
           case r of
               Right () -> return ()
               Left e -> exception e

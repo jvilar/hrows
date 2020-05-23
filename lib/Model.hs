@@ -12,6 +12,7 @@ module Model (
               , inside
               , fromRowStore
               , addSource
+              , getSourceInfos
               -- *Rexported
               , module Model.RowStore
 ) where
@@ -19,7 +20,6 @@ module Model (
 import Model.Empty
 import Model.RowStore
 import Model.SourceInfo
-import qualified Model.RowStore.Update as RS
 
 -- |A `Model` contains a `RowStore` with the data of the application
 -- and a list of `Source`.
@@ -59,3 +59,7 @@ addSource si rst m = m {
                          _rowStore = addRowStore rst $ _rowStore m 
                          , _sources = si : _sources m
                        }
+
+-- |Get the 'SourceInfo' for the sources
+getSourceInfos :: Model -> [SourceInfo]
+getSourceInfos = _sources
