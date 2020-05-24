@@ -11,7 +11,6 @@ module Model.RowStore.Base (
                 , RowPos
                 , SortDirection(..)
                    -- *Functions
-                , addRowStore
                 , getRowStore
                 , getRowStoreIndex
                 , getDataSources
@@ -102,13 +101,6 @@ data UpdatePlan = UpdatePlan { expressions :: [Maybe Expression]
                              , updateOrder :: [FieldPos]
                              , cycled :: [FieldPos]
                              } deriving Show
-
--- |Adds a `RowStore` to the store
-addRowStore :: RowStore -> RowStore -> RowStore
-addRowStore r rst = rst {
-    _dataSources = rows r : _dataSources rst
-    , _rowStores = r : _rowStores rst
-}
 
 -- |Recovers a `RowStore` from the store
 getRowStore :: RowStore -> Int -> RowStore

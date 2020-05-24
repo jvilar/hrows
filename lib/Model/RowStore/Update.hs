@@ -3,6 +3,7 @@
 module Model.RowStore.Update (
   updateAll
   , addRow
+  , addRowStore
   , addEmptyRow
   , deleteRow
   , emptyConf
@@ -150,6 +151,15 @@ changeField r c field rst = let
        then (rst { _rows = IM.insert r row' (_rows rst), _changed = True }, poss)
        else (rst, [])
 
+-- |Adds a `RowStore` to the store
+addRowStore :: RowStore -> RowStore -> RowStore
+addRowStore r rst = addPlan $ rst {
+    _dataSources = rows r : _dataSources rst
+    , _rowStores = r : _rowStores rst
+  }
+
+-- |Creates an `UpdatePlan` for the `RowStore` and recomputes all the rows. It is
+-- used whenever a changed may potentially change the values of the formulas.
 addPlan :: RowStore -> RowStore
 addPlan rst = let
     exps = map prepare $ _fieldInfo rst

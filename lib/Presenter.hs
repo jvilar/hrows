@@ -9,6 +9,7 @@ module Presenter (
 
 import Control.Arrow(arr, (>>>))
 import Control.Auto(Auto, accum_, accumM_, arrM, delay_, emitJusts, holdWith_, perBlip, stepAuto, id, (.))
+import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Writer.Strict(runWriterT)
 import Data.Either(partitionEithers)
 import Prelude hiding((.), id)
@@ -36,7 +37,7 @@ updater = proc inputs -> do
     rec
         dauto <- delay_ processInput -< auto
         (cmds, auto) <- arrM (uncurry pr) -< (dauto, inputs)
-    arrM putStrLn -< "GUI commands: " ++ show cmds
+    -- arrM putStrLn -< "GUI commands: " ++ show cmds
     id -< cmds
 
 pr :: PresenterAuto Input () -> [Input] -> IO ([GUICommand], PresenterAuto Input ())

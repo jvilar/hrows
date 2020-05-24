@@ -10,6 +10,7 @@ import Data.Aeson(decode)
 import Data.Aeson.Encode.Pretty(encodePretty)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Text as T
+import System.FilePath(takeFileName)
 
 import HRowsException
 import Model.RowStore.Base
@@ -27,13 +28,17 @@ readRowStore (SourceInfo (Just fp) mconfFp (ListatabFormat ltInfo)) = do
                 Nothing -> ltInfo
                 Just NoFormatInfo -> ltInfo
                 Just (ListatabFormat li) -> li
-      fpt = T.pack fp
-  (h, rs) <- readListatab info fp
-  return $ case mconf of
-             Nothing -> case h of
-                            Nothing -> fromRows fpt rs
-                            Just names -> fromRowsNames fpt names rs
-             Just cnf -> fromRowsConf fpt cnf rs
+      name = T.pack $ takeFileName fp
+  (h, ds) <- readListatab info fp
+  case mconf of
+      Nothing -> case h of
+                     Nothing -> return $ fromRows name ds
+                     Just names -> return $ fromRowsNames name names ds
+      Just cnf -> do
+          let rs = fromRowsConf name cnf ds
+          sources <- mapM readRowStore $ sourceInfos cnf
+          return $ foldr addRowStore rs sources
+
 
 -- /Writes a `RowStore` using a `SourceInfo`
 writeRowStore :: SourceInfo -> [SourceInfo] -> RowStore -> IO ()

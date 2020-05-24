@@ -10,16 +10,24 @@ import Model.Expression.Lexer
 import Model.Expression.Parser
 import Model.Expression.Evaluation
 import Model.RowStore
-import Model.RowStoreConf
+import Model.RowStore.RowStoreConf
+import Model.SourceInfo(FormatInfo(..))
 
 mainRst :: RowStore
 mainRst = emptyConf "main" conf & addRowStore childRst
-  where conf = RowStoreConf [
+  where conf = fromFieldConf [
                  FieldConf (Just "first") TypeInt Nothing
                , FieldConf (Just "second") TypeInt Nothing
                , FieldConf (Just "third") TypeString Nothing
                ]
 
+
+formulaRst :: RowStore
+formulaRst = emptyConf "main" conf
+  where conf = fromFieldConf [
+                  FieldConf (Just "first") TypeInt Nothing
+                , FieldConf (Just "formula") TypeString (Just "name @ child <- first <-> value")
+                ]
 
 -- Convenience functions
 shouldBeF :: ToField f => Field -> f -> Expectation
@@ -31,7 +39,7 @@ shouldBeI = shouldBeF
 
 childRst :: RowStore
 childRst = emptyConf "child" conf & ins "one" 1 & ins "two" 2
-  where conf = RowStoreConf [
+  where conf = fromFieldConf [
                  FieldConf (Just "initial") TypeString Nothing
                , FieldConf (Just "name") TypeString Nothing
                , FieldConf (Just "value") TypeInt Nothing
@@ -101,10 +109,13 @@ testNames = describe "Test names" $ do
 
 testSearch :: Spec
 testSearch = describe "Test search" $ do
-                        it "Adds ten plus one" $
+                        it "Simple arithmetic" $ do
                           evalNames [10, 20] mainRst "first + value @ child <- \"one\" <-> name" `shouldBeI` 11
-                        it "Adds ten plus two" $
                           evalNames [10, 20] mainRst "first + value @ child <- \"two\" <-> name" `shouldBeI` 12
+                        it "Adding a source must recompute" $ do
+                          let rst = addRow formulaRst [1, 20]
+                              rst' = addRowStore childRst rst
+                          row 0 rst' !! 1 `shouldBeF` ("one" :: Text)
 
 
 testLexer :: Spec
