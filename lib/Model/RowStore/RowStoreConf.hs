@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Model.RowStore.RowStoreConf ( RowStoreConf(..)
                                    , FieldConf(..)
@@ -8,6 +9,7 @@ module Model.RowStore.RowStoreConf ( RowStoreConf(..)
 
 import Data.Aeson
 import Data.Text(Text)
+import Data.Vector(toList)
 import GHC.Generics
 
 import Model.Empty
@@ -37,7 +39,12 @@ setSourceInfos si cnf = cnf { sourceInfos = si }
 instance ToJSON RowStoreConf where
     toEncoding = genericToEncoding defaultOptions
 
-instance FromJSON RowStoreConf
+instance FromJSON RowStoreConf where
+    parseJSON (Object v) = RowStoreConf
+      <$> v .: "fieldConf"
+      <*> v .: "formatConf"
+      <*> v .: "sourceInfos"
+    parseJSON (Array a) = fromFieldConf <$> mapM parseJSON (toList a)
 
 instance ToJSON FieldConf where
     toEncoding = genericToEncoding defaultOptions

@@ -36,6 +36,7 @@ library:
   - text
   - text-show
   - transformers
+  - vector
 
 executables:
   hrows:
