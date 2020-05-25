@@ -100,12 +100,12 @@ select [] = return ()
 select ((False, _) : ms) = select ms
 select ((True, m) : _) = m
 
-selectChar :: [(Char, Tokenizer a)] -> Tokenizer a -> Tokenizer a
+selectChar :: [(Char, Tokenizer ())] -> Tokenizer () -> Tokenizer ()
 selectChar chars onOther = with peek
     onOther
     (\c -> case find ((== c) .fst) chars of
             Nothing -> onOther
-            Just (_, t) -> t)
+            Just (_, t) -> next >> t)
 
 with :: Tokenizer (Maybe Char) -> Tokenizer a -> (Char -> Tokenizer a) -> Tokenizer a
 with read onNothing onJust = read >>= maybe onNothing onJust
@@ -170,10 +170,10 @@ tokenizer =
 number :: Tokenizer ()
 number = do
     many isDigit
-    ifChar (== '.') afterPoint
-       (ifChar (== 'e') (afterE (IntT . read))
-          (emitl $ IntT . read)
-       )
+    selectChar [ ('.', afterPoint)
+               , ('e', afterE $ IntT . read)
+               ]
+               (emitl $ IntT . read)
 
 afterPoint :: Tokenizer ()
 afterPoint = many1 isDigit
@@ -215,15 +215,13 @@ equal = ifChar (== '=')
            (emit EqualT)
 
 less :: Tokenizer ()
-less = ifChar (== '=')
-           (emit LessOrEqualT)
-           (ifChar(=='-')
-                (ifChar(== '>')
-                     (emit DoubleArrowT)
-                     (emit ArrowT)
-                )
+less = selectChar [ ('=', emit LessOrEqualT)
+                  , ('-', ifChar(== '>')
+                            (emit DoubleArrowT)
+                            (emit ArrowT)
+                    )
+                  ]
                 (emit LessThanT)
-           )
 
 greater :: Tokenizer ()
 greater = ifChar (== '=')
@@ -231,9 +229,10 @@ greater = ifChar (== '=')
            (emit GreaterThanT)
 
 notSign :: Tokenizer ()
-notSign = ifChar (== '=')
-           (emit NotEqualT)
-           (emit NotT)
+notSign = selectChar [ ('=', emit NotEqualT)
+                     , ('?', emit InErrorT)
+                     ]
+                     (emit NotT) 
 
 ampersand :: Tokenizer ()
 ampersand = needChar (== '&') $ emit AndT
