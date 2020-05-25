@@ -63,8 +63,14 @@ executables:
 
 tests:
   expression-test:
-    main: Expression.hs
-    source-dirs: test
+    main: test/Expression.hs
+    dependencies:
+    - hrows
+    - hspec
+    - text
+
+  lexer-test:
+    main: test/Lexer.hs
     dependencies:
     - hrows
     - hspec

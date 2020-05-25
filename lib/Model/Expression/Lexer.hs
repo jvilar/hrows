@@ -8,6 +8,7 @@ import Control.Monad(void, when)
 import Control.Monad.State.Strict(evalStateT, get, gets, StateT, modify, put)
 import Control.Monad.Writer(execWriter, tell, Writer)
 import Data.Char(isAlpha, isAlphaNum, isDigit, isSpace)
+import Data.List(find)
 import Data.Text(Text)
 import qualified Data.Text as T
 
@@ -99,6 +100,13 @@ select [] = return ()
 select ((False, _) : ms) = select ms
 select ((True, m) : _) = m
 
+selectChar :: [(Char, Tokenizer a)] -> Tokenizer a -> Tokenizer a
+selectChar chars onOther = with peek
+    onOther
+    (\c -> case find ((== c) .fst) chars of
+            Nothing -> onOther
+            Just (_, t) -> t)
+
 with :: Tokenizer (Maybe Char) -> Tokenizer a -> (Char -> Tokenizer a) -> Tokenizer a
 with read onNothing onJust = read >>= maybe onNothing onJust
 
@@ -169,7 +177,7 @@ number = do
 
 afterPoint :: Tokenizer ()
 afterPoint = many1 isDigit
-                   (emitl ErrorT)
+                   (pop >> emitl (IntT . read))
                    (ifChar (== 'e')
                        (afterE (DoubleT . read))
                        (emitl $ DoubleT . read)
