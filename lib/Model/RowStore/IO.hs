@@ -19,8 +19,8 @@ import Model.RowStore.RowStoreConf
 import Model.RowStore.Update
 import Model.SourceInfo
 
--- |Reads a `RowStore` using a `SourceInfo`
-readRowStore :: SourceInfo -> IO RowStore
+-- |Reads a `RowStore` and its `RowStoreConf`(if any) using a `SourceInfo`
+readRowStore :: SourceInfo -> IO (RowStore, Maybe RowStoreConf)
 readRowStore (SourceInfo Nothing _ _) = throwIO $ HRowsException "No puedo cargar un fichero vacío"
 readRowStore (SourceInfo (Just fp) mconfFp (ListatabFormat ltInfo)) = do
   mconf <- readConf mconfFp
@@ -30,14 +30,15 @@ readRowStore (SourceInfo (Just fp) mconfFp (ListatabFormat ltInfo)) = do
                 Just (ListatabFormat li) -> li
       name = T.pack $ takeFileName fp
   (h, ds) <- readListatab info fp
-  case mconf of
+  rst <- case mconf of
       Nothing -> case h of
                      Nothing -> return $ fromRows name ds
                      Just names -> return $ fromRowsNames name names ds
       Just cnf -> do
           let rs = fromRowsConf name cnf ds
-          sources <- mapM readRowStore $ sourceInfos cnf
-          return $ foldr addRowStore rs sources
+          sources <- map fst <$> mapM readRowStore (sourceInfos cnf)
+          return $ setUnchanged $ foldr addRowStore rs sources
+  return (rst, mconf)
 
 
 -- /Writes a `RowStore` using a `SourceInfo`

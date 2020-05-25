@@ -19,6 +19,7 @@ import HRowsException
 import Model
 import Model.DefaultFileNames
 import Model.RowStore
+import Model.RowStore.RowStoreConf
 import Model.SourceInfo
 import Presenter.Input
 import Presenter.Auto
@@ -36,8 +37,11 @@ applyCommand :: FileCommand -> Model -> SourceInfo -> PresenterM ()
 applyCommand LoadFile _ si = do
     r <- liftIO $ try $ readRowStore si
     case r of
-        Right rs -> do
-            sendInputM $ ChangeModel $ fromRowStore rs
+        Right (rst, mconf) -> do
+            let model = case mconf of
+                  Nothing -> fromRowStore rst
+                  Just cnf -> foldr addSourceInfo (fromRowStore rst) $ sourceInfos cnf
+            sendInputM $ ChangeModel model
             sendInputM $ SetMainSource si
         Left (HRowsException mess) -> message $ ErrorMessage mess
 
@@ -55,13 +59,13 @@ applyCommand (WriteFileFromName fp conf) model si = let
 applyCommand (ImportFromFile t si) _ _ = do
     r <- liftIO $ try $ readRowStore si
     case r of
-        Right rst -> sendInputM $ ChooseImportDialog t rst
+        Right (rst, _) -> sendInputM $ ChooseImportDialog t rst
         Left (HRowsException m) -> message $ ErrorMessage m
 
 applyCommand (AddSourceFromSourceInfo name si) _ _  = do
     r <- liftIO $ try $ readRowStore si
     case r of
-        Right rst -> sendInputM . AddNewSource si $ setName name rst
+        Right (rst, _) -> sendInputM . AddNewSource si $ setName name rst
         Left (HRowsException m) -> message $ ErrorMessage m
 
 applyCommand WriteBackup model si = do

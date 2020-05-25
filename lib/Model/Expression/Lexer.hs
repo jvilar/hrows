@@ -229,10 +229,9 @@ greater = ifChar (== '=')
            (emit GreaterThanT)
 
 notSign :: Tokenizer ()
-notSign = selectChar [ ('=', emit NotEqualT)
-                     , ('?', emit InErrorT)
-                     ]
-                     (emit NotT) 
+notSign = ifChar (== '=')
+             (emit NotEqualT)
+             (emit NotT) 
 
 ampersand :: Tokenizer ()
 ampersand = needChar (== '&') $ emit AndT

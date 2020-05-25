@@ -8,7 +8,7 @@ module Presenter (
 ) where
 
 import Control.Arrow(arr, (>>>))
-import Control.Auto(Auto, accum_, accumM_, arrM, delay_, emitJusts, holdWith_, perBlip, stepAuto, id, (.))
+import Control.Auto(Auto, arrM, delay_, emitJusts, holdWith_, perBlip, stepAuto, id, (.))
 import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Writer.Strict(runWriterT)
 import Data.Either(partitionEithers)
@@ -16,7 +16,6 @@ import Prelude hiding((.), id)
 
 import GUI.Command
 import Model
-import Model.Empty
 import Model.SourceInfo
 import Presenter.Auto
 import Presenter.Input

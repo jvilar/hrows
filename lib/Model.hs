@@ -12,6 +12,7 @@ module Model (
               , inside
               , fromRowStore
               , addSource
+              , addSourceInfo
               , getSourceInfos
               -- *Rexported
               , module Model.RowStore
@@ -59,6 +60,10 @@ addSource si rst m = m {
                          _rowStore = addRowStore rst $ _rowStore m 
                          , _sources = si : _sources m
                        }
+                       
+-- |Adds a 'SourceInfo' to the 'Model'
+addSourceInfo :: SourceInfo -> Model -> Model
+addSourceInfo si m = m { _sources = si : _sources m }
 
 -- |Get the 'SourceInfo' for the sources
 getSourceInfos :: Model -> [SourceInfo]
