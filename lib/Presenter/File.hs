@@ -5,12 +5,12 @@ module Presenter.File (
 
 import Presenter.ImportType
 import Model.RowStore
-import Model.SourceInfo (SourceInfo)
+import Model.SourceInfo (PathAndConf, SourceInfo)
 
 data FileCommand = LoadFile
-                 | LoadFileFromName FilePath (Maybe FilePath)
+                 | LoadFileFromName PathAndConf
                  | WriteFile
-                 | WriteFileFromName FilePath (Maybe FilePath)
+                 | WriteFileFromName PathAndConf
                  | ImportFromFile ImportType SourceInfo
                  | AddSourceFromSourceInfo RowStoreName SourceInfo
                  | WriteBackup

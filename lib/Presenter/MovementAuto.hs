@@ -30,13 +30,13 @@ move pos (MoveToValue fpos value, model) = checkedMove (const $ nextPos fpos val
 checkedMove :: (RowPos -> RowPos) -> RowPos -> Model -> PresenterM RowPos
 checkedMove f pos model | 0 <= pos' && pos' < sm = do
                               let r = zipWith4 combine (row pos' `from` model) (formulas `from` model) (types `from` model) [0..]
-                                  combine field mformula fieldType index = FieldInfo { indexFI = index
-                                                                                     , textFI = toString field
-                                                                                     , formulaFI = mformula
-                                                                                     , typeFI = fieldType
-                                                                                     , isErrorFI = isError field
-                                                                                     , mustWriteFI = True
-                                                                                     }
+                                  combine field mformula fType index = FieldInfo { indexFI = index
+                                                                                 , textFI = toString field
+                                                                                 , formulaFI = mformula
+                                                                                 , typeFI = fType
+                                                                                 , isErrorFI = isError field
+                                                                                 , mustWriteFI = True
+                                                                                 }
                               sendGUIM $ ShowPosition (pos' + 1) sm
                               sendGUIM $ ShowFields pos' r
                               return pos'

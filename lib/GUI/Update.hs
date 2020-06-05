@@ -24,7 +24,7 @@ import GUI.MainWindow.Update (setTextField, showFields, disableTextViews)
 import GUI.ListingWindow hiding (window)
 import GUI.ListingWindow.Update (showFullListing, showFieldsRow)
 import GUI.View
-import Model.SourceInfo (FormatInfo(..), HeaderType(..), ListatabInfo(..), SourceInfo(..))
+import Model.SourceInfo
 import Presenter.ImportType
 import Presenter.Input
 
@@ -63,9 +63,9 @@ dialogCall dlg action control = dlg (dialogManager control)
 
 showIteration :: Iteration -> GUIControl -> IO ()
 showIteration AskReadFile = dialogCall askReadFile $
-                            (. uncurry LoadFileFromName) . sendInput
+                            (. LoadFileFromName) . sendInput
 showIteration AskWriteFile = dialogCall askWriteFile $
-                             (. uncurry WriteFileFromName) . sendInput
+                             (. WriteFileFromName) . sendInput
 showIteration AskCreateField = dialogCall askCreateField $
                                (. NewFields) . sendInput
 showIteration (AskDeleteFields fs) = dialogCall (askDeleteFields fs) $
@@ -111,10 +111,5 @@ sourceInfoFromDialogResult fp c = let
           , ltOutputSeparator = c
           , ltHeaderType = Comment
         }
-  in SourceInfo {
-           siFilePath = Just fp
-           -- TODO: retrieve configuration file
-           , siConfFile = Nothing
-           , siFormat = ListatabFormat lti
-       }
+  in mkSourceInfo (Just $ PathAndConf fp Nothing) lti
   

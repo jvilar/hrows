@@ -96,10 +96,13 @@ main = do
                 return $ if exFn == exCnf
                          then Just def
                          else Nothing
-  let ltinfo = def { ltInputSeparator = opts ^. inputSeparator,
+  let pc = do
+              fn <- opts ^. inputFileName
+              return $ PathAndConf fn cnf
+      ltinfo = def { ltInputSeparator = opts ^. inputSeparator,
                      ltOutputSeparator = opts ^. outputSeparator
                    }
-      sinfo =  mkSourceInfo (opts ^. inputFileName) cnf ltinfo
+      sinfo =  mkSourceInfo pc ltinfo
 
   inputChan <- newChan
   control <- makeGUI inputChan

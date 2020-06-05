@@ -21,38 +21,42 @@ import Model.SourceInfo
 
 -- |Reads a `RowStore` and its `RowStoreConf`(if any) using a `SourceInfo`
 readRowStore :: SourceInfo -> IO (RowStore, Maybe RowStoreConf)
-readRowStore (SourceInfo Nothing _ _) = throwIO $ HRowsException "No puedo cargar un fichero vacío"
-readRowStore (SourceInfo (Just fp) mconfFp (ListatabFormat ltInfo)) = do
-  mconf <- readConf mconfFp
-  let info = case formatConf <$> mconf of
-                Nothing -> ltInfo
-                Just NoFormatInfo -> ltInfo
-                Just (ListatabFormat li) -> li
-      name = T.pack $ takeFileName fp
-  (h, ds) <- readListatab info fp
-  rst <- case mconf of
-      Nothing -> case h of
-                     Nothing -> return $ fromRows name ds
-                     Just names -> return $ fromRowsNames name names ds
-      Just cnf -> do
-          let rs = fromRowsConf name cnf ds
-          sources <- map fst <$> mapM readRowStore (sourceInfos cnf)
-          return $ setUnchanged $ foldr addRowStore rs sources
-  return (rst, mconf)
+readRowStore si = case siPathAndConf si of
+    Nothing -> throwIO $ HRowsException "No puedo cargar un fichero vacío"
+    Just (PathAndConf fp mconfFp) -> do
+       let ListatabFormat ltInfo = siFormat si
+       mconf <- readConf mconfFp
+       let info = case formatConf <$> mconf of
+                     Nothing -> ltInfo
+                     Just NoFormatInfo -> ltInfo
+                     Just (ListatabFormat li) -> li
+           name = T.pack $ takeFileName fp
+       (h, ds) <- readListatab info fp
+       rst <- case mconf of
+           Nothing -> case h of
+                          Nothing -> return $ fromRows name ds
+                          Just names -> return $ fromRowsNames name names ds
+           Just cnf -> do
+               let rs = fromRowsConf name cnf ds
+               sources <- map fst <$> mapM readRowStore (sourceInfos cnf)
+               return $ setUnchanged $ foldr addRowStore rs sources
+       return (rst, mconf)
 
 
 -- /Writes a `RowStore` using a `SourceInfo`
 writeRowStore :: SourceInfo -> [SourceInfo] -> RowStore -> IO ()
-writeRowStore (SourceInfo Nothing _ _) _ _ = throwIO $ HRowsException "No puedo escribir si no sé el nombre del fichero"
-writeRowStore (SourceInfo (Just fp) mconfFp (ListatabFormat ltInfo)) sInfos rs = do
-  writeListatab ltInfo fp (names rs) (rows rs)
-  case mconfFp of
-      Nothing -> return ()
-      Just conf -> do
-          r <- try (BS.writeFile conf . encodePretty . setSourceInfos sInfos $ getConf rs)
-          case r of
-              Right () -> return ()
-              Left e -> exception e
+writeRowStore si sInfos rs = case siPathAndConf si of
+  Nothing -> throwIO $ HRowsException "No puedo escribir si no sé el nombre del fichero"
+  Just (PathAndConf fp mconfFp) -> do
+      let ListatabFormat ltInfo = siFormat si
+      writeListatab ltInfo fp (names rs) (rows rs)
+      case mconfFp of
+          Nothing -> return ()
+          Just conf -> do
+              r <- try (BS.writeFile conf . encodePretty . setSourceInfos sInfos $ getConf rs)
+              case r of
+                  Right () -> return ()
+                  Left e -> exception e
 
 
 readConf :: Maybe FilePath -> IO (Maybe RowStoreConf)

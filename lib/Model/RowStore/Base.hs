@@ -36,8 +36,6 @@ module Model.RowStore.Base (
                 , fieldIndex
                 , setName
                 , setNames
-                , size
-                , types
 ) where
 
 import Data.IntMap(IntMap)

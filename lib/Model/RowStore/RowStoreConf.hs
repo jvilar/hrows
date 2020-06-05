@@ -45,6 +45,7 @@ instance FromJSON RowStoreConf where
       <*> v .: "formatConf"
       <*> v .: "sourceInfos"
     parseJSON (Array a) = fromFieldConf <$> mapM parseJSON (toList a)
+    parseJSON _ = error "Mal formato del fichero de configuración"
 
 instance ToJSON FieldConf where
     toEncoding = genericToEncoding defaultOptions

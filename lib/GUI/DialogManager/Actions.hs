@@ -37,6 +37,7 @@ import GUI.Command
 import GUI.DialogManager
 import Model hiding (deleteFields)
 import Model.DefaultFileNames
+import Model.SourceInfo
 import Presenter.ImportType
 
 displayMessage :: Message -> Window -> IO ()
@@ -105,11 +106,11 @@ type DialogAction info = info -> IO ()
 
 type DialogFunction info = DialogManager -> DialogAction info -> Window -> IO ()
 
-askReadFile :: DialogFunction (FilePath, Maybe FilePath)
+askReadFile :: DialogFunction PathAndConf
 askReadFile dmg = askFile (loadFileDialog dmg)
                           (confFileLoadCheckButton dmg)
 
-askWriteFile :: DialogFunction (FilePath, Maybe FilePath)
+askWriteFile :: DialogFunction PathAndConf
 askWriteFile dmg = askFile (saveAsDialog dmg)
                            (confFileSaveCheckButton dmg)
 
@@ -121,7 +122,7 @@ asInt32 = fromIntegral . fromEnum
 
 askFile :: FileChooserDialog
         -> CheckButton
-        -> DialogAction (FilePath, Maybe FilePath)
+        -> DialogAction PathAndConf
         -> Window
         -> IO ()
 askFile dialog button action parent = do
@@ -135,7 +136,7 @@ askFile dialog button action parent = do
                     conf = if chk
                            then defaultConfFileName <$> file
                            else Nothing
-                action (fp, conf)
+                action (PathAndConf fp conf)
 
 askImportFrom :: DialogFunction (FilePath, Char)
 askImportFrom dmg action parent = do

@@ -16,6 +16,6 @@ sourceAuto = accumM_ update
 
 update :: SourceInfo -> SourceCommand -> PresenterM SourceInfo
 update _ (SetMainSource si) = do
-    let name = "hrows: " ++ fromMaybe "No file" (siFilePath si)
+    let name = "hrows: " ++ fromMaybe "No file" (path <$> siPathAndConf si)
     sendGUIM . ChangeTitle $ T.pack name
     return si
