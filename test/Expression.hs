@@ -133,7 +133,16 @@ testParser = describe "Test the parser" $
                                                                                 (mkNamedPosition "name2")
                                                                                 (mkNamedPosition "value")
 
-
+testTypeError :: Spec
+testTypeError = describe "Test a bug found when errors are used in operations" $
+                  it "Check using an error" $ do
+                    let err = mkError "Mal nombre de campo: error"
+                    evalNames [1, 2] mainRst "2 * (error + error)" `shouldBe` err
+                    evalNames [1, 3] mainRst "error > 1 ? 1 : 1 - error" `shouldBe` err
+                    evalNames [1, 3] mainRst "5 + (error > 1 ? 1 : 1 - error)" `shouldBe` err
+                    evalNames [1, 3] mainRst "5 + min" `shouldBe` mkError "Error en EOFT, esperaba un paréntesis abierto"
+                    evalNames [1, 3] mainRst "5 + 4 - (min > 1 ? 1 - min : 0)" `shouldBe` mkError "Error en GreaterThanT, esperaba un paréntesis abierto"
+                  
 main:: IO ()
 main = hspec $ do
   testSimpleExpressions
@@ -142,3 +151,4 @@ main = hspec $ do
   testSearch
   testLexer
   testParser
+  testTypeError
