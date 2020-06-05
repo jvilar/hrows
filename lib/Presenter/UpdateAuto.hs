@@ -6,17 +6,21 @@ module Presenter.UpdateAuto (
 
 import Control.Arrow(first)
 import Control.Auto(accumM_)
+import Control.Exception(throwIO)
+import Control.Monad.IO.Class(liftIO)
+import Data.Text(Text)
 import qualified Data.Text as T
 
 import GUI.Command
+import HRowsException
 import Model
 import Presenter.Auto
 import Presenter.Input
 
-data UndoZipper a = UndoZipper { undo :: [a]
-               , current :: a
-               , redo :: [a]
-               }
+data UndoZipper a = UndoZipper [a] a [a]
+
+current :: UndoZipper a -> a
+current (UndoZipper _ c _) = c
 
 back :: UndoZipper a -> Maybe (UndoZipper a)
 back (UndoZipper (u:us) c rs) = Just $ UndoZipper us u (c:rs)
@@ -41,33 +45,30 @@ updateAuto :: PresenterAuto (UpdateCommand, RowPos) Model
 updateAuto = fst . current <$> accumM_ undoOrUpdate initialZM
 
 undoOrUpdate :: ZM -> (UpdateCommand, RowPos) -> PresenterM ZM
-undoOrUpdate zm (Undo, _) = case back zm of
-                                Nothing -> do
-                                    message $ InformationMessage "No puedo deshacer"
-                                    return zm
-                                Just zm' -> do
-                                    let (model, pos) = current zm'
-                                    _ <- completeRefresh pos model
-                                    return zm'
-undoOrUpdate zm (Redo, _) = case forward zm of
-                                Nothing -> do
-                                    message $ InformationMessage "No puedo rehacer"
-                                    return zm
-                                Just zm' -> do
-                                    let (model, pos) = current zm'
-                                    _ <- completeRefresh pos model
-                                    return zm'
+undoOrUpdate zm (Undo, _) = tryToMoveZM zm back "No puedo deshacer"
+undoOrUpdate zm (Redo, _) =  tryToMoveZM zm forward "No puedo rehacer"
 undoOrUpdate zm (BlockUndo, _) = return $ UndoZipper [] (current zm) []
 undoOrUpdate zm (DoNothing, _) = return zm
 undoOrUpdate zm p@(_, pos) = push zm . (,pos) <$> update (fst $ current zm) p
 
+tryToMoveZM :: ZM -> (ZM -> Maybe ZM) -> Text -> PresenterM ZM
+tryToMoveZM zm dir m = case dir zm of
+                           Nothing -> do
+                               message $ InformationMessage m
+                               return zm
+                           Just zm' -> do
+                               let (model, pos) = current zm'
+                               _ <- completeRefresh pos model
+                               return zm'
+
+
 update :: Model -> (UpdateCommand, RowPos) -> PresenterM Model
 update model (UpdateField fpos v, pos) = do
-    let (rst', changed) = changeField pos fpos v <@ model
+    let (rst', chngd) = changeField pos fpos v <@ model
         model' = setStore rst' model
         r = row pos rst'
     sendGUIM . ShowFields pos $ do
-                             c <- changed
+                             c <- chngd
                              let f = r !!! c
                              return $ FieldInfo { indexFI = c
                                                 , textFI = toString f
@@ -91,8 +92,8 @@ update model (NewFields l, pos) =
     completeRefresh pos $ newFields (map (first Just) l) `inside` model
 update model (DeleteFields fs, pos) =
     completeRefresh pos $ deleteFields fs `inside` model
-update model (RenameFields names, pos) =
-    completeRefresh pos $ renameFields names `inside` model
+update model (RenameFields ns, pos) =
+    completeRefresh pos $ renameFields ns `inside` model
 update model (ImportFieldsFromRowStore m keys values, pos) =
     partialRefresh pos $ importFields m keys values `inside` model
 update model (ImportRowsFromRowStore m values, pos) =
@@ -104,7 +105,12 @@ update model (ChangeFieldType t f, pos) =
 update model (ChangeFieldFormula mf f, pos) =
     partialRefresh pos $ changeFieldFormula mf f `inside` model
 update model (SetUnchanged, _) = return $ setUnchanged `inside` model
-update model (AddNewSource si rst, _) = return $ addSource si rst model
+update model (AddNewSource si rst, _) = do
+    message . InformationMessage $ T.concat ["Se ha añadido la fuente ", getName rst]
+    return $ addSource si rst model
+update _ (Undo, _) = liftIO $ throwIO $ HRowsException "No puede llegar un Undo al método update de UpdateAuto"
+update _ (Redo, _) = liftIO $ throwIO $ HRowsException "No puede llegar un Redo al método update de UpdateAuto"
+update _ (BlockUndo, _) = liftIO $ throwIO $ HRowsException "No puede llegar un BlockUndo al método update de UpdateAuto"
 
 cnames :: RowStore -> [FieldName]
 cnames = map (`T.append` ": ") . fnames
