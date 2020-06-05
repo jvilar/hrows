@@ -9,7 +9,7 @@ module Presenter (
 
 import Control.Arrow(arr, (>>>))
 import Control.Auto(Auto, arrM, delay_, emitJusts, holdWith_, perBlip, stepAuto, id, (.))
-import Control.Monad.IO.Class(liftIO)
+-- import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Writer.Strict(runWriterT)
 import Data.Either(partitionEithers)
 import Prelude hiding((.), id)
@@ -99,9 +99,9 @@ getDialogs (InputDialog cmd) = Just cmd
 getDialogs _ = Nothing
 
 processControlCommands :: PresenterAuto (Input, ModelChanged) ()
-processControlCommands = proc (inp, changed) -> do
+processControlCommands = proc (inp, chngd) -> do
                            bcontrol <- emitJusts getControls -< inp
-                           holdWith_ () . perBlip controlAuto -< (, changed) <$> bcontrol
+                           holdWith_ () . perBlip controlAuto -< (, chngd) <$> bcontrol
 
 getControls :: Input -> Maybe ControlCommand
 getControls (InputControl cmd) = Just cmd
