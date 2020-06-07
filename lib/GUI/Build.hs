@@ -32,9 +32,8 @@ makeGUI :: Chan Input -> IO GUIControl
 makeGUI iChan = do
   _ <- GI.Gtk.init Nothing
 
-  builder <- builderNew
   gladefn <- getDataFileName "src/hrows.glade"
-  _ <- builderAddFromFile builder $ T.pack gladefn
+  builder <- builderNewFromFile $ T.pack gladefn
 
   styleFile <- getDataFileName "src/hrows.css"
 
