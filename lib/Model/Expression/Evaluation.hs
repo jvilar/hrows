@@ -37,6 +37,9 @@ eval = para ev
       ev _ (PrefixBinary info v1 v2) = opPB info <$> v1 <*> v2
       ev _ (Cast ft v) = convert ft <$> v
       ev _ (Ternary v1 v2 v3) = ternary <$> v1 <*> v2 <*> v3
+      ev _ (ErrorCheck v1 v2) = do
+                    q <- isError <$> v1
+                    if q then v2 else v1
       ev (In (FromSource si n1 n2 n3)) _ =  evalFromSource si n1 n2 n3
       ev _ (Error m) = return $ mkError m
 

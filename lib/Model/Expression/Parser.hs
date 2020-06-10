@@ -72,12 +72,21 @@ eof = do
 -- expression -> logical (QuestionMarkT expression ColonT expression)?
 expression :: Parser Expression
 expression = do
-    cond <- logical
+    eCheck <- errorCheck
     q <- check QuestionMarkT
     if q
-    then mkTernary cond <$> (advance >> expression)
+    then mkTernary eCheck <$> (advance >> expression)
                         <*> (colon >> expression)
-    else return cond
+    else return eCheck
+
+-- errorCheck -> logical (IsErrorT errorCheck)?
+errorCheck :: Parser Expression
+errorCheck = do
+    left <- logical
+    q <- check IsErrorT
+    if q
+    then mkErrorCheck left <$> (advance >> errorCheck)
+    else return left
 
 binaryLevel :: Parser Expression -> Parser (Maybe BinaryOpInfo) -> Parser Expression
 binaryLevel nextLevel operator = nextLevel >>= go

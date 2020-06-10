@@ -39,6 +39,7 @@ data Token = IntT Int
            | OrT
            | NotT
            | QuestionMarkT
+           | IsErrorT
            | ColonT
            | CommaT
            | AtT
@@ -155,7 +156,7 @@ tokenizer =
                        , (c == '!' , notSign)
                        , (c == '&' , ampersand)
                        , (c == '|' , bar)
-                       , (c == '?' , emit QuestionMarkT)
+                       , (c == '?' , questionMark)
                        , (c == ':' , emit ColonT)
                        , (c == ',' , emit CommaT)
                        , (isSpace c, omit)
@@ -238,6 +239,11 @@ ampersand = needChar (== '&') $ emit AndT
 
 bar :: Tokenizer ()
 bar = needChar (== '|') $ emit OrT
+
+questionMark :: Tokenizer ()
+questionMark = ifChar (== '!')
+                  (emit IsErrorT)
+                  (emit QuestionMarkT)
 
 at :: Tokenizer ()
 at = ifChar (== '{')

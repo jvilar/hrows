@@ -142,7 +142,20 @@ testTypeError = describe "Test a bug found when errors are used in operations" $
                     evalNames [1, 3] mainRst "5 + (error > 1 ? 1 : 1 - error)" `shouldBe` err
                     evalNames [1, 3] mainRst "5 + min" `shouldBe` mkError "Error en EOFT, esperaba un paréntesis abierto"
                     evalNames [1, 3] mainRst "5 + 4 - (min > 1 ? 1 - min : 0)" `shouldBe` mkError "Error en GreaterThanT, esperaba un paréntesis abierto"
-                  
+    
+testIsErrorOperator :: Spec
+testIsErrorOperator = describe "Test the new isError operator" $ do
+                        it "Check the lexer" $
+                           tokenize "? ?! !?" `shouldBe` [QuestionMarkT, IsErrorT, NotT, QuestionMarkT, EOFT]
+                        it "Simple checks" $ do 
+                           simpleEval [] "error ?! 2" `shouldBeI` 2
+                           simpleEval [] "1/(0 ?! 2)" `shouldBe` (1/0)
+                           simpleEval [] "2+3 ?! 1" `shouldBeI` 5
+                           simpleEval [] "1 ?! 2/0 ?! 3/0" `shouldBeI` 1
+                        it "Check with names" $ do
+                           evalNames [6, 2] mainRst "first / second ?! 4" `shouldBeF` (3 :: Double)
+                           evalNames [6, 0] mainRst "first / error ?! 4" `shouldBeI` 4
+                           
 main:: IO ()
 main = hspec $ do
   testSimpleExpressions
@@ -152,3 +165,4 @@ main = hspec $ do
   testLexer
   testParser
   testTypeError
+  testIsErrorOperator

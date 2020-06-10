@@ -26,6 +26,7 @@ module Model.Expression ( -- *Types
                         , mkBinary
                         , mkPBinary
                         , mkTernary
+                        , mkErrorCheck
                         , mkCast
                         , mkFromSource
                         , mkErrorExpr
@@ -69,6 +70,7 @@ instance Show Expression where
                    gshow (Binary b exp1 exp2) = concat ["Binary ", show b, " (", exp1,", ", exp2, ")" ]
                    gshow (PrefixBinary b exp1 exp2) = concat ["PrefixBinary ", show b, " (", exp1,", ", exp2, ")" ]
                    gshow (Ternary exp1 exp2 exp3) = concat ["Ternary ", " (", exp1, ", ", exp2, ", ", exp3, ")" ]
+                   gshow (ErrorCheck exp1 exp2) = concat ["ErrorCheck ", " (", exp1, ", ", exp2, ")" ]
                    gshow (FromSource sName exp1 exp2 exp3) = concat["FromSource", " (", sName, ", ", exp1, ", ", exp2, ", ", exp3, ")"]
                    gshow (Cast t exp) = concat ["Cast ", show t, " (", exp, ")" ]
                    gshow (Error e) = T.unpack e
@@ -81,6 +83,7 @@ data Node a = Position Int -- ^A position in the row
             | Binary BinaryOpInfo a a -- ^Application of a binary operator
             | PrefixBinary PBinaryOpInfo a a -- ^Aplication of a prefix binary operator (max or min) 
             | Ternary a a a -- ^Application of the ternary operator
+            | ErrorCheck a a -- ^Check an error. If the left operator evaluates to an error return the evaluation of the right operator.
             | Cast FieldType a -- ^Application of cast
             | FromSource a a a a -- ^Recover from a source. Parameters: source, position in the row to compare with,
                                  -- position in the source, position in the source to get the value from 
@@ -108,6 +111,9 @@ mkPBinary i e e' = In $ PrefixBinary i e e'
 
 mkTernary :: Expression -> Expression -> Expression -> Expression
 mkTernary e e' e'' = In $ Ternary e e' e''
+
+mkErrorCheck :: Expression -> Expression -> Expression
+mkErrorCheck e e' = In $ ErrorCheck e e'
 
 mkCast :: FieldType -> Expression -> Expression
 mkCast = (In .) . Cast
@@ -177,6 +183,7 @@ toFormula = para tf
           tf (In (PrefixBinary info _ _)) (PrefixBinary _ f1 f2) =
                     T.concat [formulaPB info, "(", f1, ", ", f2, ")"]
           tf _ (Cast ft f) = T.concat [typeOperator ft, "(", f, ")"]
+          tf _ (ErrorCheck f1 f2) = T.concat ["(", f1, ") ?! (", f2, ")"]
           tf (In (Ternary e1 e2 e3)) (Ternary f1 f2 f3) = let
                 f1' = parent 1 (prio e1) f1
                 f2' = parent 0 (prio e2) f2
@@ -212,6 +219,7 @@ getPositions = cata gp
         gp (PrefixBinary _ ps1 ps2) = merge ps1 ps2
         gp (Cast _ ps) = ps
         gp (Ternary ps1 ps2 ps3) = ps1 `merge` ps2 `merge` ps3
+        gp (ErrorCheck ps1 ps2) = merge ps1 ps2
         gp (FromSource _ ps _ _) = ps
         gp (Error _) = []
 
