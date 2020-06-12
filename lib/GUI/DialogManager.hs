@@ -28,6 +28,7 @@ data DialogManager' f = DialogManager { changeFieldFormulaDialog :: HKD f Dialog
                                       , searchFieldCombo :: HKD f ComboBoxText
                                       , copyOtherDialog :: HKD f Dialog
                                       , copyOtherCombo :: HKD f ComboBoxText
+                                      , aboutDialog :: HKD f Dialog
                                       } deriving Generic
 
 type DialogManager = DialogManager' Identity

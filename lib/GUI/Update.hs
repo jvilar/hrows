@@ -98,6 +98,8 @@ showIteration AskAddSource = dialogCall askImportFrom $
                                                       name = T.pack $ takeFileName fp
                                                       si = sourceInfoFromDialogResult fp c
                                                     in sendInput control $ AddSourceFromSourceInfo name si
+showIteration DisplayAbout = \control -> showAboutDialog (dialogManager control) (window $ mainWindow control)
+
 showIteration it = unimplemented (T.pack $ show it)
 
 

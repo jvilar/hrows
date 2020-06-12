@@ -21,6 +21,7 @@ module GUI.DialogManager.Actions (
   , getFieldFormula
   , searchField
   , copyOther
+  , showAboutDialog
 ) where
 
 import Control.Monad(filterM, forM, forM_, unless, when)
@@ -443,4 +444,9 @@ copyOther _ initial values dmg action parent = do
     mt <- useCombo dlg combo initial values dmg parent
     forM_ mt action
 
-
+showAboutDialog :: DialogManager -> Window -> IO ()
+showAboutDialog dmg parent = do
+    let dlg = aboutDialog dmg
+    configureDialog parent dlg
+    runAndHide dlg
+    return ()

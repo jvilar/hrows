@@ -42,6 +42,7 @@ buildDialogManager builder = do
     , searchFieldCombo = getObject "searchFieldCombo"
     , copyOtherDialog = getObject "copyOtherDialog"
     , copyOtherCombo = getObject "copyOtherCombo"
+    , aboutDialog = getObject "aboutDialog" 
     }
 
 configureDialogManager :: BuildMonad()

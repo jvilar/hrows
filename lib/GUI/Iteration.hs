@@ -27,4 +27,5 @@ data Iteration = NoIteration -- ^No need to iterate.
                | SearchField FieldPos Text [Text] -- ^Search for a record containing a value.
                | CopyOtherField FieldPos Text [Text] -- ^Copy the value of the field from another record.
                | AskAddSource -- ^Ask for a new source.
+               | DisplayAbout -- ^Show an about dialog
                deriving Show

@@ -30,4 +30,5 @@ dialogAuto = arrM $ \(input, model, pos) -> let
                                              SearchFieldDialog f -> SearchField f (toString $ row pos `from` model !!! f) (fieldValues f `from` model)
                                              CopyOtherDialog f -> CopyOtherField f (toString $ row pos `from` model !!! f) (fieldValues f `from` model)
                                              AddSourceDialog -> AskAddSource
+                                             ShowAboutDialog -> DisplayAbout
                                              d -> DisplayMessage . ErrorMessage $ T.concat ["Error: ", T.pack $ show d, " not implemented"] 
