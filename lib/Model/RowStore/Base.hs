@@ -13,6 +13,7 @@ module Model.RowStore.Base (
                    -- *Functions
                 , getRowStore
                 , getRowStoreIndex
+                , getRowStores
                 , getDataSources
                 , getName
                 , changed
@@ -107,6 +108,10 @@ getRowStore = (!!) . _rowStores
 -- |Finds the position of the `RowStore` with the given name
 getRowStoreIndex :: RowStore -> Text -> Maybe Int
 getRowStoreIndex rst name = findIndex ((== name) . _nameRS) $ _rowStores rst
+
+-- |Get all the `RowStore` s
+getRowStores :: RowStore -> [RowStore]
+getRowStores = _rowStores
 
 -- |Whether the store has changed.
 changed :: RowStore -> RowsChanged

@@ -42,6 +42,8 @@ buildDialogManager builder = do
     , searchFieldCombo = getObject "searchFieldCombo"
     , copyOtherDialog = getObject "copyOtherDialog"
     , copyOtherCombo = getObject "copyOtherCombo"
+    , showSourcesDialog = getObject "showSourcesDialog"
+    , sourcesTreeView = getObject "sourcesTreeView"
     , aboutDialog = getObject "aboutDialog" 
     }
 

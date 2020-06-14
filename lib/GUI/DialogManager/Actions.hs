@@ -21,11 +21,14 @@ module GUI.DialogManager.Actions (
   , getFieldFormula
   , searchField
   , copyOther
+  , showSources
   , showAboutDialog
 ) where
 
 import Control.Monad(filterM, forM, forM_, unless, when)
 import Data.Either(lefts, rights)
+import Data.GI.Base.Attributes(clear)
+import Data.GI.Base.GType(gtypeString)
 import Data.List(elemIndex)
 import Data.Maybe(catMaybes, fromJust, fromMaybe, isJust)
 import Data.Text(Text)
@@ -33,6 +36,7 @@ import qualified Data.Text as T
 import GHC.Int(Int32)
 import GI.Gtk hiding (MessageDialog)
 import GI.Gdk hiding (Window)
+
 
 import GUI.Command
 import GUI.DialogManager
@@ -444,9 +448,47 @@ copyOther _ initial values dmg action parent = do
     mt <- useCombo dlg combo initial values dmg parent
     forM_ mt action
 
+showSources :: DialogManager -> [(RowStoreName, [FieldName])] -> Window -> IO ()
+showSources dmg srcs parent = do
+    let dlg = showSourcesDialog dmg
+        trv = sourcesTreeView dmg
+    configureDialog parent dlg
+    fillTreeView trv srcs    
+    showRunAndHide dlg
+    return ()
+
+fillTreeView :: TreeView -> [(RowStoreName, [FieldName])] -> IO ()
+fillTreeView tv srcs = do
+    let types = [gtypeString]
+    ts <- treeStoreNew types
+    current <- #getNColumns tv
+    unless (current == 1) $ do
+        col <- treeViewColumnNew
+        renderer <- cellRendererTextNew
+        #packStart col renderer True
+        #addAttribute col renderer "text" 0
+        #setTitle col "Fuentes"
+        #appendColumn tv col
+        return ()
+    let srcs' = if null srcs
+                then [("No hay fuentes", [])]
+                else srcs
+    forM_ srcs' $ \(src, names) -> do
+        it <- #append ts Nothing
+        v <- toGValue $ Just src
+        #setValue ts it 0 v
+        forM_ names $ \name -> do
+           it' <- #append ts $ Just it
+           v <- toGValue $ Just name
+           #setValue ts it' 0 v
+    clear tv #model
+    #setModel tv $ Just ts
+
+
 showAboutDialog :: DialogManager -> Window -> IO ()
 showAboutDialog dmg parent = do
     let dlg = aboutDialog dmg
     configureDialog parent dlg
     runAndHide dlg
     return ()
+

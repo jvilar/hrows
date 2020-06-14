@@ -165,6 +165,7 @@ prepareListingMenu = menuItemInput "newListingMenuItem" (toInput ShowListingRequ
 prepareSourceMenu :: BuildMonad ()
 prepareSourceMenu = mapM_ (uncurry menuItemInput)
                                [("addSourceMenuItem", toInput AddSourceDialog)
+                               , ("showSourcesMenuItem", toInput ShowSourcesDialog)
                                , ("deleteSourceMenuItem", toInput DeleteSourceDialog)
                                ]
                                

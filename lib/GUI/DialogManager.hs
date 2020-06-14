@@ -28,6 +28,8 @@ data DialogManager' f = DialogManager { changeFieldFormulaDialog :: HKD f Dialog
                                       , searchFieldCombo :: HKD f ComboBoxText
                                       , copyOtherDialog :: HKD f Dialog
                                       , copyOtherCombo :: HKD f ComboBoxText
+                                      , showSourcesDialog :: HKD f Dialog
+                                      , sourcesTreeView :: HKD f TreeView
                                       , aboutDialog :: HKD f Dialog
                                       } deriving Generic
 
