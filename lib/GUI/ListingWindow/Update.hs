@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GUI.ListingWindow.Update (
   changeTitle,
@@ -69,9 +70,7 @@ showFullListing tss lw = do
   ls <- listStoreNew types
   forM_ tss $ \ts -> do
     iter <- #append ls
-    forM_ (zip ts [0..]) $ \(t, i) -> do
-      v <- toGValue $ Just t
-      #setValue ls iter i v
+    fillRow iter ls $ zip [0..] ts
   #setModel lv $ Just ls
 
 showFieldsRow :: RowPos -> [FieldInfo] -> ListingWindow -> IO ()
@@ -80,13 +79,15 @@ showFieldsRow pos fis lw = do
   Just model <- #getModel lv
   Just listStore <- castTo ListStore model
   path <- rowPos2Path pos
-  (True, iter) <- #getIter model path
-  forM_ fis $ \fi -> do
-    let col = indexFI fi
-        text = textFI fi
-    v <- toGValue $ Just text
-    #setValue listStore iter col v
+  iter <- #getIter model path >>= \case
+               (True, it) -> return it
+               (False, _) -> #append listStore
+  fillRow iter listStore [(indexFI fi, textFI fi) | fi <- fis]
   #rowChanged model path iter
+
+fillRow :: TreeIter -> ListStore -> [(Int32, Text)] -> IO ()
+fillRow iter listStore = mapM_ $ \(i, t) ->
+      toGValue (Just t) >>= #setValue listStore iter i
 
 rowPos2Path :: RowPos -> IO TreePath
 rowPos2Path pos = do
