@@ -25,7 +25,7 @@ eliminateNames rst (In (NamedPosition name)) = In $ case fieldIndex rst name of
                                                  Nothing -> Error $ "Mal nombre de campo: " `T.append` name
                                                  Just i -> Position i
 eliminateNames rst (In (FromSource s inr ins gets)) = In $ case identifySource rst s of
-    Nothing -> Error "Mal nombre de fuente"
+    Nothing -> Error $ T.append "Mal nombre de fuente: " (toFormula s)
     Just (rst', s') -> let
                          inr' = eliminateNames rst inr
                          ins' = eliminateNames rst' ins

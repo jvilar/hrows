@@ -116,6 +116,11 @@ testSearch = describe "Test search" $ do
                           let rst = addRow formulaRst [1, 20]
                               rst' = addRowStore childRst rst
                           row 0 rst' !! 1 `shouldBeF` ("one" :: Text)
+                        it "The source must exist" $
+                          evalNames [10, 20] mainRst "value @ unknown <- 2 <-> value" `shouldBe` mkError "Mal nombre de fuente: unknown"
+                        it "The value must exist" $
+                          evalNames [10, 20] mainRst "value @ child <- 2 <-> name" `shouldBe` mkError "No encontrado 2"
+                                                
 
 
 testLexer :: Spec
