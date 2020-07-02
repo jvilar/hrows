@@ -66,13 +66,13 @@ instance Show Expression where
              where gshow (Position i) = "Position " ++ show i
                    gshow (NamedPosition t) = "NamedPosition " ++ T.unpack t
                    gshow (Constant f) = "Constant " ++ show f
-                   gshow (Unary u exp) = concat ["Unary ", show u, " (", exp, ")" ]
-                   gshow (Binary b exp1 exp2) = concat ["Binary ", show b, " (", exp1,", ", exp2, ")" ]
-                   gshow (PrefixBinary b exp1 exp2) = concat ["PrefixBinary ", show b, " (", exp1,", ", exp2, ")" ]
-                   gshow (Ternary exp1 exp2 exp3) = concat ["Ternary ", " (", exp1, ", ", exp2, ", ", exp3, ")" ]
-                   gshow (ErrorCheck exp1 exp2) = concat ["ErrorCheck ", " (", exp1, ", ", exp2, ")" ]
-                   gshow (FromSource sName exp1 exp2 exp3) = concat["FromSource", " (", sName, ", ", exp1, ", ", exp2, ", ", exp3, ")"]
-                   gshow (Cast t exp) = concat ["Cast ", show t, " (", exp, ")" ]
+                   gshow (Unary u ex) = concat ["Unary ", show u, " (", ex, ")" ]
+                   gshow (Binary b ex1 ex2) = concat ["Binary ", show b, " (", ex1,", ", ex2, ")" ]
+                   gshow (PrefixBinary b ex1 ex2) = concat ["PrefixBinary ", show b, " (", ex1,", ", ex2, ")" ]
+                   gshow (Ternary ex1 ex2 ex3) = concat ["Ternary ", " (", ex1, ", ", ex2, ", ", ex3, ")" ]
+                   gshow (ErrorCheck ex1 ex2) = concat ["ErrorCheck ", " (", ex1, ", ", ex2, ")" ]
+                   gshow (FromSource sName ex1 ex2 ex3) = concat["FromSource", " (", sName, ", ", ex1, ", ", ex2, ", ", ex3, ")"]
+                   gshow (Cast t ex) = concat ["Cast ", show t, " (", ex, ")" ]
                    gshow (Error e) = T.unpack e
 
 -- |A node in the AST for expressions
@@ -167,29 +167,35 @@ instance Eq PBinaryOpInfo where
 toFormula :: Expression -> Formula
 toFormula = para tf
     where tf :: RAlgebra Node Formula
-          tf _ (Position p) = "$" `T.append` showt (p + 1)
-          tf _ (NamedPosition n) | T.all isAlphaNum n = n
-                                 | otherwise = T.concat ["@{", n, "}"]
-          tf _ (Constant f) | typeOf f == TypeString = T.concat[ "\"", toString f, "\""]
-                            | otherwise = toString f
-          tf (In (Unary info e)) (Unary _ f) = formulaU info `T.append` parent 8 (prio e) f
-          tf (In (Binary info e1 e2)) (Binary _ f1 f2) = let
+          tf (Position p) = "$" `T.append` showt (p + 1)
+          tf (NamedPosition n) | T.all isAlphaNum n = n
+                               | otherwise = T.concat ["@{", n, "}"]
+          tf (Constant f) | typeOf f == TypeString = T.concat[ "\"", toString f, "\""]
+                          | otherwise = toString f
+          tf (Unary info (e, f)) = formulaU info `T.append` parent 8 (prio e) f
+          tf (Binary info (e1, f1) (e2, f2)) = let
                      (pe1, pe2) = case assocB info of
                                       LeftAssoc -> (prioB info, prioB info + 1)
                                       RightAssoc -> (prioB info + 1, prioB info)
                                       TrueAssoc -> (prioB info, prioB info)
                                       NoAssoc -> (prioB info + 1, prioB info + 1)
                      in T.concat [parent pe1 (prio e1) f1, formulaB info, parent pe2 (prio e2) f2]
-          tf (In (PrefixBinary info _ _)) (PrefixBinary _ f1 f2) =
+          tf (PrefixBinary info (_, f1) (_, f2)) =
                     T.concat [formulaPB info, "(", f1, ", ", f2, ")"]
-          tf _ (Cast ft f) = T.concat [typeOperator ft, "(", f, ")"]
-          tf _ (ErrorCheck f1 f2) = T.concat ["(", f1, ") ?! (", f2, ")"]
-          tf (In (Ternary e1 e2 e3)) (Ternary f1 f2 f3) = let
+          tf (Cast ft (_, f)) = T.concat [typeOperator ft, "(", f, ")"]
+          tf (ErrorCheck (_, f1) (_, f2)) = T.concat ["(", f1, ") ?! (", f2, ")"]
+          tf (Ternary (e1, f1) (e2, f2) (e3, f3)) = let
                 f1' = parent 1 (prio e1) f1
                 f2' = parent 0 (prio e2) f2
                 f3' = parent 0 (prio e3) f3
               in T.concat [f1', "?", f2',  ":", f3']
-          tf _ (Error s) = "Error: " `T.append` s
+          tf (FromSource (e1, f1) (e2, f2) (e3, f3) (e4, f4)) = let
+                f1' = parent 1 (prio e1) f1
+                f2' = parent 0 (prio e2) f2
+                f3' = parent 0 (prio e3) f3
+                f4' = parent 0 (prio e4) f4
+              in T.concat [f4', "@", f1', "<-", f2', "<->", f3']
+          tf (Error s) = "Error: " `T.append` s
 
 parent :: Priority -> Priority -> Text -> Text
 parent p1 p2 s | p1 > p2 = T.concat ["(", s, ")"]
@@ -202,9 +208,9 @@ prio _ = 10
 
 
 addCast :: FieldType -> Expression -> Expression
-addCast ft exp@(In (Cast ft' e)) | ft == ft' = exp
+addCast ft ex@(In (Cast ft' e)) | ft == ft' = ex
                                  | otherwise = In (Cast ft e)
-addCast ft exp = In (Cast ft exp)
+addCast ft ex = In (Cast ft ex)
 
 -- |The positions referenced in the expression. They are sorted, without repetions and
 --  only include those positions that refer to the current row, not to other data sources.

@@ -11,6 +11,7 @@ import Data.Char(isAlpha, isAlphaNum, isDigit, isSpace)
 import Data.List(find)
 import Data.Text(Text)
 import qualified Data.Text as T
+import TextShow(fromString, TextShow(..))
 
 import Model.Field
 
@@ -50,6 +51,9 @@ data Token = IntT Int
            | ErrorT String
            deriving (Show, Eq)
 
+instance TextShow Token where
+  showb = fromString . show
+
 tokenize :: Text -> [Token]
 tokenize inp = execWriter $ evalStateT tokenizer ([], T.unpack inp)
 
@@ -67,6 +71,7 @@ peek = do
 
 pop :: Tokenizer ()
 pop = get >>= \case
+        ([], _) -> return ()
         (c:lex, inp) -> put (lex, c:inp)
 
 next :: Tokenizer (Maybe Char)
@@ -109,7 +114,7 @@ selectChar chars onOther = with peek
             Just (_, t) -> next >> t)
 
 with :: Tokenizer (Maybe Char) -> Tokenizer a -> (Char -> Tokenizer a) -> Tokenizer a
-with read onNothing onJust = read >>= maybe onNothing onJust
+with readChar onNothing onJust = readChar >>= maybe onNothing onJust
 
 many :: (Char -> Bool) -> Tokenizer ()
 many cond = ifChar cond

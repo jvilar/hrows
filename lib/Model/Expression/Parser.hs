@@ -9,15 +9,12 @@ import Control.Monad.Trans(lift)
 import Data.Maybe(isNothing)
 import Data.Text(Text)
 import qualified Data.Text as T
-import TextShow(fromString, TextShow(..))
+import TextShow(TextShow(..))
 
 import Model.Expression.Lexer
 import Model.Expression
 
 type Parser = ExceptT Text (State [Token])
-
-instance TextShow Token where
-  showb = fromString . show
 
 many :: Parser (Maybe a) -> Parser [a]
 many p = do
@@ -48,7 +45,7 @@ expectName message = do
       NameT s -> do
            advance
            return $ mkNamedPosition $ T.pack s
-      _ -> throwError $ T.concat ["Error en ", showt c, ", se esperaba un nombre"]
+      _ -> throwError $ T.concat ["Error en ", showt c, ", se esperaba ", message]
 
 match :: [(Token, a)] -> Parser (Maybe a)
 match l = do
@@ -149,8 +146,8 @@ base = do
         NameT s -> name s
         CastT ft -> mkCast ft <$> parenthesized
         OpenT -> expression <* close
-        MaxT -> maxMin MaxT
-        MinT -> maxMin MinT
+        MaxT -> maxMin $ PBinaryOpInfo maxField "max"
+        MinT -> maxMin $ PBinaryOpInfo minField "min"
         _ -> throwError $ T.concat ["Error en ", showt t, ", esperaba un comienzo de expresión"]
 
 -- name --> (AtT NameT ArrowT NameT EqualT NameT)?
@@ -161,7 +158,7 @@ name s = do
         if at
         then do
                 advance
-                source <- expectName "El nombre de la fuente"
+                source <- expectName "el nombre de la fuente"
                 expect ArrowT "una flecha"
                 fHere <- expression
                 expect DoubleArrowT "una flecha doble"
@@ -180,14 +177,11 @@ close = expect CloseT "un paréntesis cerrado"
 colon :: Parser ()
 colon = expect ColonT "dos puntos"
 
-maxMin :: Token -> Parser Expression
-maxMin t = do
-           open
-           left <- expression
-           expect CommaT "una coma"
-           right <- expression
-           close
-           let op = case t of
-                       MaxT -> PBinaryOpInfo maxField "max"
-                       MinT -> PBinaryOpInfo minField "min"
-           return $ mkPBinary op left right
+maxMin :: PBinaryOpInfo -> Parser Expression
+maxMin op = do
+              open
+              left <- expression
+              expect CommaT "una coma"
+              right <- expression
+              close
+              return $ mkPBinary op left right
