@@ -64,6 +64,16 @@ testSimpleExpressions = describe "Test simple expressions" $ do
                      it "Multiplies 2 by 3" $
                        simpleEval [] "2 * 3" `shouldBeI` 6
 
+                     it "Subtracts 4 from 6" $
+                       simpleEval [] "6 - 4" `shouldBeI` 2
+
+                     it "Divides 6 by 3" $
+                       simpleEval [] "6 / 3" `shouldBeF` (2::Double)
+                       
+                     it "Checks float division" $
+                       simpleEval [] "6.0 / 3.0" `shouldBeF` (2:: Double)                  
+
+
 evalInts :: [Int] -> Expression -> Field
 evalInts xs = let
     fs = map toField xs
@@ -88,6 +98,10 @@ testNames = describe "Test names" $ do
                         it "Simple arithmetic with names" $ do
                           evalNames [3, 2] mainRst "first - second" `shouldBeI` 1
                           evalNames [6, 3] mainRst "@{first} / @{second}" `shouldBeF` (2 :: Double)
+                          evalNames [6, 3] mainRst "(first + 3) / second" `shouldBeF` (3 :: Double)
+                        it "Conditional with names" $ do
+                          evalNames [2, 3] mainRst "first == 2 ? second : second * 3" `shouldBeI` 3
+                          evalNames [1, 3] mainRst "first == 2 ? second : second * 3" `shouldBeI` 9
                         it "Checks the substitution of names" $ do
                           eliminateNames mainRst (parse "first") `shouldBe` mkPosition 0
                           eliminateNames mainRst (parse "second") `shouldBe` mkPosition 1
