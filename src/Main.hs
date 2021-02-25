@@ -8,7 +8,7 @@ import Control.Concurrent.Chan(Chan, newChan, writeChan, writeList2Chan)
 import Control.Lens (makeLenses, (^.), set, Getting)
 import Control.Monad(forM_, unless, void, when)
 import Data.Default(Default(..))
-import Data.Maybe(fromJust, isJust)
+import Data.Maybe(isJust)
 import Data.GI.Gtk.Threading(postGUIASync)
 import qualified GI.Gtk as Gtk
 import System.Directory (doesFileExist)
@@ -20,7 +20,6 @@ import System.Console.JMVOptions
 
 import GUI.Build
 import GUI.Update
-import Model
 import Model.DefaultFileNames
 import Model.SourceInfo
 import Presenter
@@ -90,11 +89,11 @@ main = do
          then return $ opts ^. confFileName
          else do
                 let Just fn = opts ^. inputFileName
-                    def = defaultConfFileName fn
+                    defFn = defaultConfFileName fn
                 exFn <- doesFileExist fn
-                exCnf <- doesFileExist def
+                exCnf <- doesFileExist defFn
                 return $ if exFn == exCnf
-                         then Just def
+                         then Just defFn
                          else Nothing
   let pc = do
               fn <- opts ^. inputFileName
@@ -106,11 +105,11 @@ main = do
 
   inputChan <- newChan
   control <- makeGUI inputChan
-  forkIO $ void $ runOnChanM id
+  _ <- forkIO $ void $ runOnChanM id
                             (updateScreen control)
                             inputChan
                             presenter
-  forkIO $ backupLoop inputChan
+  _ <- forkIO $ backupLoop inputChan
   writeList2Chan inputChan [ toInput MoveBegin
                            , toInput $ SetMainSource sinfo
                            , toInput LoadFile]
