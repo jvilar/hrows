@@ -1,0 +1,22 @@
+cradle:
+  stack:
+    - path: "./lib"
+      component: "hrows:lib"
+
+    - path: "././src/Main.hs"
+      component: "hrows:exe:hrows"
+
+    - path: "././Paths_hrows.hs"
+      component: "hrows:exe:hrows"
+
+    - path: "././src/testParser.hs"
+      component: "hrows:exe:testParser"
+
+    - path: "././Paths_hrows.hs"
+      component: "hrows:exe:testParser"
+
+    - path: "././"
+      component: "hrows:test:expression-test"
+
+    - path: "././"
+      component: "hrows:test:lexer-test"
