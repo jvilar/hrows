@@ -35,7 +35,7 @@ readRowStore si = case siPathAndConf si of
        rst <- case mconf of
            Nothing -> case h of
                           Nothing -> return $ fromRows name ds
-                          Just names -> return $ fromRowsNames name names ds
+                          Just ns -> return $ fromRowsNames name ns ds
            Just cnf -> do
                let rs = fromRowsConf name cnf ds
                sources <- map fst <$> mapM readRowStore (sourceInfos cnf)
