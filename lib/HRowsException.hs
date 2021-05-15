@@ -8,7 +8,7 @@ import Control.Exception(displayException, Exception, IOException, throwIO)
 import Data.Typeable(Typeable)
 import Data.Text(pack, Text)
 
-data HRowsException = HRowsException Text
+newtype HRowsException = HRowsException Text
                       deriving (Show, Typeable)
 
 instance Exception HRowsException
