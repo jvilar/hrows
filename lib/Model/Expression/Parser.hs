@@ -132,7 +132,8 @@ multiplicative = binaryLevel base
                          ]
                  )
 
--- base -> IntT | DoubleT | StringT | PositionT | NameT name | CastT parenthesized | OpenT expression CloseT
+-- base -> IntT | DoubleT | StringT | PositionT | NameT name | NotT base
+--         | CastT parenthesized | OpenT expression CloseT
 --         | MaxT OpenT expression CommaT expression CloseT
 --         | MinT OpenT expression CommaT expression CloseT
 base :: Parser Expression
@@ -144,6 +145,7 @@ base = do
         StringT s -> return . mkConstant $ toField $ T.pack s
         PositionT n -> return (mkPosition $ n - 1)
         NameT s -> name s
+        NotT -> mkUnary (UnaryOpInfo notField "!") <$> base
         CastT ft -> mkCast ft <$> parenthesized
         OpenT -> expression <* close
         MaxT -> maxMin $ PBinaryOpInfo maxField "max"

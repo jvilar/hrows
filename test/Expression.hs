@@ -73,6 +73,15 @@ testSimpleExpressions = describe "Test simple expressions" $ do
                      it "Checks float division" $
                        simpleEval [] "6.0 / 3.0" `shouldBeF` (2:: Double)
 
+                     it "Ands 3 and 4" $
+                       simpleEval [] "3 && 4" `shouldBeI` 1
+
+                     it "Ors 3 and 4" $
+                       simpleEval [] "3 || 4" `shouldBeI` 1
+
+                     it "Negates 3" $
+                       simpleEval [] "!3" `shouldBeI` 0
+
 
 mkTypeError :: FieldType -> Text -> Field
 mkTypeError t = convert t . mkError

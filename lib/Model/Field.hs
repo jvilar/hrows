@@ -21,6 +21,7 @@ module Model.Field ( Field
                    -- **Operators
                    , andField
                    , orField
+                   , notField
                    , compareField
                    , maxField
                    , minField
@@ -205,6 +206,11 @@ orField :: Field -> Field -> Field
 orField (AnInt n1 _) (AnInt n2 _) | n1 > 0 || n2 > 0 = toField (1::Int)
                                 | otherwise = toField (0::Int)
 orField f1 f2 = typeError2 "o lógico" f1 f2
+
+notField :: Field -> Field
+notField (AnInt n _) | n > 0 = toField (0::Int)
+                     | otherwise = toField (1::Int)
+notField f = typeError "no lógico" f
 
 maxField :: Field -> Field -> Field
 maxField f1 f2 = case compareField (>=) f1 f2 of
