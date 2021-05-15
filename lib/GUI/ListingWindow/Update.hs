@@ -101,4 +101,4 @@ updatePosition pos lw = do
   unless (cRow == Just pos) $ do
     let lv = listingView lw
     path <- rowPos2Path pos
-    #setCursor lv path noTreeViewColumn False
+    #setCursor lv path (Nothing :: Maybe TreeViewColumn) False
