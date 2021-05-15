@@ -179,13 +179,16 @@ mkError :: Text -> Field
 mkError = AnError TypeEmpty
 
 isError :: Field -> Bool
-isError (AnError _ _) = True
+isError AnError {} = True
 isError _ = False
 
 typeError :: Text -> Field -> Field
+typeError _ e@AnError {} = e
 typeError op f = AnError TypeEmpty $ T.concat ["Error de tipos en ", op, ": ", typeLabel $ typeOf f]
 
 typeError2 :: Text -> Field -> Field -> Field
+typeError2 _ e@AnError{} _ = e
+typeError2 _ _ e@AnError{} = e
 typeError2 op f1 f2 = AnError TypeEmpty $ T.concat ["Error de tipos en ", op, ": ", typeLabel $ typeOf f1, " y ", typeLabel $ typeOf f2]
 
 nmap :: Text -> (forall a. Num a => a -> a) -> (Field -> Field)
@@ -194,15 +197,11 @@ nmap _ op (ADouble d _) = toField $ op d
 nmap name _ f = typeError name f
 
 andField :: Field -> Field -> Field
-andField e@(AnError _ _) _ = e
-andField _ e@(AnError _ _) = e
 andField (AnInt n1 _) (AnInt n2 _) | n1 > 0 && n2 > 0 = toField (1::Int)
                                  | otherwise = toField (0::Int)
 andField f1 f2 = typeError2 "y lógico" f1 f2
 
 orField :: Field -> Field -> Field
-orField e@(AnError _ _) _ = e
-orField _ e@(AnError _ _) = e
 orField (AnInt n1 _) (AnInt n2 _) | n1 > 0 || n2 > 0 = toField (1::Int)
                                 | otherwise = toField (0::Int)
 orField f1 f2 = typeError2 "o lógico" f1 f2
@@ -232,14 +231,11 @@ compareField cmp f1 f2 | not $ comparable (typeOf f1) (typeOf f2) = AnError Type
           numeric _ = False
 
 ternary :: Field -> Field -> Field -> Field
-ternary e@(AnError _ _) _ _ = e
 ternary (AnInt n1 _) e2 e3 | n1 > 0 = e2
                           | otherwise = e3
 ternary e1 _ _ = typeError "operador ?" e1
 
 instance Num Field where
-    f@(AnError _ _) + _ = f
-    _ + f@(AnError _ _) = f
     AnInt n1 _ + AnInt n2 _ = toField $ n1 + n2
     AnInt n _ + ADouble d _ = toField $ fromIntegral n + d
 
@@ -250,8 +246,6 @@ instance Num Field where
 
     f1 + f2 = typeError2 "suma" f1 f2
 
-    f@(AnError _ _) * _ = f
-    _ * f@(AnError _ _) = f
     AnInt n1 _ * AnInt n2 _ = toField $ n1 * n2
     AnInt n _ * ADouble d _ = toField $ fromIntegral n * d
 

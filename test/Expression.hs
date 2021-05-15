@@ -69,10 +69,45 @@ testSimpleExpressions = describe "Test simple expressions" $ do
 
                      it "Divides 6 by 3" $
                        simpleEval [] "6 / 3" `shouldBeF` (2::Double)
-                       
-                     it "Checks float division" $
-                       simpleEval [] "6.0 / 3.0" `shouldBeF` (2:: Double)                  
 
+                     it "Checks float division" $
+                       simpleEval [] "6.0 / 3.0" `shouldBeF` (2:: Double)
+
+
+mkTypeError :: FieldType -> Text -> Field
+mkTypeError t = convert t . mkError
+
+testSimpleErrors :: Spec
+testSimpleErrors = describe "Test simple errors" $ do
+                    it "Transmits errors" $ do
+                        simpleEval [] "1 + int(\"patata\")" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "int(\"patata\") + 1" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "1 - int(\"patata\")" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "int(\"patata\") - 1" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "1 * int(\"patata\")" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "int(\"patata\") * 1" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "1 / int(\"patata\")" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "int(\"patata\") / 1" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "1 && int(\"patata\")" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "int(\"patata\") && 1" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "1 || int(\"patata\")" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "int(\"patata\") || 1" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "!int(\"patata\")" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
+                        simpleEval [] "int(\"patata\") && 1" `shouldBe`
+                           mkTypeError TypeInt "patata no es un entero"
 
 evalInts :: [Int] -> Expression -> Field
 evalInts xs = let
@@ -118,8 +153,8 @@ testNames = describe "Test names" $ do
                                                                (mkPosition 1)
                                                                (mkPosition 2)
                                                  )
-                                                                                                                                    
-                                                                               
+
+
 
 testSearch :: Spec
 testSearch = describe "Test search" $ do
@@ -134,7 +169,6 @@ testSearch = describe "Test search" $ do
                           evalNames [10, 20] mainRst "value @ unknown <- 2 <-> value" `shouldBe` mkError "Mal nombre de fuente: unknown"
                         it "The value must exist" $
                           evalNames [10, 20] mainRst "value @ child <- 2 <-> name" `shouldBe` mkError "No encontrado 2"
-                                                
 
 
 testLexer :: Spec
@@ -161,7 +195,7 @@ testTypeError = describe "Test a bug found when errors are used in operations" $
                     evalNames [1, 3] mainRst "5 + (error > 1 ? 1 : 1 - error)" `shouldBe` err
                     evalNames [1, 3] mainRst "5 + min" `shouldBe` mkError "Error en EOFT, esperaba un paréntesis abierto"
                     evalNames [1, 3] mainRst "5 + 4 - (min > 1 ? 1 - min : 0)" `shouldBe` mkError "Error en GreaterThanT, esperaba un paréntesis abierto"
-    
+
 testIsErrorOperator :: Spec
 testIsErrorOperator = describe "Test the new isError operator" $ do
                         it "Check the lexer" $
@@ -174,10 +208,11 @@ testIsErrorOperator = describe "Test the new isError operator" $ do
                         it "Check with names" $ do
                            evalNames [6, 2] mainRst "first / second ?! 4" `shouldBeF` (3 :: Double)
                            evalNames [6, 0] mainRst "first / error ?! 4" `shouldBeI` 4
-                           
+
 main:: IO ()
 main = hspec $ do
   testSimpleExpressions
+  testSimpleErrors
   testAbsolutePositions
   testNames
   testSearch

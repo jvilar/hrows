@@ -203,7 +203,7 @@ parent p1 p2 s | p1 > p2 = T.concat ["(", s, ")"]
 
 prio :: Expression -> Priority
 prio (In (Binary info _ _)) = prioB info
-prio (In (Ternary _ _ _)) = 1
+prio (In Ternary {}) = 1
 prio _ = 10
 
 
