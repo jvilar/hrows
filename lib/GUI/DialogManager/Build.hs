@@ -44,7 +44,7 @@ buildDialogManager builder = do
     , copyOtherCombo = getObject "copyOtherCombo"
     , showSourcesDialog = getObject "showSourcesDialog"
     , sourcesTreeView = getObject "sourcesTreeView"
-    , aboutDialog = getObject "aboutDialog" 
+    , aboutDialog = getObject "aboutDialog"
     }
 
 configureDialogManager :: BuildMonad()
