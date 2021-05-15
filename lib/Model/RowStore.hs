@@ -1,10 +1,7 @@
 module Model.RowStore (
              -- *Functions
-             -- **Construction
-             addRowStore
-             , emptyName
              -- **Querying
-             , changed
+             changed
              , names
              , fnames
              , getName
