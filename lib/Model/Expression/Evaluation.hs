@@ -71,7 +71,7 @@ evalFromSource si val n1 n2 = do
                      | row <- ds
                     ] of
                  Just v -> Right v
-                 Nothing -> Left $ "No encontrado " `T.append` toFormula val
+                 Nothing -> Left $ "No encontrado " `T.append` toString v1
     return $ case t of
         Right v -> v
         Left e -> mkError e
