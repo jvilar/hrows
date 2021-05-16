@@ -34,6 +34,7 @@ buildDialogManager builder = do
     , loadFileDialog = getObject "loadFileDialog"
     , importFromFileDialog = getObject "importFromFileDialog"
     , importInputSeparator = getObject "importInputSeparator"
+    , importInputFormat = getObject "importInputFormat"
     , importFieldsOptionsDialog = getObject "importFieldsOptionsDialog"
     , importFieldsOptionsRows = getObject "importFieldsOptionsRows"
     , importRowsOptionsDialog = getObject "importRowsOptionsDialog"

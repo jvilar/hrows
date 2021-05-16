@@ -20,6 +20,7 @@ data DialogManager' f = DialogManager { changeFieldFormulaDialog :: HKD f Dialog
                                       , loadFileDialog :: HKD f FileChooserDialog
                                       , importFromFileDialog :: HKD f FileChooserDialog
                                       , importInputSeparator :: HKD f Entry
+                                      , importInputFormat :: HKD f ComboBoxText
                                       , importFieldsOptionsDialog :: HKD f Dialog
                                       , importFieldsOptionsRows :: HKD f Grid
                                       , importRowsOptionsDialog :: HKD f Dialog

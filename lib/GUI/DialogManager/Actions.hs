@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings
            , OverloadedLabels
 #-}
@@ -27,6 +28,7 @@ module GUI.DialogManager.Actions (
 
 import Control.Monad(filterM, forM, forM_, unless, when)
 import Data.Either(lefts, rights)
+import Data.Functor((<&>))
 import Data.GI.Base.Attributes(clear)
 import Data.GI.Base.GType(gtypeString)
 import Data.List(elemIndex)
@@ -143,7 +145,7 @@ askFile dialog button action parent = do
                            else Nothing
                 action (PathAndConf fp conf)
 
-askImportFrom :: DialogFunction (FilePath, Char)
+askImportFrom :: DialogFunction (FilePath, Char, HeaderType)
 askImportFrom dmg action parent = do
     let dialog = importFromFileDialog dmg
     configureDialog parent dialog
@@ -151,7 +153,13 @@ askImportFrom dmg action parent = do
     when (isResponse r ResponseTypeOk) $ do
         file <- #getFilename dialog
         separator <- translateChar <$> #getText (importInputSeparator dmg)
-        when (isJust file) $ action (fromJust file, separator)
+        header <- #getActiveText (importInputFormat dmg) <&> (\case
+                      Just "Comentario" -> Comment
+                      Just "Sin cabecera" -> NoHeader
+                      Just "Primera línea" -> FirstLine
+                      _ -> Comment -- TODO: deal with the possibility of an error
+                      )
+        when (isJust file) $ action (fromJust file, separator, header)
 
 askImportOptions :: ImportType -> [FieldName] -> [FieldName] -> DialogFunction ([(FieldPos, FieldPos)], [(FieldPos, FieldPos)])
 askImportOptions t ifs cfs dmg action parent = do
@@ -453,7 +461,7 @@ showSources dmg srcs parent = do
     let dlg = showSourcesDialog dmg
         trv = sourcesTreeView dmg
     configureDialog parent dlg
-    fillTreeView trv srcs    
+    fillTreeView trv srcs
     showRunAndHide dlg
     return ()
 

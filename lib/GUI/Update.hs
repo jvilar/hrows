@@ -71,7 +71,7 @@ showIteration AskCreateField = dialogCall askCreateField $
 showIteration (AskDeleteFields fs) = dialogCall (askDeleteFields fs) $
                                      (. DeleteFields) . sendInput
 showIteration (AskImportFrom t) = dialogCall askImportFrom $
-                                    \control -> sendInput control . ImportFromFile t . uncurry sourceInfoFromDialogResult
+                                    \control -> sendInput control . ImportFromFile t . sourceInfoFromDialogResult
 showIteration (AskImportOptions t ifs cfs rst) = dialogCall (askImportOptions t ifs cfs)
    (\control (keys, values) -> sendInput control $ case t of
                               ImportFields -> ImportFieldsFromRowStore rst keys values
@@ -93,10 +93,10 @@ showIteration (SearchField fpos initial l) = dialogCall (searchField fpos initia
                                              (. MoveToValue fpos) . sendInput
 showIteration (CopyOtherField fpos initial l) = dialogCall (copyOther fpos initial l)
                                                 (\control t -> setTextField fpos t $ mainWindow control)
-showIteration AskAddSource = dialogCall askImportFrom $ 
-                                                \control (fp, c) -> let
+showIteration AskAddSource = dialogCall askImportFrom $
+                                                \control r@(fp, _, _) -> let
                                                       name = T.pack $ takeFileName fp
-                                                      si = sourceInfoFromDialogResult fp c
+                                                      si = sourceInfoFromDialogResult r
                                                     in sendInput control $ AddSourceFromSourceInfo name si
 showIteration (ShowSources srcs) = \control -> showSources (dialogManager control) srcs (window $ mainWindow control)
 showIteration DisplayAbout = \control -> showAboutDialog (dialogManager control) (window $ mainWindow control)
@@ -107,12 +107,11 @@ showIteration it = unimplemented (T.pack $ show it)
 unimplemented :: Text -> GUIControl -> IO ()
 unimplemented func control = sendInput control . MessageDialog . ErrorMessage $ T.concat ["Función ", func, " no implementada"]
 
-sourceInfoFromDialogResult :: FilePath -> Char -> SourceInfo
-sourceInfoFromDialogResult fp c = let
+sourceInfoFromDialogResult :: (FilePath, Char, HeaderType) -> SourceInfo
+sourceInfoFromDialogResult (fp, c, t) = let
   lti = ListatabInfo {
           ltInputSeparator = c
           , ltOutputSeparator = c
-          , ltHeaderType = Comment
+          , ltHeaderType = t
         }
   in mkSourceInfo (Just $ PathAndConf fp Nothing) lti
-  

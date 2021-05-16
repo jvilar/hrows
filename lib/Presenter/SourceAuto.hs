@@ -3,7 +3,6 @@ module Presenter.SourceAuto (
 ) where
 
 import Control.Auto(accumM_)
-import Data.Maybe(fromMaybe)
 import qualified Data.Text as T
 
 import GUI.Command
@@ -16,6 +15,6 @@ sourceAuto = accumM_ update
 
 update :: SourceInfo -> SourceCommand -> PresenterM SourceInfo
 update _ (SetMainSource si) = do
-    let name = "hrows: " ++ fromMaybe "No file" (path <$> siPathAndConf si)
+    let name = "hrows: " ++ maybe "No file" path (siPathAndConf si)
     sendGUIM . ChangeTitle $ T.pack name
     return si
