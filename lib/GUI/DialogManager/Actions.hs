@@ -59,9 +59,24 @@ createDialog parent = do
   configureDialog parent dlg
   return dlg
 
-configureDialog :: IsDialog dlg => Window -> dlg -> IO ()
+
+createDialogButtons :: Window -> [(Text, Int32)] -> IO Dialog
+createDialogButtons parent btns = do
+  dlg <- createDialog parent
+  forM_ btns $ uncurry (#addButton dlg)
+  return dlg
+
+
+createDialogButtonsLabel :: Window -> [(Text, Int32)] -> Text -> IO Dialog
+createDialogButtonsLabel parent btns lbl = do
+  dlg <- createDialogButtons parent btns
+  content <- #getContentArea dlg
+  labelNew (Just lbl) >>= #add content
+  return dlg
+
+
+configureDialog :: Window -> Dialog -> IO ()
 configureDialog parent dlg = do
-  dlg <- toDialog dlg
   set dlg [ #transientFor := parent
           , #modal := True
           , #typeHint := WindowTypeHintDialog
@@ -97,7 +112,7 @@ runAndHide dlg = do
 
 noResponseMessage :: Text -> Window -> IO ()
 noResponseMessage m parent = do
-    dlg <- createDialog parent
+    dlg <- createDialogButtons parent [("Ok", asInt32 ResponseTypeOk)]
     _ <- #addButton dlg "Ok" $ asInt32 ResponseTypeOk
     content <- #getContentArea dlg
     message <- labelNew $ Just m
@@ -133,7 +148,7 @@ askFile :: FileChooserDialog
         -> Window
         -> IO ()
 askFile dialog button action parent = do
-    configureDialog parent dialog
+    configureDialog parent =<< toDialog dialog
     r <- runAndHide dialog
     when (isResponse r ResponseTypeOk) $ do
             file <- #getFilename dialog
@@ -148,7 +163,7 @@ askFile dialog button action parent = do
 askImportFrom :: DialogFunction (FilePath, Char, HeaderType)
 askImportFrom dmg action parent = do
     let dialog = importFromFileDialog dmg
-    configureDialog parent dialog
+    configureDialog parent =<< toDialog dialog
     r <- runAndHide dialog
     when (isResponse r ResponseTypeOk) $ do
         file <- #getFilename dialog
@@ -218,21 +233,18 @@ translateChar t = case T.unpack t of
 
 confirmExit :: Bool -> DialogFunction Bool
 confirmExit changed _ action parent = do
-  dlg <- createDialog parent
+  let buttons = if changed
+                then [("Grabar y salir", 1)
+                     ,("Salir sin grabar", asInt32 ResponseTypeYes)
+                     ,("No salir", asInt32 ResponseTypeNo)]
+                else [("Sí", asInt32 ResponseTypeYes)
+                     ,("No", asInt32 ResponseTypeNo)]
+  dlg <- createDialogButtons parent buttons
   content <- #getContentArea dlg
   label <- labelNew $ Just $ if changed
                              then "Ha habido cambios, ¿cómo quieres salir?"
                              else "¿Seguro que quieres salir?"
   #packStart content label True True 8
-
-  _ <- if changed
-  then do
-         _ <- #addButton dlg "Grabar y salir" 1
-         _ <- #addButton dlg "Salir sin grabar" $ asInt32 ResponseTypeYes
-         #addButton dlg "No salir" $ asInt32 ResponseTypeNo
-  else do
-         _ <- #addButton dlg "Sí" $ asInt32 ResponseTypeYes
-         #addButton dlg "No" $ asInt32 ResponseTypeNo
 
   r <- showRunAndDestroy dlg
   when (isResponse r ResponseTypeYes) $ action False
@@ -240,12 +252,11 @@ confirmExit changed _ action parent = do
 
 askCreateField :: DialogFunction [(FieldName, FieldType)]
 askCreateField _ action parent = do
-    dlg <- createDialog parent
-
-    _ <- #addButton dlg "Crear" $ asInt32 ResponseTypeOk
-    _ <- #addButton dlg "Cancelar" $ asInt32 ResponseTypeCancel
+    dlg <- createDialogButtonsLabel parent
+                         [("Crear", asInt32 ResponseTypeOk)
+                         ,("Cancelar", asInt32 ResponseTypeCancel)]
+                         "Crear Campos"
     content <- #getContentArea dlg
-    labelNew (Just "Crear Campos") >>= #add content
 
     grid <- gridNew
     _ <- addLabel grid "Nombre" 0 0
@@ -323,16 +334,15 @@ addComboBox grid options left top = do
 
 askDeleteFields :: [FieldName] -> DialogFunction [FieldPos]
 askDeleteFields names _ action parent = do
-    dlg <- createDialog parent
-
-    _ <- #addButton dlg "Borrar" $ asInt32 ResponseTypeOk
-    _ <- #addButton dlg "Cancelar" $ asInt32 ResponseTypeCancel
-    content <- #getContentArea dlg
-    labelNew (Just "Borrar Campos") >>= #add content
+    dlg <- createDialogButtonsLabel parent
+                      [("Borrar", asInt32 ResponseTypeOk)
+                      ,("Cancelar", asInt32 ResponseTypeCancel)]
+                      "Borrar Campos"
 
     grid <- gridNew
     cbuttons <- forM (enumerate names) $ \(row, name) -> addCheckButton grid name 0 row
 
+    content <- #getContentArea dlg
     #add content grid
 
     r <- showAndRun dlg
@@ -345,11 +355,10 @@ askDeleteFields names _ action parent = do
 
 askRenameFields :: [FieldName] -> DialogFunction [FieldName]
 askRenameFields names dmg action parent = do
-    dlg <- createDialog parent
-    _ <- #addButton dlg "Cambiar" $ asInt32 ResponseTypeOk
-    _ <- #addButton dlg "Cancelar" $ asInt32  ResponseTypeCancel
-    content <- #getContentArea dlg
-    labelNew (Just "Cambiar Nombres de Campos") >>= #add content
+    dlg <- createDialogButtonsLabel parent
+               [("Cambiar", asInt32 ResponseTypeOk)
+               ,("Cancelar", asInt32  ResponseTypeCancel)]
+               "Cambiar nombres de campos"
 
     grid <- gridNew
     #setColumnSpacing grid 4
@@ -359,6 +368,7 @@ askRenameFields names dmg action parent = do
         #setText entry name
         return entry
 
+    content <- #getContentArea dlg
     #packStart content grid True True 8
 
     r <- showAndRun dlg
@@ -370,12 +380,11 @@ askRenameFields names dmg action parent = do
 
 askSortRows :: [FieldName] -> DialogFunction (FieldPos, SortDirection)
 askSortRows names dmg action parent = do
-    dlg <- createDialog parent
-    _ <- #addButton dlg "Ascendente" 1
-    _ <- #addButton dlg "Descendente" 2
-    _ <- #addButton dlg "Cancelar" 3
-    content <- #getContentArea dlg
-    labelNew (Just "Ordenar") >>= #add content
+    dlg <- createDialogButtonsLabel parent
+                 [("Ascendente", 1)
+                 ,("Descendente", 2)
+                 ,("Cancelar", 3)]
+                 "Ordenar"
 
     grid <- gridNew
 
@@ -384,6 +393,7 @@ askSortRows names dmg action parent = do
     cbuttons <- (btn :) <$> forM (enumerate $ tail names) (\(row, name) ->
         addRadioButtonFromWidget grid btn name 0 (row + 1))
 
+    content <- #getContentArea dlg
     #add content grid
 
     r <- showAndRun dlg
@@ -455,6 +465,7 @@ copyOther _ initial values dmg action parent = do
 
     mt <- useCombo dlg combo initial values dmg parent
     forM_ mt action
+
 
 showSources :: DialogManager -> [(RowStoreName, [FieldName])] -> Window -> IO ()
 showSources dmg srcs parent = do
