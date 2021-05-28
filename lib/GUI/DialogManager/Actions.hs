@@ -84,28 +84,28 @@ configureDialog parent dlg = do
           ]
 
 showAndRun :: IsDialog dlg => dlg -> IO Int32
-showAndRun dlg = do
-    dlg <- toDialog dlg
+showAndRun dl = do
+    dlg <- toDialog dl
     #showAll dlg
     #run dlg
 
 showRunAndDestroy :: IsDialog dlg => dlg -> IO Int32
-showRunAndDestroy dlg = do
-    dlg <- toDialog dlg
+showRunAndDestroy dl = do
+    dlg <- toDialog dl
     #showAll dlg
     r <- #run dlg
     #destroy dlg
     return r
 
 showRunAndHide :: IsDialog dlg => dlg -> IO Int32
-showRunAndHide dlg = do
-  dlg <- toDialog dlg
+showRunAndHide dl = do
+  dlg <- toDialog dl
   #showAll dlg
   runAndHide dlg
 
 runAndHide :: IsDialog dlg => dlg -> IO Int32
-runAndHide dlg = do
-  dlg <- toDialog dlg
+runAndHide dl = do
+  dlg <- toDialog dl
   r <- #run dlg
   #hide dlg
   return r
@@ -113,7 +113,6 @@ runAndHide dlg = do
 noResponseMessage :: Text -> Window -> IO ()
 noResponseMessage m parent = do
     dlg <- createDialogButtons parent [("Ok", asInt32 ResponseTypeOk)]
-    _ <- #addButton dlg "Ok" $ asInt32 ResponseTypeOk
     content <- #getContentArea dlg
     message <- labelNew $ Just m
     #packStart content message True True 2
