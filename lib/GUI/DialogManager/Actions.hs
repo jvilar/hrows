@@ -352,19 +352,20 @@ askDeleteFields names _ action parent = do
 
     #destroy dlg
 
-askRenameFields :: [FieldName] -> DialogFunction [FieldName]
-askRenameFields names dmg action parent = do
+
+askRename :: Text -> [Text] -> DialogFunction [Text]
+askRename header labels _ action parent = do
     dlg <- createDialogButtonsLabel parent
                [("Cambiar", asInt32 ResponseTypeOk)
                ,("Cancelar", asInt32  ResponseTypeCancel)]
-               "Cambiar nombres de campos"
+               header
 
     grid <- gridNew
     #setColumnSpacing grid 4
-    centries <- forM (enumerate names) $ \(row, name) -> do
-        _ <- addLabel grid name 0 row
-        entry <- addEntry grid 1 row
-        #setText entry name
+    centries <- forM (enumerate labels) $ \(rw, label) -> do
+        _ <- addLabel grid label 0 rw
+        entry <- addEntry grid 1 rw
+        #setText entry label
         return entry
 
     content <- #getContentArea dlg
@@ -376,6 +377,11 @@ askRenameFields names dmg action parent = do
          (mapM #getText centries >>= action)
 
     #destroy dlg
+
+
+askRenameFields :: [FieldName] -> DialogFunction [FieldName]
+askRenameFields = askRename "Cambiar nombres de campos"
+
 
 askSortRows :: [FieldName] -> DialogFunction (FieldPos, SortDirection)
 askSortRows names dmg action parent = do
