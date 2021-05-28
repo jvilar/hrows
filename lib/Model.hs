@@ -14,8 +14,10 @@ module Model (
               , addSource
               , addSourceInfo
               , getSourceInfos
+              , renameSources
               -- *Rexported
               , module Model.RowStore
+              , module Model.SourceInfo
 ) where
 
 import Model.Empty
@@ -68,3 +70,10 @@ addSourceInfo si m = m { _sources = si : _sources m }
 -- |Get the 'SourceInfo' for the sources
 getSourceInfos :: Model -> [SourceInfo]
 getSourceInfos = _sources
+
+-- |Change the names of the sources
+renameSources :: [SourceName] -> Model -> Model
+renameSources names m = m {
+                            _rowStore = renameDataSources names $ _rowStore m
+                            , _sources = zipWith renameSourceInfo names $ _sources m 
+                          }

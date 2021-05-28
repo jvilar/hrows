@@ -20,6 +20,7 @@ module Model.RowStore.Update (
   , moveField
   , changeFieldType
   , changeFieldFormula
+  , renameDataSources
 ) where
 
 import qualified Data.IntMap.Strict as IM
@@ -325,4 +326,8 @@ changeFieldFormula mf n rst = addPlan rst { _fieldInfo = newInfo, _changed = Tru
           change f xs = let
               (h, x:t) = splitAt (fromIntegral n) xs
               in h ++ f x : t
+
+-- |Change the names of the `DataSource` s
+renameDataSources :: [RowStoreName] -> RowStore -> RowStore
+renameDataSources nms rst = addPlan rst { _rowStores = zipWith setName nms $ _rowStores rst }
 

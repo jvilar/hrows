@@ -18,6 +18,7 @@ module GUI.DialogManager.Actions (
   , askCreateField
   , askDeleteFields
   , askRenameFields
+  , askRenameSources
   , askSortRows
   , getFieldFormula
   , searchField
@@ -381,6 +382,10 @@ askRename header labels _ action parent = do
 
 askRenameFields :: [FieldName] -> DialogFunction [FieldName]
 askRenameFields = askRename "Cambiar nombres de campos"
+
+
+askRenameSources :: [SourceName] -> DialogFunction [SourceName]
+askRenameSources = askRename "Cambiar nombres de fuentes"
 
 
 askSortRows :: [FieldName] -> DialogFunction (FieldPos, SortDirection)

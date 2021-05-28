@@ -108,6 +108,8 @@ update model (SetUnchanged, _) = return $ setUnchanged `inside` model
 update model (AddNewSource si rst, _) = do
     message . InformationMessage $ T.concat ["Se ha añadido la fuente ", getName rst]
     return $ addSource si rst model
+update model (RenameSources ns, pos) =
+    partialRefresh pos $ renameSources ns model
 update _ (Undo, _) = liftIO $ throwIO $ HRowsException "No puede llegar un Undo al método update de UpdateAuto"
 update _ (Redo, _) = liftIO $ throwIO $ HRowsException "No puede llegar un Redo al método update de UpdateAuto"
 update _ (BlockUndo, _) = liftIO $ throwIO $ HRowsException "No puede llegar un BlockUndo al método update de UpdateAuto"

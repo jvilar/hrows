@@ -10,7 +10,6 @@ import qualified Data.Text as T
 
 import GUI.Command
 import Model
-import Model.RowStore
 import Presenter.Auto
 import Presenter.Input
 
@@ -25,7 +24,7 @@ dialogAuto = arrM $ \(input, model, pos) -> let
                                              DeleteFieldsDialog -> AskDeleteFields fieldNames
                                              ImportFromDialog t -> AskImportFrom t
                                              ChooseImportDialog t rst -> AskImportOptions t (fnames rst) fieldNames rst
-                                             ChangeNamesDialog -> AskRenameFields fieldNames
+                                             RenameFieldsDialog -> AskRenameFields fieldNames
                                              SortRowsDialog -> AskSortRows fieldNames
                                              MessageDialog m -> DisplayMessage m
                                              ChangeFieldFormulaDialog f -> GetFieldFormula f (fieldNames !!! f) (formulas `from` model !!! f)
@@ -33,5 +32,6 @@ dialogAuto = arrM $ \(input, model, pos) -> let
                                              CopyOtherDialog f -> CopyOtherField f (toString $ row pos `from` model !!! f) (fieldValues f `from` model)
                                              AddSourceDialog -> AskAddSource
                                              ShowSourcesDialog -> ShowSources sourceList
+                                             RenameSourcesDialog -> AskRenameSources (map fst sourceList)
                                              ShowAboutDialog -> DisplayAbout
                                              d -> DisplayMessage . ErrorMessage $ T.concat ["Error: ", T.pack $ show d, " not implemented"] 

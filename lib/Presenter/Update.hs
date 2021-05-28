@@ -6,10 +6,7 @@ module Presenter.Update (
                , SortDirection(..)
 ) where
 
-import Data.Text(Text)
-
 import Model
-import Model.SourceInfo (SourceInfo)
 
 data UpdateCommand = UpdateField FieldPos Field
                    | ChangeModel Model
@@ -26,7 +23,8 @@ data UpdateCommand = UpdateField FieldPos Field
                    | ChangeFieldType FieldType FieldPos
                    | ChangeFieldFormula (Maybe Formula) FieldPos
                    | SetUnchanged
-                   | AddNewSource SourceInfo RowStore 
+                   | AddNewSource SourceInfo RowStore
+                   | RenameSources [SourceName]
                    | Undo
                    | Redo
                    | BlockUndo

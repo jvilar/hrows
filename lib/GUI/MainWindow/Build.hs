@@ -137,7 +137,7 @@ prepareFileMenu  = mapM_ (uncurry menuItemInput)
                              ,("deleteFieldsMenuItem", toInput DeleteFieldsDialog)
                              ,("importFieldsMenuItem", toInput $ ImportFromDialog ImportFields)
                              ,("importRowsMenuItem", toInput $ ImportFromDialog ImportRows)
-                             ,("changeNamesMenuItem", toInput ChangeNamesDialog)
+                             ,("changeNamesMenuItem", toInput RenameFieldsDialog)
                              ]
 
 prepareFieldMenu :: BuildMonad ()
@@ -167,8 +167,9 @@ prepareSourceMenu = mapM_ (uncurry menuItemInput)
                                [("addSourceMenuItem", toInput AddSourceDialog)
                                , ("showSourcesMenuItem", toInput ShowSourcesDialog)
                                , ("deleteSourceMenuItem", toInput DeleteSourceDialog)
+                               , ("renameSourcesMenuItem", toInput RenameSourcesDialog)
                                ]
-                               
+
 prepareHelpMenu :: BuildMonad ()
 prepareHelpMenu = mapM_ (uncurry menuItemInput)
                                [("aboutMenuItem", toInput ShowAboutDialog)

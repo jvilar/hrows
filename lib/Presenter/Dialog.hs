@@ -15,7 +15,7 @@ data DialogCommand = LoadFileDialog
                    | DeleteFieldsDialog
                    | ImportFromDialog ImportType
                    | ChooseImportDialog ImportType RowStore
-                   | ChangeNamesDialog
+                   | RenameFieldsDialog
                    | SortRowsDialog
                    | MessageDialog Message
                    | ChangeFieldFormulaDialog FieldPos
@@ -24,5 +24,6 @@ data DialogCommand = LoadFileDialog
                    | AddSourceDialog
                    | ShowSourcesDialog
                    | DeleteSourceDialog
+                   | RenameSourcesDialog
                    | ShowAboutDialog
                      deriving Show

@@ -3,6 +3,8 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Model.SourceInfo ( SourceInfo
+                        , SourceName
+                        , siName
                         , siPathAndConf
                         , siFormat
                         , FormatInfo(..)
@@ -10,6 +12,7 @@ module Model.SourceInfo ( SourceInfo
                         , changeFormatInfo
                         , changePathAndConf
                         , mkSourceInfo
+                        , renameSourceInfo
                         , module Model.RowStore.ListatabInfo
                         ) where
 
@@ -25,7 +28,7 @@ import Model.RowStore.ListatabInfo
 
 
 -- |The name of a `SourceInfo`
-type SourceInfoName = Text
+type SourceName = Text
 
 
 -- |The location of a file possibly including the corresponding configuration file
@@ -34,7 +37,7 @@ data PathAndConf = PathAndConf { path :: FilePath, confPath :: Maybe FilePath } 
 
 -- |The information about the source of the model. It contains the name,
 -- the file path, and the options related to the format.
-data SourceInfo = SourceInfo { siName :: SourceInfoName
+data SourceInfo = SourceInfo { siName :: SourceName
                              , siFilePath :: FilePath
                              , siConfFile :: Maybe FilePath
                              , siFormat :: FormatInfo
@@ -89,8 +92,11 @@ changeFormatInfo :: FormatInfo -> SourceInfo -> SourceInfo
 changeFormatInfo f s = s { siFormat = f }
 
 
-mkSourceInfo :: Maybe SourceInfoName -> PathAndConf -> ListatabInfo -> SourceInfo
+mkSourceInfo :: Maybe SourceName -> PathAndConf -> ListatabInfo -> SourceInfo
 mkSourceInfo n PathAndConf {..} = let
     nme = fromMaybe (pack $ takeBaseName path) n
   in SourceInfo nme path confPath . ListatabFormat
 
+
+renameSourceInfo :: SourceName -> SourceInfo -> SourceInfo
+renameSourceInfo n si = si { siName = n }

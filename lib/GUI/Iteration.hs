@@ -19,7 +19,7 @@ data Iteration = NoIteration -- ^No need to iterate.
                | AskDeleteFields [FieldName] -- ^Ask for fields to delete.
                | AskImportFrom ImportType -- ^Ask for a file to import from.
                | AskImportOptions ImportType [FieldName] [FieldName] RowStore -- ^Ask for the pairing of fields in an import.
-               | AskRenameFields [FieldName] -- ^Ask for fields to rename.
+               | AskRenameFields [FieldName] -- ^Ask for new names for the fields
                | AskSortRows [FieldName] -- ^Ask the field for sorting.
                | DisplayMessage Message -- ^Display a message.
                | ConfirmExit Bool -- ^Confirm exit program.
@@ -27,6 +27,7 @@ data Iteration = NoIteration -- ^No need to iterate.
                | SearchField FieldPos Text [Text] -- ^Search for a record containing a value.
                | CopyOtherField FieldPos Text [Text] -- ^Copy the value of the field from another record.
                | AskAddSource -- ^Ask for a new source.
+               | AskRenameSources [SourceName] -- ^Ask for new names for the sources
                | ShowSources [(RowStoreName, [FieldName])] -- ^Show the available sources and their fields
                | DisplayAbout -- ^Show an about dialog
                deriving Show

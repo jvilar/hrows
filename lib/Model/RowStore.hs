@@ -25,6 +25,7 @@ module Model.RowStore (
              -- **Updating
              , setName
              , sortRows
+             , renameDataSources
              , setUnchanged
              -- * Types
              , FieldName
