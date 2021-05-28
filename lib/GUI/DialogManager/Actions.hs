@@ -477,7 +477,7 @@ copyOther _ initial values dmg action parent = do
     forM_ mt action
 
 
-showSources :: DialogManager -> [(RowStoreName, [FieldName])] -> Window -> IO ()
+showSources :: DialogManager -> [(RowStoreName, FilePath, [FieldName])] -> Window -> IO ()
 showSources dmg srcs parent = do
     let dlg = showSourcesDialog dmg
         trv = sourcesTreeView dmg
@@ -486,7 +486,7 @@ showSources dmg srcs parent = do
     showRunAndHide dlg
     return ()
 
-fillTreeView :: TreeView -> [(RowStoreName, [FieldName])] -> IO ()
+fillTreeView :: TreeView -> [(RowStoreName, FilePath, [FieldName])] -> IO ()
 fillTreeView tv srcs = do
     let types = [gtypeString]
     ts <- treeStoreNew types
@@ -500,11 +500,11 @@ fillTreeView tv srcs = do
         #appendColumn tv col
         return ()
     let srcs' = if null srcs
-                then [("No hay fuentes", [])]
+                then [("No hay fuentes", "", [])]
                 else srcs
-    forM_ srcs' $ \(src, names) -> do
+    forM_ srcs' $ \(src, fp, names) -> do
         it <- #append ts Nothing
-        v <- toGValue $ Just src
+        v <- toGValue $ Just (T.concat [src, " (", T.pack fp, ")" ])
         #setValue ts it 0 v
         forM_ names $ \name -> do
            it' <- #append ts $ Just it

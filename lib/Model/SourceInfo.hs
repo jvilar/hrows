@@ -5,6 +5,7 @@
 module Model.SourceInfo ( SourceInfo
                         , SourceName
                         , siName
+                        , siFilePath
                         , siPathAndConf
                         , siFormat
                         , FormatInfo(..)

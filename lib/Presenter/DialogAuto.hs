@@ -16,7 +16,10 @@ import Presenter.Input
 dialogAuto :: PresenterAuto (DialogCommand, Model, RowPos) ()
 dialogAuto = arrM $ \(input, model, pos) -> let
                            fieldNames = fnames <@ model
-                           sourceList = [(getName rst, fnames rst) | rst <- getRowStores <@ model ]
+                           sourceList = [(getName rst, siFilePath si, fnames rst)
+                                         | (rst, si) <- zip (getRowStores <@ model)
+                                                            (getSourceInfos model)
+                                        ]
                         in sendGUIM . ShowIteration $ case input of
                                              LoadFileDialog -> AskReadFile
                                              SaveAsFileDialog -> AskWriteFile
@@ -32,6 +35,9 @@ dialogAuto = arrM $ \(input, model, pos) -> let
                                              CopyOtherDialog f -> CopyOtherField f (toString $ row pos `from` model !!! f) (fieldValues f `from` model)
                                              AddSourceDialog -> AskAddSource
                                              ShowSourcesDialog -> ShowSources sourceList
-                                             RenameSourcesDialog -> AskRenameSources (map fst sourceList)
+                                             RenameSourcesDialog -> AskRenameSources (map fst3 sourceList)
                                              ShowAboutDialog -> DisplayAbout
                                              d -> DisplayMessage . ErrorMessage $ T.concat ["Error: ", T.pack $ show d, " not implemented"] 
+
+fst3 :: (a, b, c) -> a
+fst3 (a, _, _) = a

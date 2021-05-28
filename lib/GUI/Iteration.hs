@@ -28,6 +28,6 @@ data Iteration = NoIteration -- ^No need to iterate.
                | CopyOtherField FieldPos Text [Text] -- ^Copy the value of the field from another record.
                | AskAddSource -- ^Ask for a new source.
                | AskRenameSources [SourceName] -- ^Ask for new names for the sources
-               | ShowSources [(RowStoreName, [FieldName])] -- ^Show the available sources and their fields
+               | ShowSources [(RowStoreName, FilePath, [FieldName])] -- ^Show the available sources and their fields
                | DisplayAbout -- ^Show an about dialog
                deriving Show
