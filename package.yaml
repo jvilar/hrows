@@ -75,3 +75,11 @@ tests:
     - hrows
     - hspec
     - text
+
+  sourceinfo-test:
+    main: test/SourceInfo.hs
+    dependencies:
+    - aeson
+    - bytestring
+    - hrows
+    - hspec

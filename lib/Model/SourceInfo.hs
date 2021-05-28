@@ -1,73 +1,96 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Model.SourceInfo ( SourceInfo
                         , siPathAndConf
                         , siFormat
-                        , PathAndConf(..)
                         , FormatInfo(..)
-                        , FormatInfoClass(..)
+                        , PathAndConf(..)
                         , changeFormatInfo
                         , changePathAndConf
                         , mkSourceInfo
                         , module Model.RowStore.ListatabInfo
                         ) where
 
-import Model.Empty
-import Model.RowStore.ListatabInfo
+import Control.Monad(mzero)
+import Data.Aeson (defaultOptions, genericToEncoding, FromJSON (parseJSON), ToJSON(..), Value(Object), (.:?), (.:))
+import Data.Default(Default (def))
+import Data.Maybe(fromMaybe)
+import Data.Text(pack, Text)
 import GHC.Generics (Generic)
-import Data.Aeson (defaultOptions, genericToEncoding, FromJSON, ToJSON(..))
+import System.FilePath(takeBaseName)
+
+import Model.RowStore.ListatabInfo
+
+
+-- |The name of a `SourceInfo`
+type SourceInfoName = Text
 
 
 -- |The location of a file possibly including the corresponding configuration file
 data PathAndConf = PathAndConf { path :: FilePath, confPath :: Maybe FilePath } deriving Show
 
 
--- |The information about the source of the model. It contains
--- the possible file path and the options related to the format.
-data SourceInfo = SourceInfo { siFilePath :: Maybe FilePath
+-- |The information about the source of the model. It contains the name,
+-- the file path, and the options related to the format.
+data SourceInfo = SourceInfo { siName :: SourceInfoName
+                             , siFilePath :: FilePath
                              , siConfFile :: Maybe FilePath
                              , siFormat :: FormatInfo
                              } deriving (Generic, Show)
 
-instance Empty SourceInfo where
-  empty = mkSourceInfo Nothing ()
 
 instance ToJSON SourceInfo where
   toEncoding = genericToEncoding defaultOptions
-  
-instance FromJSON SourceInfo
 
--- |The information about the format of the model.
+
+instance FromJSON SourceInfo where
+  parseJSON (Object v) = do
+    n <- v .:? "siName"
+    fp <- v .: "siFilePath"
+    c <- v .: "siConfFile"
+    f <- v .: "siFormat"
+    return $ case n of
+      Nothing -> SourceInfo "algo" fp c f
+      Just nm -> SourceInfo nm fp c f
+  parseJSON _ = mzero
+
+
+-- |This class defines the different formats available as input. For
+-- the moment, only ListatabFormat is supported
 data FormatInfo = NoFormatInfo
                 | ListatabFormat ListatabInfo
                 deriving (Generic, Show)
-                
+
+
 instance ToJSON FormatInfo where
-  toEncoding = genericToEncoding defaultOptions
+    toEncoding = genericToEncoding defaultOptions
+
 
 instance FromJSON FormatInfo
 
+
+instance Default FormatInfo where
+    def = ListatabFormat def
+
+
 changePathAndConf :: PathAndConf -> SourceInfo -> SourceInfo
-changePathAndConf pc si = si { siFilePath = Just $ path pc
+changePathAndConf pc si = si { siFilePath = path pc
                              , siConfFile = confPath pc
                              }
 
-siPathAndConf :: SourceInfo -> Maybe PathAndConf
-siPathAndConf (SourceInfo Nothing _ _) = Nothing
-siPathAndConf (SourceInfo (Just p) cnf _) = Just $ PathAndConf p cnf
+
+siPathAndConf :: SourceInfo -> PathAndConf
+siPathAndConf (SourceInfo _ p cnf _) = PathAndConf p cnf
+
 
 changeFormatInfo :: FormatInfo -> SourceInfo -> SourceInfo
 changeFormatInfo f s = s { siFormat = f }
 
-mkSourceInfo :: FormatInfoClass i => Maybe PathAndConf -> i -> SourceInfo
-mkSourceInfo pc = SourceInfo (path <$> pc) (pc >>= confPath) . toFormatInfo
 
-class FormatInfoClass t where
-    toFormatInfo :: t -> FormatInfo
-
-instance FormatInfoClass () where
-    toFormatInfo () = NoFormatInfo
-
-instance FormatInfoClass ListatabInfo where
-    toFormatInfo = ListatabFormat
+mkSourceInfo :: Maybe SourceInfoName -> PathAndConf -> ListatabInfo -> SourceInfo
+mkSourceInfo n PathAndConf {..} = let
+    nme = fromMaybe (pack $ takeBaseName path) n
+  in SourceInfo nme path confPath . ListatabFormat
 

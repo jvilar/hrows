@@ -8,6 +8,7 @@ module Model.RowStore.RowStoreConf ( RowStoreConf(..)
                                    ) where
 
 import Data.Aeson
+import Data.Default(def)
 import Data.Text(Text)
 import Data.Vector(toList)
 import GHC.Generics
@@ -23,7 +24,7 @@ data RowStoreConf = RowStoreConf {
     } deriving (Generic, Show)
 
 instance Empty RowStoreConf where
-  empty = RowStoreConf [] NoFormatInfo []
+  empty = RowStoreConf [] def []
 
 data FieldConf = FieldConf { nameFC :: Maybe Text
                            , typeFC :: FieldType

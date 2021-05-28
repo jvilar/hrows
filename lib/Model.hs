@@ -27,10 +27,10 @@ import Model.SourceInfo
 data Model = Model { _rowStore :: RowStore
                    , _sources :: [SourceInfo]
                    } deriving Show
-                   
+
 -- |Change the `RowStore` of the model
 setStore :: RowStore -> Model -> Model
-setStore rst m = m { _rowStore = rst } 
+setStore rst m = m { _rowStore = rst }
 
 instance Empty Model where
     empty = fromRowStore $ emptyName "vacía"
@@ -57,10 +57,10 @@ inside f m = setStore (f $ _rowStore m) m
 -- |Adds a new source to the `Model`
 addSource :: SourceInfo -> RowStore -> Model -> Model
 addSource si rst m = m {
-                         _rowStore = addRowStore rst $ _rowStore m 
+                         _rowStore = addRowStore rst $ _rowStore m
                          , _sources = si : _sources m
                        }
-                       
+
 -- |Adds a 'SourceInfo' to the 'Model'
 addSourceInfo :: SourceInfo -> Model -> Model
 addSourceInfo si m = m { _sources = si : _sources m }

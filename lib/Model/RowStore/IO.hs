@@ -6,8 +6,9 @@ module Model.RowStore.IO (
 ) where
 
 import Control.Exception (throwIO, try)
-import Data.Aeson(decode)
+import Data.Aeson(decode, FromJSON (parseJSON), Value)
 import Data.Aeson.Encode.Pretty(encodePretty)
+import Data.Aeson.Types(parseEither)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Text as T
 import System.FilePath(takeFileName)
@@ -21,15 +22,15 @@ import Model.SourceInfo
 
 -- |Reads a `RowStore` and its `RowStoreConf`(if any) using a `SourceInfo`
 readRowStore :: SourceInfo -> IO (RowStore, Maybe RowStoreConf)
-readRowStore si = case siPathAndConf si of
-    Nothing -> throwIO $ HRowsException "No puedo cargar un fichero vacío"
-    Just (PathAndConf fp mconfFp) -> do
-       let ListatabFormat ltInfo = siFormat si
+readRowStore si = do
+       let PathAndConf fp mconfFp = siPathAndConf si
+           ListatabFormat ltInfo = siFormat si
        mconf <- readConf mconfFp
-       let info = case formatConf <$> mconf of
-                     Nothing -> ltInfo
-                     Just NoFormatInfo -> ltInfo
-                     Just (ListatabFormat li) -> li
+       let info = case mconf of
+                      Nothing -> ltInfo
+                      Just f -> case formatConf f of
+                                  NoFormatInfo -> ltInfo
+                                  ListatabFormat inf -> inf
            name = T.pack $ takeFileName fp
        (h, ds) <- readListatab info fp
        rst <- case mconf of
@@ -45,10 +46,9 @@ readRowStore si = case siPathAndConf si of
 
 -- /Writes a `RowStore` using a `SourceInfo`
 writeRowStore :: SourceInfo -> [SourceInfo] -> RowStore -> IO ()
-writeRowStore si sInfos rs = case siPathAndConf si of
-  Nothing -> throwIO $ HRowsException "No puedo escribir si no sé el nombre del fichero"
-  Just (PathAndConf fp mconfFp) -> do
-      let ListatabFormat ltInfo = siFormat si
+writeRowStore si sInfos rs = do
+      let PathAndConf fp mconfFp = siPathAndConf si
+          ListatabFormat ltInfo = siFormat si
       writeListatab ltInfo fp (names rs) (rows rs)
       case mconfFp of
           Nothing -> return ()
@@ -57,6 +57,12 @@ writeRowStore si sInfos rs = case siPathAndConf si of
               case r of
                   Right () -> return ()
                   Left e -> exception e
+
+
+parseConfFile :: BS.ByteString -> Either String RowStoreConf
+parseConfFile bs = case (decode bs :: Maybe Value) of
+                      Nothing -> Left "Erroneous JSON in config file"
+                      Just v -> parseEither parseJSON v
 
 
 readConf :: Maybe FilePath -> IO (Maybe RowStoreConf)
@@ -68,8 +74,8 @@ readConf (Just fp) = do
                                    then return l
                                    else throwIO $ hRowsException $ "Empty config file: " ++ fp
                  case mf of
-                     Right s -> case decode s of
-                                    Nothing -> throwIO $ hRowsException $ "Bad config file: " ++ fp
-                                    Just c -> return $ Just c
+                     Right s -> case parseConfFile s of
+                                    Left e -> throwIO $ hRowsException $ "Bad config file: " ++ fp ++ "\nException: " ++ show e
+                                    Right c -> return $ Just c
                      Left e -> exception e
 

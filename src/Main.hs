@@ -85,30 +85,28 @@ backupLoop inputChan = do
 main :: IO ()
 main = do
   opts <- getOptions
+  let Just fn = opts ^. inputFileName
   cnf <- if isJust $ opts ^. confFileName
          then return $ opts ^. confFileName
          else do
-                let Just fn = opts ^. inputFileName
-                    defFn = defaultConfFileName fn
+                let defFn = defaultConfFileName fn
                 exFn <- doesFileExist fn
                 exCnf <- doesFileExist defFn
                 return $ if exFn == exCnf
                          then Just defFn
                          else Nothing
-  let pc = do
-              fn <- opts ^. inputFileName
-              return $ PathAndConf fn cnf
+  let pc = PathAndConf fn cnf
       ltinfo = def { ltInputSeparator = opts ^. inputSeparator,
                      ltOutputSeparator = opts ^. outputSeparator
                    }
-      sinfo =  mkSourceInfo pc ltinfo
+      sinfo =  mkSourceInfo Nothing pc ltinfo
 
   inputChan <- newChan
   control <- makeGUI inputChan
   _ <- forkIO $ void $ runOnChanM id
                             (updateScreen control)
                             inputChan
-                            presenter
+                            (presenter sinfo)
   _ <- forkIO $ backupLoop inputChan
   writeList2Chan inputChan [ toInput MoveBegin
                            , toInput $ SetMainSource sinfo

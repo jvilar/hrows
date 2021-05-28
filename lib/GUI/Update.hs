@@ -114,4 +114,4 @@ sourceInfoFromDialogResult (fp, c, t) = let
           , ltOutputSeparator = c
           , ltHeaderType = t
         }
-  in mkSourceInfo (Just $ PathAndConf fp Nothing) lti
+  in mkSourceInfo Nothing (PathAndConf fp Nothing) lti

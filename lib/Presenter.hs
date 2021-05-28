@@ -28,13 +28,13 @@ import Presenter.MovementAuto
 import Presenter.SourceAuto
 import Presenter.UpdateAuto
 
-presenter ::  Auto IO Input [GUICommand]
-presenter = arr (:[]) >>> updater
+presenter ::  SourceInfo -> Auto IO Input [GUICommand]
+presenter si0 = arr (:[]) >>> updater si0
 
-updater :: Auto IO [Input] [GUICommand]
-updater = proc inputs -> do
+updater :: SourceInfo -> Auto IO [Input] [GUICommand]
+updater si0 = proc inputs -> do
     rec
-        dauto <- delay_ processInput -< auto
+        dauto <- delay_ (processInput si0) -< auto
         (cmds, auto) <- arrM (uncurry pr) -< (dauto, inputs)
     -- arrM putStrLn -< "GUI commands: " ++ show cmds
     id -< cmds
@@ -47,13 +47,13 @@ pr auto (i:is) = do
     (cmds', auto'') <- pr auto' (is ++ is')
     return (cmds ++ cmds', auto'')
 
-processInput :: PresenterAuto Input ()
-processInput = proc inp -> do
+processInput :: SourceInfo -> PresenterAuto Input ()
+processInput si0 = proc inp -> do
              -- arrM (liftIO . putStrLn) -< "inp: " ++ show inp
              rec
                model <- processUpdateCommands -< (inp, pos)
                pos <- processMoveCommands -< (inp, model)
-             si <- processSourceCommands -< inp
+             si <- processSourceCommands si0 -< inp
              processFileCommands -< (inp, model, si)
              processDialogCommands -< (inp, model, pos)
              processListingCommands -< (inp, model)
@@ -107,9 +107,8 @@ getControls :: Input -> Maybe ControlCommand
 getControls (InputControl cmd) = Just cmd
 getControls _ = Nothing
 
-processSourceCommands :: PresenterAuto Input SourceInfo
-processSourceCommands = emitJusts getSources >>> holdWith_ si0 . perBlip (sourceAuto si0)
-                        where si0 = empty
+processSourceCommands :: SourceInfo -> PresenterAuto Input SourceInfo
+processSourceCommands si0 = emitJusts getSources >>> holdWith_ si0 . perBlip (sourceAuto si0)
 
 getSources :: Input -> Maybe SourceCommand
 getSources (InputSource cmd) = Just cmd
