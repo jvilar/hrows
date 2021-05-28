@@ -22,7 +22,7 @@ import Data.Default(Default (def))
 import Data.Maybe(fromMaybe)
 import Data.Text(pack, Text)
 import GHC.Generics (Generic)
-import System.FilePath(takeBaseName)
+import System.FilePath(takeFileName)
 
 import Model.RowStore.ListatabInfo
 
@@ -55,7 +55,7 @@ instance FromJSON SourceInfo where
     c <- v .: "siConfFile"
     f <- v .: "siFormat"
     return $ case n of
-      Nothing -> SourceInfo "algo" fp c f
+      Nothing -> SourceInfo (pack $ takeFileName fp) fp c f
       Just nm -> SourceInfo nm fp c f
   parseJSON _ = mzero
 
@@ -94,7 +94,7 @@ changeFormatInfo f s = s { siFormat = f }
 
 mkSourceInfo :: Maybe SourceName -> PathAndConf -> ListatabInfo -> SourceInfo
 mkSourceInfo n PathAndConf {..} = let
-    nme = fromMaybe (pack $ takeBaseName path) n
+    nme = fromMaybe (pack $ takeFileName path) n
   in SourceInfo nme path confPath . ListatabFormat
 
 

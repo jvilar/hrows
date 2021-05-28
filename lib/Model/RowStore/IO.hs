@@ -10,8 +10,6 @@ import Data.Aeson(decode, FromJSON (parseJSON), Value)
 import Data.Aeson.Encode.Pretty(encodePretty)
 import Data.Aeson.Types(parseEither)
 import qualified Data.ByteString.Lazy as BS
-import qualified Data.Text as T
-import System.FilePath(takeFileName)
 
 import HRowsException
 import Model.RowStore.Base
@@ -44,7 +42,7 @@ readRowStore si = do
        return (rst, mconf)
 
 
--- /Writes a `RowStore` using a `SourceInfo`
+-- |Writes a `RowStore` using a `SourceInfo`
 writeRowStore :: SourceInfo -> [SourceInfo] -> RowStore -> IO ()
 writeRowStore si sInfos rs = do
       let PathAndConf fp mconfFp = siPathAndConf si
