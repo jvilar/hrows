@@ -25,13 +25,13 @@ readRowStore :: SourceInfo -> IO (RowStore, Maybe RowStoreConf)
 readRowStore si = do
        let PathAndConf fp mconfFp = siPathAndConf si
            ListatabFormat ltInfo = siFormat si
+           name = siName si
        mconf <- readConf mconfFp
        let info = case mconf of
                       Nothing -> ltInfo
                       Just f -> case formatConf f of
                                   NoFormatInfo -> ltInfo
                                   ListatabFormat inf -> inf
-           name = T.pack $ takeFileName fp
        (h, ds) <- readListatab info fp
        rst <- case mconf of
            Nothing -> case h of
