@@ -149,6 +149,7 @@ askFile :: FileChooserDialog
         -> IO ()
 askFile dialog button action parent = do
     configureDialog parent =<< toDialog dialog
+    #setActive button True
     r <- runAndHide dialog
     when (isResponse r ResponseTypeOk) $ do
             file <- #getFilename dialog
