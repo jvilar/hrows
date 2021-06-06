@@ -263,9 +263,16 @@ askCreateField _ action parent = do
     _ <- addLabel grid "Nombre" 0 0
     _ <- addLabel grid "Tipo" 1 0
     entries <- forM [1..10] $ \row -> (,)
-                                    <$> addEntry grid 0 row
+                                    <$> do
+                                           e <- addEntry grid 0 row
+                                           #setHexpand e True 
+                                           return e
                                     <*> addComboBox grid (map snd typeLabels) 1 row
 
+    #setMarginStart grid 5
+    #setMarginTop grid 5
+    #setMarginBottom grid 5
+    #setMarginEnd grid 5
     #add content grid
 
     r <- showAndRun dlg
