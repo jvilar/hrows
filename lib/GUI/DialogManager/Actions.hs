@@ -54,10 +54,19 @@ displayMessage (WarningMessage m) = noResponseMessage m
 displayMessage (InformationMessage m) = noResponseMessage m
 displayMessage (QuestionMessage _) = undefined
 
+addMargin :: IsWidget w => w -> IO ()
+addMargin w = do
+    widgetSetMarginStart w 5
+    widgetSetMarginTop w 3
+    widgetSetMarginBottom w 5
+    widgetSetMarginEnd w 5
+
+
 createDialog :: Window -> IO Dialog
 createDialog parent = do
   dlg <- dialogNew
   configureDialog parent dlg
+  #getContentArea dlg >>= addMargin
   return dlg
 
 
@@ -72,7 +81,9 @@ createDialogButtonsLabel :: Window -> [(Text, Int32)] -> Text -> IO Dialog
 createDialogButtonsLabel parent btns lbl = do
   dlg <- createDialogButtons parent btns
   content <- #getContentArea dlg
-  labelNew (Just lbl) >>= #add content
+  l <- labelNew (Just lbl)
+  #setMarginBottom l 4
+  #add content l
   return dlg
 
 
@@ -269,10 +280,7 @@ askCreateField _ action parent = do
                                            return e
                                     <*> addComboBox grid (map snd typeLabels) 1 row
 
-    #setMarginStart grid 5
-    #setMarginTop grid 5
-    #setMarginBottom grid 5
-    #setMarginEnd grid 5
+    addMargin grid
     #add content grid
 
     r <- showAndRun dlg
@@ -351,6 +359,7 @@ askDeleteFields names _ action parent = do
     cbuttons <- forM (enumerate names) $ \(row, name) -> addCheckButton grid name 0 row
 
     content <- #getContentArea dlg
+    addMargin grid
     #add content grid
 
     r <- showAndRun dlg
