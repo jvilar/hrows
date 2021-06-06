@@ -1536,6 +1536,8 @@
             <property name="visible">True</property>
             <property name="can_focus">True</property>
             <property name="shadow_type">in</property>
+            <property name="propagate_natural_width">True</property>
+            <property name="propagate_natural_height">True</property>
             <child>
               <object class="GtkTreeView" id="sourcesTreeView">
                 <property name="width_request">200</property>
