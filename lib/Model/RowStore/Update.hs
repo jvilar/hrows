@@ -16,6 +16,7 @@ module Model.RowStore.Update (
   , deleteFields
   , renameFields
   , changeVisibleFields
+  , hideField
   , importFields
   , importRows
   , moveField
@@ -69,7 +70,7 @@ evaluateField up dss r f = let
 -- |Adds a `Row` to a `RowStore`.
 addRow :: RowStore -> Row -> RowStore
 addRow m r = let
-               r' = updateAll (_updatePlan m) (_dataSources m) $ zipWith convert (types m) (fillEmpty r) 
+               r' = updateAll (_updatePlan m) (_dataSources m) $ zipWith convert (types m) (fillEmpty r)
              in m { _rows = IM.insert (_size m) r' (_rows m)
                   , _size = _size m + 1
                   , _changed = True
@@ -228,10 +229,16 @@ renameFields names rst = addPlan rst { _fieldInfo = zipWith updateFInfo (_fieldI
                                         }
 
 -- |Changes the visible property of the fields according to the list.
-changeVisibleFields:: [Bool] -> RowStore -> RowStore
+changeVisibleFields :: [Bool] -> RowStore -> RowStore
 changeVisibleFields vs rst = rst { _fieldInfo = zipWith (\fi v -> fi { _visible = v })
                                                        (_fieldInfo rst) vs
                                  }
+
+-- |Hides a single field
+hideField :: FieldPos -> RowStore -> RowStore
+hideField fpos rst = rst { _fieldInfo = zipWith f (_fieldInfo rst) [0..] }
+    where f fi n | n == fpos = fi { _visible = False }
+                 | otherwise = fi
 
 -- Returns the values associated to a position from the corresponding
 -- position in the row, given the association of input positions to

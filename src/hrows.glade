@@ -221,7 +221,6 @@
         <property name="can_focus">False</property>
         <property name="tooltip_text" translatable="yes">Buscar un registro con un valor</property>
         <property name="label" translatable="yes">Buscar</property>
-        <property name="use_underline">True</property>
       </object>
     </child>
     <child>
@@ -306,6 +305,14 @@
         <property name="can_focus">False</property>
         <property name="tooltip_text" translatable="yes">Eliminar el campo</property>
         <property name="label" translatable="yes">Eliminar</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="hideFieldMenuItem">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="tooltip_text" translatable="yes">Eliminar el campo</property>
+        <property name="label" translatable="yes">Ocultar</property>
       </object>
     </child>
   </object>

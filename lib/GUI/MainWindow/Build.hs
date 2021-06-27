@@ -146,6 +146,7 @@ prepareFieldMenu = do
                      fieldMenuAction "searchFieldMenuItem" SearchFieldDialog
                      fieldMenuAction "copyOtherMenuItem" CopyOtherDialog
                      fieldMenuAction "deleteFieldMenuItem" (DeleteFields . (:[]))
+                     fieldMenuAction "hideFieldMenuItem" HideField
                      fieldMenuAction "formulaMenuItem" ChangeFieldFormulaDialog
                      fieldMenuAction "changeToStringMenuItem" (ChangeFieldType TypeString)
                      fieldMenuAction "changeToIntMenuItem" (ChangeFieldType TypeInt)

@@ -95,6 +95,8 @@ update model (DeleteFields fs, pos) =
     completeRefresh pos $ deleteFields fs `inside` model
 update model (RenameFields ns, pos) =
     completeRefresh pos $ renameFields ns `inside` model
+update model (HideField fpos, pos) =
+    completeRefresh pos $ hideField fpos `inside` model
 update model (SetFieldsVisibility vs, pos) =
     completeRefresh pos $ changeVisibleFields vs `inside` model
 update model (ImportFieldsFromRowStore m keys values, pos) =
