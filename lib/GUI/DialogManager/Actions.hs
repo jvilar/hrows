@@ -348,28 +348,40 @@ addComboBox grid options left top = do
     #attach grid cbox left top 1 1
     return cbox
 
-askDeleteFields :: [FieldName] -> DialogFunction [FieldPos]
-askDeleteFields names _ action parent = do
-    dlg <- createDialogButtonsLabel parent
-                      [("Borrar", asInt32 ResponseTypeOk)
-                      ,("Cancelar", asInt32 ResponseTypeCancel)]
-                      "Borrar Campos"
-
+selectFieldsDialog :: [FieldName] -> [Bool] -> Window -> Text -> Text -> Text -> IO (Maybe [Bool])
+selectFieldsDialog nmes vs parent okLbl cancelLbl lbl = do
+    dlg <- createDialogButtonsLabel parent 
+                      [ (okLbl, asInt32 ResponseTypeOk)
+                      , (cancelLbl, asInt32 ResponseTypeCancel)]
+                       lbl
     grid <- gridNew
-    cbuttons <- forM (enumerate names) $ \(row, name) -> addCheckButton grid name 0 row
+
+    #setColumnSpacing grid 4
+    cbuttons <- forM (enumerate $ zip nmes vs) $ \(rw, (name, v)) -> do
+        btn <- addCheckButton grid name 0 rw
+        #setActive btn v
+        return btn
 
     content <- #getContentArea dlg
-    addMargin grid
-    #add content grid
+    #packStart content grid True True 8
 
     r <- showAndRun dlg
 
-    when (isResponse r ResponseTypeOk) $ do
-        fields <- map fst <$> filterM (#getActive . snd) (enumerate cbuttons)
-        unless (null fields) $ action fields
+    selected <- if isResponse r ResponseTypeOk
+                then Just <$> mapM #getActive cbuttons
+                else return Nothing
 
     #destroy dlg
+    return selected
 
+askDeleteFields :: [FieldName] -> DialogFunction [FieldPos]
+askDeleteFields nmes _ action parent = do
+    selectFieldsDialog nmes (replicate (length nmes) False) parent
+                        "Borrar" "Cancelar" "Borrar Campos" >>=
+      \case Just sl -> let
+                         flds = [ i | (i, s) <- enumerate sl, s ]
+                       in unless (null flds) $ action flds
+            Nothing -> return ()
 
 askRename :: Text -> [Text] -> DialogFunction [Text]
 askRename header labels _ action parent = do
@@ -406,28 +418,10 @@ askRenameSources = askRename "Cambiar nombres de fuentes"
 
 
 askShowHideFields :: [FieldName] -> [Bool] -> DialogFunction [Bool]
-askShowHideFields names vs dmg action parent = do
-    dlg <- createDialogButtonsLabel parent
-                 [("Cambiar", 1)
-                 ,("Cancelar", 2)]
-                 "Mostrar/Ocular"
-    grid <- gridNew
-    #setColumnSpacing grid 4
-    cbuttons <- forM (enumerate $ zip names vs) $ \(rw, (name, v)) -> do
-        btn <- addCheckButton grid name 0 rw
-        #setActive btn v
-        return btn
-
-    content <- #getContentArea dlg
-    #packStart content grid True True 8
-
-    r <- showAndRun dlg
-
-    when (r == 1)
-         (mapM #getActive cbuttons >>= action)
-
-    #destroy dlg
-
+askShowHideFields nmes vs dmg action parent = do
+    selectFieldsDialog nmes vs parent "Cambiar" "Cancelar" "Mostrar/Ocultar" >>=
+      \case Just vs' -> action vs'
+            Nothing -> return ()
 
 askSortRows :: [FieldName] -> DialogFunction (FieldPos, SortDirection)
 askSortRows names dmg action parent = do
