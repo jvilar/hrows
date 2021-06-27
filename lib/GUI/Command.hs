@@ -32,5 +32,4 @@ data FieldInfo = FieldInfo { indexFI :: FieldPos
                            , typeFI :: FieldType
                            , isErrorFI :: Bool
                            , isVisibleFI :: Bool
-                           , mustWriteFI :: Bool
                            } deriving Show

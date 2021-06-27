@@ -40,7 +40,6 @@ checkedMove f pos model | 0 <= pos' && pos' < sm = do
                                                                                  , typeFI = fType
                                                                                  , isErrorFI = isError field
                                                                                  , isVisibleFI = visible
-                                                                                 , mustWriteFI = True
                                                                                  }
                               sendGUIM $ ShowPosition (pos' + 1) sm
                               sendGUIM $ ShowFields pos' r

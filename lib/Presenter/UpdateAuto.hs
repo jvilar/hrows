@@ -7,6 +7,7 @@ module Presenter.UpdateAuto (
 import Control.Arrow(first)
 import Control.Auto(accumM_)
 import Control.Exception(throwIO)
+import Control.Monad(guard)
 import Control.Monad.IO.Class(liftIO)
 import Data.Text(Text)
 import qualified Data.Text as T
@@ -69,6 +70,7 @@ update model (UpdateField fpos v, pos) = do
         r = row pos rst'
     sendGUIM . ShowFields pos $ do
                              c <- chngd
+                             guard $ c /= fpos
                              let f = r !!! c
                              return $ FieldInfo { indexFI = c
                                                 , textFI = toString f
@@ -76,7 +78,6 @@ update model (UpdateField fpos v, pos) = do
                                                 , typeFI = fieldType c rst'
                                                 , isErrorFI = isError f
                                                 , isVisibleFI = isVisible c rst'
-                                                , mustWriteFI = c /= fpos
                                                 }
     return model'
 update _ (ChangeModel model, _) =

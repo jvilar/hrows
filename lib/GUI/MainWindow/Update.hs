@@ -74,9 +74,8 @@ showFields fis mWindow = do
                           #setStateFlags textView [StateFlagsNormal] True
 
                           buffer <- textViewGetBuffer textView
-                          when (mustWriteFI fi) $ let
-                                 t = textFI fi
-                               in textBufferSetText buffer t (fromIntegral . BS.length $ T.encodeUtf8 t)
+                          let t = textFI fi
+                          textBufferSetText buffer t (fromIntegral . BS.length $ T.encodeUtf8 t)
                           reconnectTextView (indexFI fi) mWindow
                         )
   widgetShow grid
