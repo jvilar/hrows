@@ -56,26 +56,30 @@ showFields fis mWindow = do
 
   forM_ fis $ \fi -> do
                        textView <- recoverTextView (indexFI fi) mWindow
-                       disconnectTextView (indexFI fi) mWindow
-                       let tooltip = fromMaybe (typeLabel $ typeFI fi) $ formulaFI fi
                        label <- recoverLabel (indexFI fi) mWindow
-                       label `set` [ #tooltipText := tooltip ]
-                       set textView [ textViewEditable := isNothing $ formulaFI fi
-                                    , widgetCanFocus := isNothing $ formulaFI fi
-                                    , #name := if isErrorFI fi
-                                               then "error"
-                                               else if isJust $ formulaFI fi
-                                                    then "formula"
-                                                    else "normal"
-                                    ]
-                       #setStateFlags textView [StateFlagsNormal] True
+                       #setVisible textView (isVisibleFI fi)
+                       #setVisible label (isVisibleFI fi)
+                       when (isVisibleFI fi) (do
+                          disconnectTextView (indexFI fi) mWindow
+                          let tooltip = fromMaybe (typeLabel $ typeFI fi) $ formulaFI fi
+                          label `set` [ #tooltipText := tooltip ]
+                          set textView [ textViewEditable := isNothing $ formulaFI fi
+                                       , widgetCanFocus := isNothing $ formulaFI fi
+                                       , #name := if isErrorFI fi
+                                                  then "error"
+                                                  else if isJust $ formulaFI fi
+                                                       then "formula"
+                                                       else "normal"
+                                       ]
+                          #setStateFlags textView [StateFlagsNormal] True
 
-                       buffer <- textViewGetBuffer textView
-                       when (mustWriteFI fi) $ let
-                              t = textFI fi
-                            in textBufferSetText buffer t (fromIntegral . BS.length $ T.encodeUtf8 t)
-                       reconnectTextView (indexFI fi) mWindow
-  widgetShowAll grid
+                          buffer <- textViewGetBuffer textView
+                          when (mustWriteFI fi) $ let
+                                 t = textFI fi
+                               in textBufferSetText buffer t (fromIntegral . BS.length $ T.encodeUtf8 t)
+                          reconnectTextView (indexFI fi) mWindow
+                        )
+  widgetShow grid
 
 recoverTextView :: FieldPos -> MainWindow -> IO TextView
 recoverTextView row mWindow = do

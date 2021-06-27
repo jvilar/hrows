@@ -138,6 +138,7 @@ prepareFileMenu  = mapM_ (uncurry menuItemInput)
                              ,("importFieldsMenuItem", toInput $ ImportFromDialog ImportFields)
                              ,("importRowsMenuItem", toInput $ ImportFromDialog ImportRows)
                              ,("changeNamesMenuItem", toInput RenameFieldsDialog)
+                             ,("showHideMenuItem", toInput ShowHideFieldsDialog)
                              ]
 
 prepareFieldMenu :: BuildMonad ()

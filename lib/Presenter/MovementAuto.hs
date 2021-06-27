@@ -4,7 +4,7 @@ module Presenter.MovementAuto (
 ) where
 
 import Control.Auto(accumM_)
-import Data.List(zipWith4)
+import Data.List(zipWith5)
 
 import GUI.Command
 import Model
@@ -29,12 +29,17 @@ move pos (MoveToValue fpos value, model) = checkedMove (const $ nextPos fpos val
 
 checkedMove :: (RowPos -> RowPos) -> RowPos -> Model -> PresenterM RowPos
 checkedMove f pos model | 0 <= pos' && pos' < sm = do
-                              let r = zipWith4 combine (row pos' `from` model) (formulas `from` model) (types `from` model) [0..]
-                                  combine field mformula fType index = FieldInfo { indexFI = index
+                              let r = zipWith5 combine (row pos' `from` model)
+                                                       (formulas `from` model)
+                                                       (types `from` model)
+                                                       (visibilities `from` model)
+                                                       [0..]
+                                  combine field mformula fType visible index = FieldInfo { indexFI = index
                                                                                  , textFI = toString field
                                                                                  , formulaFI = mformula
                                                                                  , typeFI = fType
                                                                                  , isErrorFI = isError field
+                                                                                 , isVisibleFI = visible
                                                                                  , mustWriteFI = True
                                                                                  }
                               sendGUIM $ ShowPosition (pos' + 1) sm

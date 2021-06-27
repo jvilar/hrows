@@ -15,6 +15,7 @@ module Model.RowStore.Update (
   , newFields
   , deleteFields
   , renameFields
+  , changeVisibleFields
   , importFields
   , importRows
   , moveField
@@ -101,6 +102,7 @@ fromConf cnf = FieldInfo { _name = nameFC cnf
                          , _defaultValue = defaultValue $ typeFC cnf
                          , _expression = parse <$> formulaFC cnf
                          , _formula = formulaFC cnf
+                         , _visible = True
                          }
 
 -- |An empty `RowStore` with a name.
@@ -132,6 +134,7 @@ inferInfo f = FieldInfo { _name = Nothing
                         , _defaultValue = defaultValue $ typeOf f
                         , _expression = Nothing
                         , _formula = Nothing
+                        , _visible = True
                         }
 
 -- |Creates a `RowStore` from a list of `Row`s and a list of names.
@@ -178,6 +181,7 @@ newFields l rst = let
                           , _defaultValue = defaultValue t
                           , _expression = Nothing
                           , _formula = Nothing
+                          , _visible = True
                           } | (n, t) <- zip (drop (_nFields rst) names) (map snd l) ]
     rinfo = oldInfo ++ newInfo
     in addPlan rst { _rows = IM.map (++ map (defaultValue . snd) l) (_rows rst)
@@ -222,6 +226,12 @@ renameFields names rst = addPlan rst { _fieldInfo = zipWith updateFInfo (_fieldI
                                         , _expression = Just e'
                                         , _formula = Just $ toFormula e'
                                         }
+
+-- |Changes the visible property of the fields according to the list.
+changeVisibleFields:: [Bool] -> RowStore -> RowStore
+changeVisibleFields vs rst = rst { _fieldInfo = zipWith (\fi v -> fi { _visible = v })
+                                                       (_fieldInfo rst) vs
+                                 }
 
 -- Returns the values associated to a position from the corresponding
 -- position in the row, given the association of input positions to

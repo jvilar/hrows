@@ -16,6 +16,7 @@ data DialogCommand = LoadFileDialog
                    | ImportFromDialog ImportType
                    | ChooseImportDialog ImportType RowStore
                    | RenameFieldsDialog
+                   | ShowHideFieldsDialog
                    | SortRowsDialog
                    | MessageDialog Message
                    | ChangeFieldFormulaDialog FieldPos

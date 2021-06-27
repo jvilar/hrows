@@ -344,7 +344,7 @@
             <property name="visible">True</property>
             <property name="can_focus">False</property>
             <child>
-              <object class="GtkMenuItem" id="menuitem1">
+              <object class="GtkMenuItem" id="fileMenuItem">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="label" translatable="yes">_Archivo</property>
@@ -400,7 +400,7 @@
               </object>
             </child>
             <child>
-              <object class="GtkMenuItem" id="menuitem2">
+              <object class="GtkMenuItem" id="fieldMenuItem">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="label" translatable="yes">_Campos</property>
@@ -413,7 +413,7 @@
                       <object class="GtkMenuItem" id="createFieldsMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Crear</property>
+                        <property name="label" translatable="yes">_Crear</property>
                         <property name="use_underline">True</property>
                       </object>
                     </child>
@@ -421,7 +421,7 @@
                       <object class="GtkMenuItem" id="deleteFieldsMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Eliminar</property>
+                        <property name="label" translatable="yes">_Eliminar</property>
                         <property name="use_underline">True</property>
                       </object>
                     </child>
@@ -429,7 +429,7 @@
                       <object class="GtkMenuItem" id="importFieldsMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Importar</property>
+                        <property name="label" translatable="yes">_Importar</property>
                         <property name="use_underline">True</property>
                       </object>
                     </child>
@@ -437,7 +437,15 @@
                       <object class="GtkMenuItem" id="changeNamesMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Cambiar nombres</property>
+                        <property name="label" translatable="yes">Cambiar _nombres</property>
+                        <property name="use_underline">True</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="showHideMenuItem">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">_Mostrar/Ocultar</property>
                         <property name="use_underline">True</property>
                       </object>
                     </child>
@@ -446,7 +454,7 @@
               </object>
             </child>
             <child>
-              <object class="GtkMenuItem" id="menuitem3">
+              <object class="GtkMenuItem" id="recordMenuItem">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="label" translatable="yes">_Registros</property>
@@ -459,7 +467,7 @@
                       <object class="GtkMenuItem" id="newRowMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Nuevo</property>
+                        <property name="label" translatable="yes">_Nuevo</property>
                         <property name="use_underline">True</property>
                       </object>
                     </child>
@@ -467,7 +475,7 @@
                       <object class="GtkMenuItem" id="deleteRowMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Eliminar</property>
+                        <property name="label" translatable="yes">_Eliminar</property>
                         <property name="use_underline">True</property>
                       </object>
                     </child>
@@ -475,7 +483,7 @@
                       <object class="GtkMenuItem" id="importRowsMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Importar</property>
+                        <property name="label" translatable="yes">_Importar</property>
                         <property name="use_underline">True</property>
                       </object>
                     </child>
@@ -483,7 +491,7 @@
                       <object class="GtkMenuItem" id="sortRowsMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Ordenar</property>
+                        <property name="label" translatable="yes">_Ordenar</property>
                         <property name="use_underline">True</property>
                       </object>
                     </child>
@@ -492,7 +500,7 @@
               </object>
             </child>
             <child>
-              <object class="GtkMenuItem">
+              <object class="GtkMenuItem" id="sourceMenuItem">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="label" translatable="yes">_Fuentes</property>
@@ -505,7 +513,7 @@
                       <object class="GtkMenuItem" id="addSourceMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Añadir</property>
+                        <property name="label" translatable="yes">_Añadir</property>
                         <property name="use_underline">True</property>
                       </object>
                     </child>
@@ -513,7 +521,7 @@
                       <object class="GtkMenuItem" id="showSourcesMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Mostrar</property>
+                        <property name="label" translatable="yes">_Mostrar</property>
                         <property name="use_underline">True</property>
                       </object>
                     </child>
@@ -521,7 +529,7 @@
                       <object class="GtkMenuItem" id="deleteSourceMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Eliminar</property>
+                        <property name="label" translatable="yes">_Eliminar</property>
                         <property name="use_underline">True</property>
                       </object>
                     </child>
@@ -529,7 +537,7 @@
                       <object class="GtkMenuItem" id="renameSourcesMenuItem">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">Cambiar nombres</property>
+                        <property name="label" translatable="yes">Cambiar _nombres</property>
                         <property name="use_underline">True</property>
                       </object>
                     </child>
@@ -546,7 +554,7 @@
               </object>
             </child>
             <child>
-              <object class="GtkMenuItem" id="menuitem4">
+              <object class="GtkMenuItem" id="helpMenuItem">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="label" translatable="yes">Ay_uda</property>

@@ -78,6 +78,8 @@ showIteration (AskImportOptions t ifs cfs rst) = dialogCall (askImportOptions t 
                               ImportRows -> ImportRowsFromRowStore rst values)
 showIteration (AskRenameFields fs) = dialogCall (askRenameFields fs) $
                                      (. RenameFields) . sendInput
+showIteration (AskShowHideFields fs vs) = dialogCall (askShowHideFields fs vs) $
+                                            (. SetFieldsVisibility) . sendInput
 showIteration (AskSortRows fs) = dialogCall (askSortRows fs) $
                 (. uncurry SortRows) . sendInput
 showIteration (DisplayMessage m) = displayMessage m . (window :: MainWindow -> Window) . mainWindow

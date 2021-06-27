@@ -19,6 +19,7 @@ module Model.RowStore.Base (
                 , changed
                 , names
                 , fnames
+                , visibilities
                 , row
                 , rows
                 , nFields
@@ -27,6 +28,7 @@ module Model.RowStore.Base (
                 , formulas
                 , types
                 , isFormula
+                , isVisible
                 , fieldFormula
                 , fieldType
                 , fieldValues
@@ -83,6 +85,7 @@ data FieldInfo = FieldInfo { _name :: Maybe FieldName
                            , _defaultValue :: Field
                            , _expression :: Maybe Expression
                            , _formula :: Maybe Formula
+                           , _visible :: Bool
                            } deriving Show
 
 -- |The name of the `RowStore`
@@ -91,7 +94,7 @@ getName = _nameRS
 
 -- |Change the name of the `RowStore`
 setName :: RowStoreName -> RowStore -> RowStore
-setName n rst = rst { _nameRS = n } 
+setName n rst = rst { _nameRS = n }
 
 -- |Determines the order in which updates must take place when a
 -- `Field` changes
@@ -167,6 +170,10 @@ formulas = map _formula . _fieldInfo
 isFormula :: FieldPos -> RowStore -> Bool
 isFormula c = isJust . _formula . (!!! c) .  _fieldInfo
 
+-- |True if the field is visible
+isVisible :: FieldPos -> RowStore -> Bool
+isVisible c = _visible . (!!! c) .  _fieldInfo
+
 -- |The formula of a field
 fieldFormula :: FieldPos -> RowStore -> Maybe Formula
 fieldFormula c = (!!!  c) . formulas
@@ -211,6 +218,10 @@ fnames store = fromMaybe
 -- |Returns the rows of the `RowStore`.
 rows :: RowStore -> DataSource
 rows = IM.elems . _rows
+
+-- |Returns the value of the visible properties of the fields
+visibilities :: RowStore -> [Bool]
+visibilities = map _visible . _fieldInfo
 
 -- |The direction of a sort
 data SortDirection = Ascending | Descending deriving Show

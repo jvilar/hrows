@@ -4,6 +4,7 @@ module Model.RowStore (
              changed
              , names
              , fnames
+             , visibilities
              , getName
              , getDataSources
              , getRowStores
@@ -15,6 +16,7 @@ module Model.RowStore (
              , formulas
              , types
              , isFormula
+             , isVisible
              , fieldFormula
              , fieldType
              , fieldValues

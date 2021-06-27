@@ -31,5 +31,6 @@ data FieldInfo = FieldInfo { indexFI :: FieldPos
                            , formulaFI :: Maybe Formula
                            , typeFI :: FieldType
                            , isErrorFI :: Bool
+                           , isVisibleFI :: Bool
                            , mustWriteFI :: Bool
                            } deriving Show

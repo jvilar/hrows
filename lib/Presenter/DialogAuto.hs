@@ -16,6 +16,7 @@ import Presenter.Input
 dialogAuto :: PresenterAuto (DialogCommand, Model, RowPos) ()
 dialogAuto = arrM $ \(input, model, pos) -> let
                            fieldNames = fnames <@ model
+                           fieldVisibilities = visibilities <@ model
                            sourceList = [(getName rst, siFilePath si, fnames rst)
                                          | (rst, si) <- zip (getRowStores <@ model)
                                                             (getSourceInfos model)
@@ -28,6 +29,7 @@ dialogAuto = arrM $ \(input, model, pos) -> let
                                              ImportFromDialog t -> AskImportFrom t
                                              ChooseImportDialog t rst -> AskImportOptions t (fnames rst) fieldNames rst
                                              RenameFieldsDialog -> AskRenameFields fieldNames
+                                             ShowHideFieldsDialog -> AskShowHideFields fieldNames fieldVisibilities
                                              SortRowsDialog -> AskSortRows fieldNames
                                              MessageDialog m -> DisplayMessage m
                                              ChangeFieldFormulaDialog f -> GetFieldFormula f (fieldNames !!! f) (formulas `from` model !!! f)

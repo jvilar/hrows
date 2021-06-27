@@ -75,6 +75,7 @@ update model (UpdateField fpos v, pos) = do
                                                 , formulaFI = fieldFormula c rst'
                                                 , typeFI = fieldType c rst'
                                                 , isErrorFI = isError f
+                                                , isVisibleFI = isVisible c rst'
                                                 , mustWriteFI = c /= fpos
                                                 }
     return model'
@@ -94,6 +95,8 @@ update model (DeleteFields fs, pos) =
     completeRefresh pos $ deleteFields fs `inside` model
 update model (RenameFields ns, pos) =
     completeRefresh pos $ renameFields ns `inside` model
+update model (SetFieldsVisibility vs, pos) =
+    completeRefresh pos $ changeVisibleFields vs `inside` model
 update model (ImportFieldsFromRowStore m keys values, pos) =
     partialRefresh pos $ importFields m keys values `inside` model
 update model (ImportRowsFromRowStore m values, pos) =

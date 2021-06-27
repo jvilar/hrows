@@ -20,6 +20,7 @@ data Iteration = NoIteration -- ^No need to iterate.
                | AskImportFrom ImportType -- ^Ask for a file to import from.
                | AskImportOptions ImportType [FieldName] [FieldName] RowStore -- ^Ask for the pairing of fields in an import.
                | AskRenameFields [FieldName] -- ^Ask for new names for the fields
+               | AskShowHideFields [FieldName] [Bool] -- ^Ask which fields to show
                | AskSortRows [FieldName] -- ^Ask the field for sorting.
                | DisplayMessage Message -- ^Display a message.
                | ConfirmExit Bool -- ^Confirm exit program.

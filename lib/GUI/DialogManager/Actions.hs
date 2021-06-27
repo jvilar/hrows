@@ -19,6 +19,7 @@ module GUI.DialogManager.Actions (
   , askDeleteFields
   , askRenameFields
   , askRenameSources
+  , askShowHideFields
   , askSortRows
   , getFieldFormula
   , searchField
@@ -45,7 +46,6 @@ import GUI.Command
 import GUI.DialogManager
 import Model hiding (deleteFields)
 import Model.DefaultFileNames
-import Model.SourceInfo
 import Presenter.ImportType
 
 displayMessage :: Message -> Window -> IO ()
@@ -403,6 +403,30 @@ askRenameFields = askRename "Cambiar nombres de campos"
 
 askRenameSources :: [SourceName] -> DialogFunction [SourceName]
 askRenameSources = askRename "Cambiar nombres de fuentes"
+
+
+askShowHideFields :: [FieldName] -> [Bool] -> DialogFunction [Bool]
+askShowHideFields names vs dmg action parent = do
+    dlg <- createDialogButtonsLabel parent
+                 [("Cambiar", 1)
+                 ,("Cancelar", 2)]
+                 "Mostrar/Ocular"
+    grid <- gridNew
+    #setColumnSpacing grid 4
+    cbuttons <- forM (enumerate $ zip names vs) $ \(rw, (name, v)) -> do
+        btn <- addCheckButton grid name 0 rw
+        #setActive btn v
+        return btn
+
+    content <- #getContentArea dlg
+    #packStart content grid True True 8
+
+    r <- showAndRun dlg
+
+    when (r == 1)
+         (mapM #getActive cbuttons >>= action)
+
+    #destroy dlg
 
 
 askSortRows :: [FieldName] -> DialogFunction (FieldPos, SortDirection)
