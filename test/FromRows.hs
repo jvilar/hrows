@@ -18,12 +18,17 @@ mainRst = emptyConf "main" conf
 
 simpleRow :: Spec
 simpleRow = describe "Adding a row with errors does not add messages" $ do
-    it "Keeps the text" $ do
-       let texts = [ "one", "two", "three" ] :: [Text]
-           errorRow = map toField texts
-           rst = addRow mainRst errorRow
-           newRow = row 0 rst
+    let texts = [ "one", "two", "three" ] :: [Text]
+        errorRow = map toField texts
+        rst = addRow mainRst errorRow
+    it "Keeps the text in add" $ do
+       let newRow = row 0 rst
        map toString newRow `shouldBe` texts
+    it "Keeps the text in changes" $ do
+       let (rst', _) = changeField 0 0 (head errorRow) rst
+           newRow = row 0 rst'
+       toString (head newRow) `shouldBe` head texts
+
 
 
 main :: IO ()

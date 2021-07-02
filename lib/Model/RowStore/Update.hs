@@ -150,7 +150,7 @@ fromRowsConf n conf rs = (foldl' addRow  (emptyConf n conf) rs) { _changed = Fal
 changeField :: RowPos -> FieldPos -> Field -> RowStore -> (RowStore, [FieldPos])
 changeField r c field rst = let
       row = _rows rst IM.! r
-      field' = convert (_type $ _fieldInfo rst !!! c) field
+      field' = convertKeepText (_type $ _fieldInfo rst !!! c) field
       (row', poss) = updateField (_updatePlan rst) field' c (_dataSources rst) row
     in if row !!! c /= field'
        then (rst { _rows = IM.insert r row' (_rows rst), _changed = True }, poss)
