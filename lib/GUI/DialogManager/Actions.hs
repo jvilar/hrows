@@ -395,6 +395,7 @@ askRename header labels _ action parent = do
     centries <- forM (enumerate labels) $ \(rw, label) -> do
         _ <- addLabel grid label 0 rw
         entry <- addEntry grid 1 rw
+        #setHexpand entry True
         #setText entry label
         return entry
 
