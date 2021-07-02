@@ -17,6 +17,7 @@ module Model.Field ( Field
                    , mkError
                    , isError
                    , convert
+                   , convertKeepText
                    , toInt
                    -- **Operators
                    , andField
@@ -141,9 +142,17 @@ defaultValue TypeEmpty = Empty
 baseType :: FieldType -> FieldType
 baseType = typeOf . defaultValue
 
+-- |Convert a field to a given type, return `AnError` with
+-- a message if there is an error in the conversion
 convert :: FieldType -> Field -> Field
 convert t f | typeOf f == baseType t = f
             | otherwise = doConvert f t
+
+-- |Convert a field to the given type but keeping the text
+convertKeepText :: FieldType -> Field -> Field
+convertKeepText t f = case convert t f of
+                        AnError _ _ -> AnError t (toString f)
+                        f' -> f'
 
 doConvert :: Field -> FieldType -> Field
 doConvert (AnError _ m) t = AnError t m

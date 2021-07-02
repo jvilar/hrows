@@ -83,3 +83,10 @@ tests:
     - bytestring
     - hrows
     - hspec
+
+  fromRows-test:
+    main: test/FromRows.hs
+    dependencies:
+    - hrows
+    - hspec
+    - text

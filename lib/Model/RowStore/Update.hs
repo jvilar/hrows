@@ -70,7 +70,7 @@ evaluateField up dss r f = let
 -- |Adds a `Row` to a `RowStore`.
 addRow :: RowStore -> Row -> RowStore
 addRow m r = let
-               r' = updateAll (_updatePlan m) (_dataSources m) $ zipWith convert (types m) (fillEmpty r)
+               r' = updateAll (_updatePlan m) (_dataSources m) $ zipWith convertKeepText (types m) (fillEmpty r)
              in m { _rows = IM.insert (_size m) r' (_rows m)
                   , _size = _size m + 1
                   , _changed = True
