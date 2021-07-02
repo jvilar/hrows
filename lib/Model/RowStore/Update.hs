@@ -23,6 +23,7 @@ module Model.RowStore.Update (
   , changeFieldType
   , changeFieldFormula
   , renameDataSources
+  , deleteDataSources
 ) where
 
 import qualified Data.IntMap.Strict as IM
@@ -348,3 +349,6 @@ changeFieldFormula mf n rst = addPlan rst { _fieldInfo = newInfo, _changed = Tru
 renameDataSources :: [RowStoreName] -> RowStore -> RowStore
 renameDataSources nms rst = addPlan rst { _rowStores = zipWith setName nms $ _rowStores rst }
 
+-- |Delete the sources with the given names
+deleteDataSources :: [RowStoreName] -> RowStore -> RowStore
+deleteDataSources nms rst = addPlan rst { _rowStores = filter ((`notElem` nms) . getName) $ _rowStores rst }

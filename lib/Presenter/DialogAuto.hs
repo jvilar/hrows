@@ -38,6 +38,7 @@ dialogAuto = arrM $ \(input, model, pos) -> let
                                              AddSourceDialog -> AskAddSource
                                              ShowSourcesDialog -> ShowSources sourceList
                                              RenameSourcesDialog -> AskRenameSources (map fst3 sourceList)
+                                             DeleteSourceDialog -> AskDeleteSources (map fst3 sourceList)
                                              ShowAboutDialog -> DisplayAbout
                                              d -> DisplayMessage . ErrorMessage $ T.concat ["Error: ", T.pack $ show d, " not implemented"] 
 

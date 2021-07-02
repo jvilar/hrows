@@ -19,6 +19,7 @@ module GUI.DialogManager.Actions (
   , askDeleteFields
   , askRenameFields
   , askRenameSources
+  , askDeleteSources
   , askShowHideFields
   , askSortRows
   , getFieldFormula
@@ -348,8 +349,8 @@ addComboBox grid options left top = do
     #attach grid cbox left top 1 1
     return cbox
 
-selectFieldsDialog :: [FieldName] -> [Bool] -> Window -> Text -> Text -> Text -> IO (Maybe [Bool])
-selectFieldsDialog nmes vs parent okLbl cancelLbl lbl = do
+selectTextDialog :: [FieldName] -> [Bool] -> Window -> Text -> Text -> Text -> IO (Maybe [Bool])
+selectTextDialog nmes vs parent okLbl cancelLbl lbl = do
     dlg <- createDialogButtonsLabel parent 
                       [ (okLbl, asInt32 ResponseTypeOk)
                       , (cancelLbl, asInt32 ResponseTypeCancel)]
@@ -376,7 +377,7 @@ selectFieldsDialog nmes vs parent okLbl cancelLbl lbl = do
 
 askDeleteFields :: [FieldName] -> DialogFunction [FieldPos]
 askDeleteFields nmes _ action parent = do
-    selectFieldsDialog nmes (replicate (length nmes) False) parent
+    selectTextDialog nmes (replicate (length nmes) False) parent
                         "Borrar" "Cancelar" "Borrar Campos" >>=
       \case Just sl -> let
                          flds = [ i | (i, s) <- enumerate sl, s ]
@@ -418,14 +419,23 @@ askRenameSources :: [SourceName] -> DialogFunction [SourceName]
 askRenameSources = askRename "Cambiar nombres de fuentes"
 
 
+askDeleteSources :: [SourceName] -> DialogFunction [SourceName]
+askDeleteSources nmes _ action parent = do
+    selectTextDialog nmes (replicate (length nmes) False) parent
+                        "Borrar" "Cancelar" "Borrar Fuentes" >>=
+        \case Just ss -> let
+                            srcs = [ n | (n, s) <- zip nmes ss, s ]
+                         in unless  (null srcs) $ action srcs
+              Nothing -> return ()
+
 askShowHideFields :: [FieldName] -> [Bool] -> DialogFunction [Bool]
-askShowHideFields nmes vs dmg action parent = do
-    selectFieldsDialog nmes vs parent "Cambiar" "Cancelar" "Mostrar/Ocultar" >>=
+askShowHideFields nmes vs _ action parent = do
+    selectTextDialog nmes vs parent "Cambiar" "Cancelar" "Mostrar/Ocultar" >>=
       \case Just vs' -> action vs'
             Nothing -> return ()
 
 askSortRows :: [FieldName] -> DialogFunction (FieldPos, SortDirection)
-askSortRows names dmg action parent = do
+askSortRows names _ action parent = do
     dlg <- createDialogButtonsLabel parent
                  [("Ascendente", 1)
                  ,("Descendente", 2)

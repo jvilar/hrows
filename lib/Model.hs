@@ -15,6 +15,7 @@ module Model (
               , addSourceInfo
               , getSourceInfos
               , renameSources
+              , deleteSources
               -- *Rexported
               , module Model.RowStore
               , module Model.SourceInfo
@@ -77,3 +78,10 @@ renameSources names m = m {
                             _rowStore = renameDataSources names $ _rowStore m
                             , _sources = zipWith renameSourceInfo names $ _sources m 
                           }
+
+-- |Delete the sources by name
+deleteSources :: [SourceName]  -> Model -> Model
+deleteSources names m = m {
+                           _rowStore = deleteDataSources names $ _rowStore m,
+                           _sources = filter ((`notElem` names) . siName) (_sources m)
+                         }

@@ -102,6 +102,8 @@ showIteration AskAddSource = dialogCall askImportFrom $
                                                     in sendInput control $ AddSourceFromSourceInfo name si
 showIteration (AskRenameSources fs) = dialogCall (askRenameSources fs) $
                                      (. RenameSources) . sendInput
+showIteration (AskDeleteSources fs) = dialogCall (askDeleteSources fs) $
+                                     (. DeleteSources) . sendInput
 showIteration (ShowSources srcs) = \control -> showSources (dialogManager control) srcs (window $ mainWindow control)
 showIteration DisplayAbout = \control -> showAboutDialog (dialogManager control) (window $ mainWindow control)
 

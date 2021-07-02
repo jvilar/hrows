@@ -27,6 +27,7 @@ data UpdateCommand = UpdateField FieldPos Field
                    | SetUnchanged
                    | AddNewSource SourceInfo RowStore
                    | RenameSources [SourceName]
+                   | DeleteSources [SourceName]
                    | Undo
                    | Redo
                    | BlockUndo
