@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Model.Expression.Manipulate ( eliminateNames
+module Model.Expression.Manipulate ( addPositions
                                      , translatePositions
                                      , translateNames
                                      , getPositions
@@ -19,22 +19,22 @@ import Model.Expression
 import Model.Expression.RecursionSchemas
 import Model.RowStore.Base
 
--- |Changes all the `NamedPosition` in a `Expression` to the corresponding `Position`.
-eliminateNames :: RowStore -> Expression -> Expression
-eliminateNames rst (In (NamedPosition name)) = In $ case fieldIndex rst name of
-                                                 Nothing -> Error $ "Mal nombre de campo: " `T.append` name
-                                                 Just i -> Position i
-eliminateNames rst (In (FromSource s inr ins gets)) = In $ case identifySource rst s of
-    Nothing -> Error $ T.append "Mal nombre de fuente: " (toFormula s)
+-- |Adds the corresponding postitions to all the `NamedPosition` in a `Expression`.
+addPositions :: RowStore -> Expression -> Expression
+addPositions rst (In (NamedPosition name _)) = case fieldIndex rst name of
+                                                 Nothing -> mkErrorExpr $ "Mal nombre de campo: " `T.append` name
+                                                 Just n -> mkKnownNamedPosition name n
+addPositions rst (In (FromSource s inr ins gets)) = case identifySource rst s of
+    Nothing -> mkErrorExpr $ T.append "Mal nombre de fuente: " (toFormula s)
     Just (rst', s') -> let
-                         inr' = eliminateNames rst inr
-                         ins' = eliminateNames rst' ins
-                         gets' = eliminateNames rst' gets
-                       in FromSource s' inr' ins' gets'
-eliminateNames rst n = In (fmap (eliminateNames rst) (out n))
+                         inr' = addPositions rst inr
+                         ins' = addPositions rst' ins
+                         gets' = addPositions rst' gets
+                       in mkFromSource s' inr' ins' gets'
+addPositions rst n = In (fmap (addPositions rst) (out n))
 
 identifySource :: RowStore -> Expression -> Maybe (RowStore, Expression)
-identifySource rst (In (NamedPosition name)) = do
+identifySource rst (In (NamedPosition name _)) = do
     n <- getRowStoreIndex rst name
     return (getRowStore rst n, mkConstant $ toField n)
 identifySource _ _ = Nothing
@@ -55,9 +55,9 @@ translatePositions newPos = second getAny . runWriter . bottomUpM tPos
 
 translateNames :: [(Text, Text)] -> Expression -> (Expression, Changed)
 translateNames newNames = second getAny . runWriter . bottomUpM tNames
-    where tNames (In (NamedPosition name)) = do
+    where tNames (In (NamedPosition name _)) = do
               let name' = fromMaybe name (lookup name newNames)
               when (name' /= name) $ tell (Any True)
-              return . In $ NamedPosition name'
+              return $ mkNamedPosition name'
           tNames e = return e
 

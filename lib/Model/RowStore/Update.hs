@@ -169,7 +169,7 @@ addRowStore r rst = addPlan $ rst {
 addPlan :: RowStore -> RowStore
 addPlan rst = let
     exps = map prepare $ _fieldInfo rst
-    prepare fi = eliminateNames rst . addCast (_type fi) <$> _expression fi
+    prepare fi = addPositions rst . addCast (_type fi) <$> _expression fi
     up = mkUpdatePlan exps
   in rst { _updatePlan = up, _rows = IM.map (updateAll up $ _dataSources rst) (_rows rst), _changed = True }
 

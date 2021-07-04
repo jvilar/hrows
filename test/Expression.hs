@@ -45,7 +45,7 @@ childRst = emptyConf "child" conf & ins "one" 1 & ins "two" 2
                , FieldConf (Just "value") TypeInt Nothing
                , FieldConf (Just "other") TypeInt Nothing
                ]
-        ins :: Text -> Int -> RowStore -> RowStore 
+        ins :: Text -> Int -> RowStore -> RowStore
         ins n v rst = addRow rst [toField ("Initial" :: Text),
                                   toField n, toField v, toField ("Other" :: Text)]
 
@@ -135,7 +135,7 @@ evalNames :: [Int] -> RowStore -> Text -> Field
 evalNames xs rst = let
     fs = map toField xs
     dss = getDataSources rst
-  in evaluate fs dss . eliminateNames mainRst . parse
+  in evaluate fs dss . addPositions mainRst . parse
 
 testNames :: Spec
 testNames = describe "Test names" $ do
@@ -143,24 +143,26 @@ testNames = describe "Test names" $ do
                           evalNames [3, 2] mainRst "first - second" `shouldBeI` 1
                           evalNames [6, 3] mainRst "@{first} / @{second}" `shouldBeF` (2 :: Double)
                           evalNames [6, 3] mainRst "(first + 3) / second" `shouldBeF` (3 :: Double)
+                        it "Searching in sources" $ do
+                          evalNames [1, 2] mainRst "name @ child <- second <-> value" `shouldBeF` ("two" :: Text)
                         it "Conditional with names" $ do
                           evalNames [2, 3] mainRst "first == 2 ? second : second * 3" `shouldBeI` 3
                           evalNames [1, 3] mainRst "first == 2 ? second : second * 3" `shouldBeI` 9
                         it "Checks the substitution of names" $ do
-                          eliminateNames mainRst (parse "first") `shouldBe` mkPosition 0
-                          eliminateNames mainRst (parse "second") `shouldBe` mkPosition 1
-                          eliminateNames mainRst (parse "other @ child <- second <-> value")
+                          addPositions mainRst (parse "first") `shouldBe` mkKnownNamedPosition "first" 0
+                          addPositions mainRst (parse "second") `shouldBe` mkKnownNamedPosition "second" 1
+                          addPositions mainRst (parse "other @ child <- second <-> value")
                              `shouldBe` mkFromSource (mkConstant $ toField (0 :: Int))
-                                                     (mkPosition 1)
-                                                     (mkPosition 2)
-                                                     (mkPosition 3)
-                          eliminateNames mainRst (parse "first + value @ child <- \"one\" <-> name")
+                                                     (mkKnownNamedPosition "second" 1)
+                                                     (mkKnownNamedPosition "value" 2)
+                                                     (mkKnownNamedPosition "other" 3)
+                          addPositions mainRst (parse "first + value @ child <- \"one\" <-> name")
                              `shouldBe` mkBinary (BinaryOpInfo (+) "+" 4 TrueAssoc)
-                                                 (mkPosition 0)
+                                                 (mkKnownNamedPosition "first" 0)
                                                  (mkFromSource (mkConstant $ toField (0 :: Int))
                                                                (mkConstant $ toField ("one" :: Text))
-                                                               (mkPosition 1)
-                                                               (mkPosition 2)
+                                                               (mkKnownNamedPosition "name" 1)
+                                                               (mkKnownNamedPosition "value" 2)
                                                  )
 
 

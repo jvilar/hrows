@@ -32,7 +32,8 @@ eval = para ev
     where
       ev :: RAlgebra Node (Eval Field)
       ev (Position n) = evalIndex n
-      ev (NamedPosition name) = return . mkError $ "Expresión con variable: " `T.append` name
+      ev (NamedPosition name Nothing) = return . mkError $ "Expresión con variable desconocida: " `T.append` name
+      ev (NamedPosition _ (Just n)) = evalIndex n
       ev (Constant f) = return f
       ev (Unary info (_, v)) = opU info <$> v
       ev (Binary info (_, v1) (_, v2)) = opB info <$> v1 <*> v2

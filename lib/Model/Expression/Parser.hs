@@ -44,7 +44,7 @@ expectName message = do
     case c of
       NameT s -> do
            advance
-           return $ mkNamedPosition $ T.pack s
+           return $ mkNamedPosition (T.pack s)
       _ -> throwError $ T.concat ["Error en ", showt c, ", se esperaba ", message]
 
 match :: [(Token, a)] -> Parser (Maybe a)
@@ -91,7 +91,7 @@ binaryLevel nextLevel operator = nextLevel >>= go
             mop <- operator
             case mop of
               Nothing -> return left
-              Just op -> (mkBinary op left <$> nextLevel) >>= go
+              Just op -> nextLevel >>= go . mkBinary op left
 
 -- logical -> conjunction (orOperator conjunction)*
 logical :: Parser Expression
@@ -155,7 +155,7 @@ base = do
 -- name --> (AtT NameT ArrowT NameT EqualT NameT)?
 name :: String -> Parser Expression
 name s = do
-        let pos = mkNamedPosition $ T.pack s
+        let pos = mkNamedPosition (T.pack s)
         at <- check AtT
         if at
         then do
