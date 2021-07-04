@@ -31,9 +31,9 @@ eval :: Expression -> Eval Field
 eval = para ev
     where
       ev :: RAlgebra Node (Eval Field)
-      ev (Position n) = evalIndex n
+      ev (Position n) = evalIndex n $ mkError $ "Error en $" `T.append` showt (n + 1)
       ev (NamedPosition name Nothing) = return . mkError $ "Expresión con variable desconocida: " `T.append` name
-      ev (NamedPosition _ (Just n)) = evalIndex n
+      ev (NamedPosition name (Just n)) = evalIndex n $ mkError $ "Error en " `T.append` name
       ev (Constant f) = return f
       ev (Unary info (_, v)) = opU info <$> v
       ev (Binary info (_, v1) (_, v2)) = opB info <$> v1 <*> v2
@@ -46,12 +46,14 @@ eval = para ev
       ev (FromSource (si, _) (v, _) (n1, _) (n2, _)) = evalFromSource si v n1 n2
       ev (Error m) = return $ mkError m
 
-evalIndex :: Int -> Eval Field
-evalIndex n = do
+evalIndex :: Int -> Field -> Eval Field
+evalIndex n inError = do
     (r, _) <- ask
-    return $ case recover r n ("Índice erróneo " `T.append` showt (n + 1))  of
-        Right v -> v
-        Left e -> mkError e
+    return $ case recover r n (mkError $ "Índice erróneo " `T.append` showt (n + 1))  of
+        Right v -> if isError v
+                   then inError
+                   else v
+        Left e -> e
 
 recover :: [a] -> Int -> e -> Either e a
 recover [] _ = Left

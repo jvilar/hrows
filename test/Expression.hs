@@ -9,6 +9,7 @@ import Model.Expression.Manipulate
 import Model.Expression.Lexer
 import Model.Expression.Parser
 import Model.Expression.Evaluation
+import Model.Row
 import Model.RowStore
 import Model.RowStore.RowStoreConf
 import Model.SourceInfo(FormatInfo(..))
@@ -126,6 +127,9 @@ evalInts xs = let
 evalNoNames :: [Int] -> Text -> Field
 evalNoNames xs = evalInts xs . parse
 
+evalInRow :: Row -> Text -> Field
+evalInRow r = evaluate r [] . addPositions mainRst . parse
+
 testAbsolutePositions :: Spec
 testAbsolutePositions = describe "Test absolute positions" $
                      it "Checks absolute positions" $
@@ -220,6 +224,16 @@ testIsErrorOperator = describe "Test the new isError operator" $ do
                            evalNames [6, 2] mainRst "first / second ?! 4" `shouldBeF` (3 :: Double)
                            evalNames [6, 0] mainRst "first / error ?! 4" `shouldBeI` 4
 
+testTransmitedError :: Spec
+testTransmitedError = describe "The errors refer to the field that causes it" $ do
+                        it "Check error in positions" $ do
+                            evalInRow [mkError "Error", toField (1::Int), toField ("aa"::Text)] "$1 + $2" `shouldBe` mkError "Error en $1"
+                            evalInRow [mkError "Error", toField (1::Int), toField ("aa"::Text)] "$1 + $3" `shouldBe` mkError "Error en $1"
+                        it "Check error in names" $ do
+                            evalInRow [mkError "Error", toField (1::Int), toField ("aa"::Text)] "first + $2" `shouldBe` mkError "Error en first"
+                            evalInRow [mkError "Error", toField (1::Int), toField ("aa"::Text)] "$1 + first" `shouldBe` mkError "Error en $1"
+                            evalInRow [mkError "Error", toField (1::Int), toField ("aa"::Text)] "1 + first" `shouldBe` mkError "Error en first"
+
 main:: IO ()
 main = hspec $ do
   testSimpleExpressions
@@ -231,3 +245,4 @@ main = hspec $ do
   testParser
   testTypeError
   testIsErrorOperator
+  testTransmitedError
