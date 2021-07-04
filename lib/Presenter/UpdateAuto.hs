@@ -70,7 +70,6 @@ update model (UpdateField fpos v, pos) = do
         r = row pos rst'
     sendGUIM . ShowFields pos $ do
                              c <- chngd
-                             guard $ c /= fpos
                              let f = r !!! c
                              return $ FieldInfo { indexFI = c
                                                 , textFI = toString f
