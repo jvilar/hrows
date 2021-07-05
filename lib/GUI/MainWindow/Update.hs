@@ -75,7 +75,8 @@ showFields fis mWindow = do
 
                           buffer <- textViewGetBuffer textView
                           let t = textFI fi
-                          textBufferSetText buffer t (fromIntegral . BS.length $ T.encodeUtf8 t)
+                          current <- readText buffer
+                          when (t /= current)$  textBufferSetText buffer t (fromIntegral . BS.length $ T.encodeUtf8 t)
                           reconnectTextView (indexFI fi) mWindow
                         )
   widgetShow grid
@@ -93,6 +94,14 @@ recoverLabel row mWindow = do
     cbox <- unsafeCastTo EventBox ebox
     lbl <- head <$> containerGetChildren cbox
     unsafeCastTo Label lbl
+
+readText :: TextBuffer -> IO Text
+readText buffer = do
+    begin <- #getStartIter buffer
+    end <- #getEndIter buffer
+    #getText buffer begin end False
+
+
 
 addTextBufferActive :: Int -> MainWindow -> IO ()
 addTextBufferActive n mWindow = modifyIORef (textBufferActive mWindow) (\bv -> ones n # bv)
@@ -205,9 +214,7 @@ createFieldTextView f mWindow = do
          _ <- buffer `on` #changed $ liftIO $ do
              isActive <- (@. f) <$> readIORef (textBufferActive mWindow)
              when isActive $ do
-                 begin <- #getStartIter buffer
-                 end <- #getEndIter buffer
-                 text <- #getText buffer begin end False
+                 text <- readText buffer
                  sendInputMW mWindow $ UpdateField f (toField text)
 
          _ <- textView `on` #buttonPressEvent $ \event -> do
