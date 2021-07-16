@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Model.RowStore.Update (
   updateAll
@@ -83,12 +84,14 @@ addEmptyRow m = addRow m (map _defaultValue $ _fieldInfo m)
 
 -- |Deletes a 'Row' from a 'RowStore'.
 deleteRow :: RowPos -> RowStore -> RowStore
-deleteRow pos m = m { _rows = IM.mapKeys f (_rows m)
-                    , _size = _size m - 1
-                    , _changed = True
-                    }
+deleteRow pos m@RowStore {..} = m { _rows = rows'
+                                  , _size = _size - 1
+                                  , _changed = True
+                                  }
                   where f n | n <= pos = n
                             | otherwise = n - 1
+                        rows' | pos == _size - 1 = IM.delete pos _rows
+                              | otherwise = IM.mapKeys f _rows
 
 -- |An empty `RowStore` that has a configuration.
 emptyConf :: RowStoreName -> RowStoreConf -> RowStore
