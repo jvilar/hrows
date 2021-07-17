@@ -22,6 +22,7 @@ library:
   - aeson-pretty
   - auto
   - base
+  - brick
   - bytestring
   - bv
   - containers
@@ -37,6 +38,7 @@ library:
   - text-show
   - transformers
   - vector
+  - vty
 
 executables:
   hrows:
@@ -60,6 +62,20 @@ executables:
     - haskeline
     - hrows
     - text
+
+  vrows:
+    main: src/VRows.hs
+    ghc-options:
+    - -threaded
+    - -Wall
+    dependencies:
+    - data-default
+    - directory
+    - hrows
+    - lens
+    - mtl
+    - text
+    - jmvOptions >= 0.2
 
 tests:
   expression-test:

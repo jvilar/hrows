@@ -15,8 +15,20 @@ cradle:
     - path: "././Paths_hrows.hs"
       component: "hrows:exe:testParser"
 
+    - path: "././src/VRows.hs"
+      component: "hrows:exe:vrows"
+
+    - path: "././Paths_hrows.hs"
+      component: "hrows:exe:vrows"
+
     - path: "././"
       component: "hrows:test:expression-test"
 
     - path: "././"
+      component: "hrows:test:fromRows-test"
+
+    - path: "././"
       component: "hrows:test:lexer-test"
+
+    - path: "././"
+      component: "hrows:test:sourceinfo-test"
