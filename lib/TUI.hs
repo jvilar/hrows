@@ -72,11 +72,15 @@ renderFields State {..} = renderList renderName False sFieldList
                           renderList renderValue False sValueList
 
 renderName :: Bool -> Text -> Widget Name
-renderName _ = txt
+renderName _ = nEmptyTxt
 
 renderValue :: Bool -> Text -> Widget Name
-renderValue _ = txt
+renderValue _ = nEmptyTxt
 
+nEmptyTxt :: Text -> Widget Name
+nEmptyTxt t = txt $ if T.null t
+                    then " "
+                    else t
 
 
 app :: App State EventType Name
