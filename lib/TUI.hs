@@ -16,6 +16,7 @@ import Graphics.Vty.Attributes(defAttr, reverseVideo, withStyle)
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl))
 
 import Model.RowStore
+import Graphics.Vty (imageWidth, imageHeight, translate)
 
 data State = State { sRowStore :: RowStore
                    , sIndex :: Int
@@ -61,7 +62,7 @@ draw s = [
        <=>
        hBorder
        <=>
-       hCenter (txt "C-q: exit")
+       hCenter (txt "Enter: zoom field, C-q: exit")
     ]
 
 
@@ -112,9 +113,29 @@ myTxt t = Widget Fixed Fixed $ do
 
 renderZoom :: State -> Widget Name
 renderZoom State {..} = case sZoom of
-    Nothing -> txt ""
-    Just (lbl, t) -> borderWithLabel (txt lbl) $ txt t
+    Nothing -> emptyWidget
+    Just (lbl, t) -> myCenter $ joinBorders $
+                       borderWithLabel (txt lbl) $
+                         txtWrap (if T.null t
+                                  then " "
+                                  else t)
+                         <=>
+                         hBorder
+                         <=>
+                         hCenter (txt "Esc to exit zoom")
 
+
+myCenter :: Widget Name -> Widget Name
+myCenter w = Widget Fixed Fixed $ do
+    wd <- availWidth <$> getContext
+    hg <- availHeight <$> getContext
+    r <- render w
+    let im = image r
+        rw = imageWidth im
+        rh = imageHeight im
+        hoffset = (wd - rw) `div` 2
+        voffset = (hg - rh) `div` 2
+    return r { image = translate hoffset voffset im }
 
 app :: App State EventType Name
 app = App { appDraw = draw
@@ -134,16 +155,27 @@ handleEvent s (VtyEvent (EvKey (KChar 'q') [MCtrl])) = halt s
 handleEvent s (VtyEvent (EvKey KPageUp [])) = backward s
 handleEvent s (VtyEvent (EvKey KPageDown [])) = forward s
 handleEvent s (VtyEvent (EvKey KEnter [])) = zoom s
+handleEvent s (VtyEvent (EvKey KEsc [])) = unZoom s
 handleEvent s (VtyEvent e@(EvKey k [])) | k `elem` listKeys = moveLists s e
 handleEvent s _ = continue s
 
 
 backward :: State -> EventM Name (Next State)
-backward s@State {..} = continue $ moveTo (sIndex - 1) s
+backward s@State {..} = updateZoom $ moveTo (sIndex - 1) s
 
 
 forward :: State -> EventM Name (Next State)
-forward s@State {..} = continue $ moveTo (sIndex + 1) s
+forward s@State {..} = updateZoom $ moveTo (sIndex + 1) s
+
+
+updateZoom :: State -> EventM Name (Next State)
+updateZoom s@State {..} = case sZoom of
+    Nothing -> continue s
+    Just _ -> zoom s
+
+
+unZoom :: State -> EventM Name (Next State)
+unZoom s = continue s { sZoom = Nothing }
 
 
 zoom :: State -> EventM Name (Next State)
@@ -159,7 +191,7 @@ moveLists :: State -> Event -> EventM Name (Next State)
 moveLists s@State{..} e = do
     fl <- handleListEvent e sFieldList
     vl <- handleListEvent e sValueList
-    continue s { sFieldList = fl, sValueList = vl }
+    updateZoom s { sFieldList = fl, sValueList = vl }
 
 
 moveTo :: Int -> State -> State
