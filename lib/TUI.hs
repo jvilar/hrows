@@ -165,10 +165,14 @@ moveLists s@State{..} e = do
 moveTo :: Int -> State -> State
 moveTo pos s@State{..}
   | valid = s { sIndex = pos
-              , sValueList = valueList pos sRowStore
+              , sValueList = vlist
               }
   | otherwise = s
     where valid = 0 <= pos && pos < size sRowStore
+          vl = valueList pos sRowStore
+          vlist = case listSelected sFieldList of
+                    Nothing -> vl
+                    Just n -> listMoveTo n vl
 
 
 myAttrMap :: AttrMap
