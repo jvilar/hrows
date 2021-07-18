@@ -76,15 +76,20 @@ renderFields State {..} = vLimit (V.length $ listElements sFieldList) $
                             renderList renderValue False sValueList
 
 renderName :: Bool -> Text -> Widget Name
-renderName _ = nEmptyTxt
+renderName _ = myTxt
 
 renderValue :: Bool -> Text -> Widget Name
-renderValue _ = nEmptyTxt
+renderValue _ = myTxt
 
-nEmptyTxt :: Text -> Widget Name
-nEmptyTxt t = txt $ if T.null t
-                    then " "
-                    else t
+myTxt :: Text -> Widget n
+myTxt t = Widget Fixed Fixed 
+  $ do
+      w <- availWidth <$> getContext
+      let l = T.length t
+          t' | l == 0 = " "
+             | l <= w = t
+             | otherwise = T.take (w-3) t <> "..." 
+      render $ txt t'
 
 
 app :: App State EventType Name
