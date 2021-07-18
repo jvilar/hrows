@@ -20,15 +20,18 @@ import Model.RowStore
 data State = State { sRowStore :: RowStore
                    , sIndex :: Int
                    , sFieldList :: List Name Text
+                   , sFieldWidth :: Int
                    , sValueList :: List Name Text
                    }
 
 initialState :: RowStore -> State
 initialState rst = State { sRowStore = rst
                          , sIndex = 0
-                         , sFieldList = listMoveTo 0 $ fieldList rst
+                         , sFieldList = listMoveTo 0 fl
+                         , sFieldWidth = min 40 (V.maximum . V.map T.length $ listElements fl)
                          , sValueList = valueList 0 rst
                          }
+                    where fl = fieldList rst
 
 fieldList :: RowStore -> List Name Text
 fieldList rst = list FieldList (V.fromList $ fnames rst) 1
@@ -65,11 +68,12 @@ title State{..} = T.concat [ getName sRowStore
 
 
 renderFields :: State -> Widget Name
-renderFields State {..} = renderList renderName False sFieldList
-                          <+>
-                          vBorder
-                          <+>
-                          renderList renderValue False sValueList
+renderFields State {..} = vLimit (V.length $ listElements sFieldList) $
+                            hLimit sFieldWidth (renderList renderName False sFieldList)
+                            <+>
+                            vBorder
+                            <+>
+                            renderList renderValue False sValueList
 
 renderName :: Bool -> Text -> Widget Name
 renderName _ = nEmptyTxt
