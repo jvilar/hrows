@@ -68,12 +68,14 @@ title State{..} = T.concat [ getName sRowStore
 
 
 renderFields :: State -> Widget Name
-renderFields State {..} = vLimit (V.length $ listElements sFieldList) $
-                            hLimit sFieldWidth (renderList renderName False sFieldList)
-                            <+>
-                            vBorder
-                            <+>
-                            renderList renderValue False sValueList
+renderFields State {..} = Widget Greedy Fixed $ do
+    h <- availHeight <$> getContext
+    let v = min (V.length $ listElements sFieldList) (h-2)
+    render $ vLimit v $ hBox [
+                hLimit sFieldWidth (renderList renderName False sFieldList)
+                , vBorder
+                , renderList renderValue False sValueList
+              ]
 
 renderName :: Bool -> Text -> Widget Name
 renderName _ = myTxt
@@ -82,13 +84,12 @@ renderValue :: Bool -> Text -> Widget Name
 renderValue _ = myTxt
 
 myTxt :: Text -> Widget n
-myTxt t = Widget Fixed Fixed 
-  $ do
+myTxt t = Widget Fixed Fixed $ do
       w <- availWidth <$> getContext
       let l = T.length t
           t' | l == 0 = " "
              | l <= w = t
-             | otherwise = T.take (w-3) t <> "..." 
+             | otherwise = T.take (w-3) t <> "..."
       render $ txt t'
 
 
