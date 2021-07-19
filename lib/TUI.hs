@@ -8,7 +8,9 @@ module TUI (
 import Brick hiding (getName)
 import Brick.Widgets.Border
 import Brick.Widgets.Center
+import Brick.Widgets.Dialog
 import Brick.Widgets.List
+import Data.Maybe(isJust, fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -20,23 +22,56 @@ import Graphics.Vty (imageWidth, imageHeight, translate)
 
 data State = State { sRowStore :: RowStore
                    , sIndex :: Int
+                   , sCurrentField :: Int
                    , sFieldList :: List Name Text
                    , sFieldWidth :: Int
                    , sValueList :: List Name Text
                    , sZoom :: Maybe Zoom
+                   , sSearch :: Maybe (SearchDialog Name)
                    }
 
 
 type Zoom = (Text, Text)
 
+data SearchDialog n = SearchDialog { sdTitle :: Text
+                                   , sdValues :: List n Text
+                                   , sdDialog :: Dialog DialogButton
+                                   }
+
+
+data DialogButton = OkButton | CancelButton
+
+
+searchDialog :: n -> Int -> Text -> [Text] -> SearchDialog n
+searchDialog n w ttle values = SearchDialog ttle
+                                           (list n (V.fromList values) 1)
+                                           (dialog (Just $ T.unpack ttle)
+                                                   (Just (0, [ ("OK", OkButton)
+                                                             , ("Cancel", CancelButton)]))
+                                                   w
+                                           )
+
+
+renderSearchDialog :: SearchDialog Name -> Widget Name
+renderSearchDialog SearchDialog {..} = renderDialog sdDialog $
+                                           vLimit (V.length $ listElements sdValues)
+                                                  (renderList renderValue False sdValues)
+
+
+handleSearchDialogEvent :: Event -> SearchDialog n -> EventM n (SearchDialog n)
+handleSearchDialogEvent ev sd@SearchDialog{..} = do
+    d' <- handleDialogEvent ev sdDialog
+    return sd { sdDialog = d' }
 
 initialState :: RowStore -> State
 initialState rst = State { sRowStore = rst
                          , sIndex = 0
+                         , sCurrentField = 0
                          , sFieldList = listMoveTo 0 fl
                          , sFieldWidth = min 40 (V.maximum . V.map T.length $ listElements fl)
                          , sValueList = valueList 0 rst
                          , sZoom = Nothing
+                         , sSearch = Nothing
                          }
                     where fl = fieldList rst
 
@@ -51,18 +86,18 @@ valueList pos rst = list ValueList (V.fromList $ map toString $ row pos rst) 1
 
 type EventType = ()
 
-data Name = FieldList | ValueList deriving (Eq, Ord, Show)
+data Name = FieldList | ValueList | SearchList deriving (Eq, Ord, Show)
 
 draw :: State -> [Widget Name]
 draw s = [
-    renderZoom s,
+    renderFront s,
     joinBorders $ center $
        borderWithLabel (txt $ title s) $
        renderFields s
        <=>
        hBorder
        <=>
-       hCenter (txt "Enter: zoom field, C-q: exit")
+       hCenter (txt "Enter: zoom field, C-f: find, C-q: exit")
     ]
 
 
@@ -111,6 +146,13 @@ myTxt t = Widget Fixed Fixed $ do
       render $ txt t'
 
 
+renderFront :: State -> Widget Name
+renderFront s@State {..}
+  | isJust sSearch = renderSearch s
+  | isJust sZoom = renderZoom s
+  | otherwise = emptyWidget
+
+
 renderZoom :: State -> Widget Name
 renderZoom State {..} = case sZoom of
     Nothing -> emptyWidget
@@ -124,6 +166,10 @@ renderZoom State {..} = case sZoom of
                          hBorder
                          <=>
                          hCenter (txt "Esc to exit zoom")
+
+
+renderSearch :: State -> Widget Name
+renderSearch = maybe emptyWidget renderSearchDialog . sSearch
 
 
 myCenter :: Widget Name -> Widget Name
@@ -152,17 +198,30 @@ listKeys = [KDown, KUp]
 
 
 handleEvent :: State -> BrickEvent Name EventType -> EventM Name (Next State)
-handleEvent s (VtyEvent (EvKey k ms)) = handleKey k ms s
+handleEvent s (VtyEvent (EvKey k ms)) = handleKey s k ms
 handleEvent s _ = continue s
 
-handleKey :: Key -> [Modifier] -> State -> EventM Name (Next State)
-handleKey (KChar 'q') [MCtrl] = halt
-handleKey KPageUp [] = backward
-handleKey KPageDown [] = forward
-handleKey KEnter [] = zoom
-handleKey KEsc [] = unZoom
-handleKey k [] | k `elem` listKeys = moveLists (EvKey k [])
-handleKey _ _ = continue
+handleKey :: State -> Key -> [Modifier] -> EventM Name (Next State)
+handleKey s@State {..} k m
+            | isJust sSearch = handleKeySearch k m s
+            | otherwise = handleKeyStandard k m s
+
+handleKeyStandard :: Key -> [Modifier] -> State -> EventM Name (Next State)
+handleKeyStandard (KChar 'q') [MCtrl] = halt
+handleKeyStandard KPageUp [] = backward
+handleKeyStandard KPageDown [] = forward
+handleKeyStandard KEnter [] = zoom
+handleKeyStandard KEsc [] = unZoom
+handleKeyStandard (KChar 'f') [MCtrl] = activateSearch
+handleKeyStandard k [] | k `elem` listKeys = moveLists (EvKey k [])
+handleKeyStandard _ _ = continue
+
+
+handleKeySearch :: Key -> [Modifier] -> State -> EventM Name (Next State)
+handleKeySearch k [] | k `elem` listKeys = moveSearchList (EvKey k [])
+handleKeySearch KEnter [] = moveToSelected
+handleKeySearch KEsc [] = deactivateSearch
+handleKeySearch k ms = handleInSearchDialog (EvKey k ms)
 
 
 backward :: State -> EventM Name (Next State)
@@ -192,11 +251,54 @@ zoom s@State {..} = do
   continue s { sZoom = z }
 
 
+activateSearch :: State -> EventM Name (Next State)
+activateSearch s@State{..} = do
+  let (index, tle) = fromMaybe (0, "") $ do
+                        listSelectedElement sFieldList
+      vs = fieldValues (fromIntegral index) sRowStore
+      sd = searchDialog SearchList 40 tle vs
+      s' = s { sSearch = Just sd }
+  continue s'
+
+
+deactivateSearch :: State -> EventM Name (Next State)
+deactivateSearch s = continue s { sSearch = Nothing }
+
+
 moveLists :: Event -> State -> EventM Name (Next State)
 moveLists e s@State{..} = do
     fl <- handleListEvent e sFieldList
     vl <- handleListEvent e sValueList
-    updateZoom s { sFieldList = fl, sValueList = vl }
+    let cf = fromMaybe 0 $ listSelected fl
+    updateZoom s { sCurrentField = cf, sFieldList = fl, sValueList = vl }
+
+
+moveSearchList :: Event -> State -> EventM Name (Next State)
+moveSearchList e s@State{..} = do
+    let Just sd@SearchDialog{..} = sSearch
+    vs' <- handleListEvent e sdValues
+    let sd' = sd { sdValues = vs' }
+    continue s { sSearch = Just sd' }
+
+
+moveToSelected :: State -> EventM Name (Next State)
+moveToSelected s@State{..} = do
+    let Just SearchDialog{..} = sSearch
+    case dialogSelection sdDialog of
+        Just OkButton -> case listSelectedElement sdValues of
+                             Nothing -> deactivateSearch s
+                             Just (_, t) -> let
+                                  pos = nextPos (fromIntegral sCurrentField) t sIndex sRowStore
+                                in deactivateSearch $ moveTo pos s
+        Just CancelButton -> deactivateSearch s
+        Nothing -> continue s
+
+
+handleInSearchDialog :: Event -> State -> EventM Name (Next State)
+handleInSearchDialog ev s@State{..} = do
+    let Just sd = sSearch
+    sd' <- handleSearchDialogEvent ev sd
+    continue s { sSearch = Just sd' }
 
 
 moveTo :: Int -> State -> State
@@ -213,11 +315,14 @@ moveTo pos s@State{..}
 
 
 myAttrMap :: AttrMap
-myAttrMap = attrMap defAttr [ ("selectedElement", withStyle defAttr reverseVideo) ]
+myAttrMap = attrMap defAttr [ ("selectedElement", withStyle defAttr reverseVideo)
+                            , (buttonSelectedAttr, withStyle defAttr reverseVideo)
+                            ]
+
 
 
 startTUI :: RowStore -> IO ()
 startTUI rst = do
-  finalState <- defaultMain app (initialState rst)
+  _ <- defaultMain app (initialState rst)
   return ()
 
