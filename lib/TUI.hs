@@ -115,6 +115,7 @@ renderZoom :: State -> Widget Name
 renderZoom State {..} = case sZoom of
     Nothing -> emptyWidget
     Just (lbl, t) -> myCenter $ joinBorders $
+                       hLimitPercent 95 $
                        borderWithLabel (txt lbl) $
                          txtWrap (if T.null t
                                   then " "
@@ -151,13 +152,17 @@ listKeys = [KDown, KUp]
 
 
 handleEvent :: State -> BrickEvent Name EventType -> EventM Name (Next State)
-handleEvent s (VtyEvent (EvKey (KChar 'q') [MCtrl])) = halt s
-handleEvent s (VtyEvent (EvKey KPageUp [])) = backward s
-handleEvent s (VtyEvent (EvKey KPageDown [])) = forward s
-handleEvent s (VtyEvent (EvKey KEnter [])) = zoom s
-handleEvent s (VtyEvent (EvKey KEsc [])) = unZoom s
-handleEvent s (VtyEvent e@(EvKey k [])) | k `elem` listKeys = moveLists s e
+handleEvent s (VtyEvent (EvKey k ms)) = handleKey k ms s
 handleEvent s _ = continue s
+
+handleKey :: Key -> [Modifier] -> State -> EventM Name (Next State)
+handleKey (KChar 'q') [MCtrl] = halt
+handleKey KPageUp [] = backward
+handleKey KPageDown [] = forward
+handleKey KEnter [] = zoom
+handleKey KEsc [] = unZoom
+handleKey k [] | k `elem` listKeys = moveLists (EvKey k [])
+handleKey _ _ = continue
 
 
 backward :: State -> EventM Name (Next State)
@@ -187,8 +192,8 @@ zoom s@State {..} = do
   continue s { sZoom = z }
 
 
-moveLists :: State -> Event -> EventM Name (Next State)
-moveLists s@State{..} e = do
+moveLists :: Event -> State -> EventM Name (Next State)
+moveLists e s@State{..} = do
     fl <- handleListEvent e sFieldList
     vl <- handleListEvent e sValueList
     updateZoom s { sFieldList = fl, sValueList = vl }
