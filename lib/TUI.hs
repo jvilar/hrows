@@ -194,7 +194,7 @@ app = App { appDraw = draw
 
 
 listKeys :: [Key]
-listKeys = [KDown, KUp]
+listKeys = [KDown, KUp, KPageUp, KPageDown, KHome, KEnd]
 
 
 handleEvent :: State -> BrickEvent Name EventType -> EventM Name (Next State)
