@@ -77,6 +77,21 @@ executables:
     - text
     - jmvOptions >= 0.2
 
+  cols:
+    main: src/Cols.hs
+    ghc-options:
+    - -threaded
+    - -Wall
+    dependencies:
+    - data-default
+    - directory
+    - hrows
+    - jmvOptions >= 0.2
+    - lens
+    - mtl
+    - parsec
+    - text
+
 tests:
   expression-test:
     main: test/Expression.hs
