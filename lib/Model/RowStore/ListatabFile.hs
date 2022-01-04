@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 
 module Model.RowStore.ListatabFile (
    -- *Functions
@@ -11,24 +12,28 @@ module Model.RowStore.ListatabFile (
 
 import Control.Exception (try, throwIO)
 import Data.List(intercalate)
+import Data.Maybe (fromMaybe)
 import Data.Text(Text)
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
+import Data.Text qualified as T
+import Data.Text.IO qualified as T
 import Data.Void(Void)
 import System.IO (Handle, hClose, hPutStrLn, openFile, IOMode(WriteMode))
 import Text.Megaparsec (many, sepBy, endBy, between, noneOf, optional, parse, Parsec, errorBundlePretty, (<|>))
 import Text.Megaparsec.Char(char)
-import qualified Text.Megaparsec as TM
+import Text.Megaparsec qualified as TM
 
 import HRowsException
 import Model.Field
 import Model.Row
 import Model.RowStore.ListatabInfo
 
--- |Reads a listatab file. Returns (possibly) the list of names and the rows.
-readListatab :: ListatabInfo -> FilePath -> IO (Maybe [Text], DataSource)
-readListatab ltInfo fp = do
-  text <- readText fp
+-- |Reads a listatab file. If the `FilePath` is None, reads from the
+-- standard input.
+-- Returns (possibly) the list of names and the rows.
+readListatab :: ListatabInfo -> Maybe FilePath -> IO (Maybe [Text], DataSource)
+readListatab ltInfo mfp = do
+  text <- maybe T.getContents readText mfp
+  let fp = fromMaybe "stdin" mfp
   case parse (analyze ltInfo) fp text of
      Right r -> return r
      Left e -> throwIO $ hRowsException $

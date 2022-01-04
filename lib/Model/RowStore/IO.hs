@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Model.RowStore.IO (
-    readRowStore,
-    writeRowStore
-) where
+module Model.RowStore.IO ( readRowStore
+                         , readRowStoreStdin
+                         , writeRowStore
+                         ) where
 
 import Control.Exception (throwIO, try)
 import Data.Aeson(decode, FromJSON (parseJSON), Value)
@@ -28,19 +28,25 @@ readRowStore si = do
        let info = case mconf of
                       Nothing -> ltInfo
                       Just f -> case formatConf f of
-                                  NoFormatInfo -> ltInfo
-                                  ListatabFormat inf -> inf
-       (h, ds) <- readListatab info fp
+                                    NoFormatInfo -> ltInfo
+                                    ListatabFormat inf -> inf
+       (h, ds) <- readListatab info $ Just fp
        rst <- case mconf of
-           Nothing -> case h of
-                          Nothing -> return $ fromRows name ds
-                          Just ns -> return $ fromRowsNames name ns ds
+           Nothing -> return $ case h of
+                          Nothing -> fromRows name ds
+                          Just ns -> fromRowsNames name ns ds
            Just cnf -> do
                let rs = fromRowsConf name cnf ds
                sources <- map fst <$> mapM readRowStore (sourceInfos cnf)
                return $ setUnchanged $ foldr addRowStore rs sources
        return (rst, mconf)
 
+readRowStoreStdin :: ListatabInfo -> IO RowStore
+readRowStoreStdin info = do
+    (h, ds) <- readListatab info Nothing
+    return $ case h of
+                Nothing -> fromRows "stdin" ds
+                Just ns -> fromRowsNames "stdin" ns ds
 
 -- |Writes a `RowStore` using a `SourceInfo`
 writeRowStore :: SourceInfo -> [SourceInfo] -> RowStore -> IO ()
