@@ -4,7 +4,6 @@ module Main where
 
 import Control.Exception(try)
 import Control.Monad(unless, when)
-import Control.Monad.Trans(liftIO)
 import Control.Lens(makeLenses, Getting, (^.), set)
 import Data.Default(Default(..))
 import Data.Maybe(isJust)
@@ -57,7 +56,8 @@ getOptions = do
                case a of
                    [] -> myError "No filename given"
                    [f] -> return $ set inputFileName (Just f) opt
-                   [f, c] -> return $ set inputFileName (Just f) $ set confFileName (Just c) opt
+                   [f, c] -> return $ set inputFileName (Just f)
+                                    $ set confFileName (Just c) opt
                    _ -> myError "Too many filenames"
 
 helpMessage :: String
@@ -88,9 +88,9 @@ main = do
       ltinfo = def { ltInputSeparator = opts ^. inputSeparator }
       sinfo =  mkSourceInfo Nothing pc ltinfo
 
-  r <- liftIO $ try $ readRowStore sinfo
+  r <- try $ readRowStore sinfo
   case r of
-      Right (rst, mconf) -> startTUI rst
-      Left (HRowsException mess) -> error $ T.unpack mess
+      Right (rst, _) -> startTUI rst
+      Left (HRowsException mess) -> myError $ T.unpack mess
 
 
