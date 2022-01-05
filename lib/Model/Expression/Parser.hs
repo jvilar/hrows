@@ -1,6 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Model.Expression.Parser ( parse ) where
+module Model.Expression.Parser (
+    -- *Types
+    Parser
+    -- *Functions
+    -- **Parsing
+    , parse
+    , parseExpression
+    -- **Auxiliary functions
+    , advance
+    , check
+    , current
+    , eof
+    , expect
+    , expectName
+    , many
+    , match
+) where
 
 import Control.Monad(unless)
 import Control.Monad.Except(ExceptT, runExceptT, throwError)
@@ -16,6 +32,8 @@ import Model.Expression
 
 type Parser = ExceptT Text (State [Token])
 
+-- |Advance the parse as long as the parser returns a `Just`, collect
+-- these parses in a list
 many :: Parser (Maybe a) -> Parser [a]
 many p = do
     mx <- p
@@ -23,21 +41,28 @@ many p = do
         Just x -> (x:) <$> many p
         Nothing -> return []
 
+-- |Read the current token.
 current :: Parser Token
 current = lift $ gets head
 
+-- |Advance one token.
 advance :: Parser ()
 advance = lift $ modify tail
 
+-- |Check if the current token is equal to the one given.
 check :: Token -> Parser Bool
 check t = (== t) <$> current
 
+-- |Check if the current token equals the expected one. Throw
+-- error if not.
 expect :: Token -> Text -> Parser ()
 expect t message = do
     c <- current
     unless (t == c) $ throwError $ T.concat ["Error en ", showt c, ", esperaba ", message]
     advance
 
+-- |Check if the current token is a name. Return the name as a
+-- `NamedPosition` if it is, throw an error if not.
 expectName :: Text -> Parser Expression
 expectName message = do
     c <- current
@@ -47,6 +72,8 @@ expectName message = do
            return $ mkNamedPosition (T.pack s)
       _ -> throwError $ T.concat ["Error en ", showt c, ", se esperaba ", message]
 
+-- |Return the value associated to the current token in the list.
+-- Return `Nothing` if there is no value associated.
 match :: [(Token, a)] -> Parser (Maybe a)
 match l = do
     t <- current
@@ -54,11 +81,18 @@ match l = do
     unless (isNothing r) advance
     return r
 
-parse :: Formula -> Expression
-parse s = case evalState (runExceptT (expression <* eof)) $ tokenize s of
-              Left err -> mkErrorExpr err
-              Right e -> e
+-- |Return an `Expression` for the given `Formula`.
+parseExpression :: Formula -> Expression
+parseExpression f = case parse (expression <* eof) f of
+                       Left err -> mkErrorExpr err
+                       Right e -> e
 
+-- |Parse a `Text`. Return a `Right a` if parsing goes Ok, `Left`
+-- with a message if there is a en error.
+parse :: Parser a -> Text -> Either Text a
+parse p = evalState (runExceptT p) . tokenize
+
+-- |Expect an `EOFT` as the current token.
 eof :: Parser ()
 eof = do
     t <- current

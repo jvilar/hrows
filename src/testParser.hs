@@ -6,7 +6,7 @@ import System.Console.Haskeline(outputStrLn, runInputT, InputT, defaultSettings,
 import Model.Expression(toFormula, toString)
 import Model.Expression.Evaluation(evaluate)
 import Model.Expression.Lexer(tokenize)
-import Model.Expression.Parser(parse)
+import Model.Expression.Parser(parseExpression)
 
 main :: IO ()
 main = do
@@ -20,7 +20,7 @@ loop = do
         Nothing -> return ()
         Just "exit" -> return ()
         Just formula -> do
-            let expression = parse formula
+            let expression = parseExpression formula
                 ev = evaluate [] [] expression
             outputStrLn $ "Tokens: " ++ show (tokenize formula)
             outputStrLn $ "Expresion: " ++ show expression

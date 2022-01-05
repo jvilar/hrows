@@ -105,7 +105,7 @@ fromConf :: FieldConf -> FieldInfo
 fromConf cnf = FieldInfo { _name = nameFC cnf
                          , _type = typeFC cnf
                          , _defaultValue = defaultValue $ typeFC cnf
-                         , _expression = parse <$> formulaFC cnf
+                         , _expression = parseExpression <$> formulaFC cnf
                          , _formula = formulaFC cnf
                          , _visible = True
                          }
@@ -343,7 +343,7 @@ changeFieldType t n rst | t /= types rst !! n' =
 -- |Changes the formula of the field.
 changeFieldFormula :: Maybe Formula -> FieldPos -> RowStore -> RowStore
 changeFieldFormula mf n rst = addPlan rst { _fieldInfo = newInfo, _changed = True }
-    where newInfo = change (\fi -> fi { _expression = parse <$> mf, _formula = mf }) $ _fieldInfo rst
+    where newInfo = change (\fi -> fi { _expression = parseExpression <$> mf, _formula = mf }) $ _fieldInfo rst
           change f xs = let
               (h, x:t) = splitAt (fromIntegral n) xs
               in h ++ f x : t
