@@ -23,6 +23,7 @@ module Model.RowStore (
              , nextPos
              -- ** IO
              , readRowStore
+             , readRowStoreStdin
              , writeRowStore
              -- **Updating
              , setName
