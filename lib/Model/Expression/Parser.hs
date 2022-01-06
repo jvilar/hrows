@@ -16,6 +16,7 @@ module Model.Expression.Parser (
     , expectName
     , many
     , match
+    , parsingError
     -- *Parsers
     , expression
 ) where
@@ -47,6 +48,10 @@ many p = do
 current :: Parser Token
 current = lift $ gets head
 
+-- |Stop the parsing giving a message
+parsingError :: Text -> Parser a
+parsingError = throwError
+
 -- |Advance one token.
 advance :: Parser ()
 advance = lift $ modify tail
@@ -60,7 +65,7 @@ check t = (== t) <$> current
 expect :: Token -> Text -> Parser ()
 expect t message = do
     c <- current
-    unless (t == c) $ throwError $ T.concat ["Error en ", showt c, ", esperaba ", message]
+    unless (t == c) $ parsingError $ T.concat ["Error en ", showt c, ", esperaba ", message]
     advance
 
 -- |Check if the current token is a name. Return the name as a
@@ -72,7 +77,7 @@ expectName message = do
       NameT s -> do
            advance
            return $ mkNamedPosition (T.pack s)
-      _ -> throwError $ T.concat ["Error en ", showt c, ", se esperaba ", message]
+      _ -> parsingError $ T.concat ["Error en ", showt c, ", se esperaba ", message]
 
 -- |Return the value associated to the current token in the list.
 -- Return `Nothing` if there is no value associated.
@@ -100,7 +105,7 @@ eof = do
     t <- current
     case t of
         EOFT -> return ()
-        _ -> throwError $ T.concat ["Error en ", showt t, ", esperaba el fin de la expresión"]
+        _ -> parsingError $ T.concat ["Error en ", showt t, ", esperaba el fin de la expresión"]
 
 -- expression -> logical (QuestionMarkT expression ColonT expression)?
 expression :: Parser Expression
@@ -186,7 +191,7 @@ base = do
         OpenT -> expression <* close
         MaxT -> maxMin $ PBinaryOpInfo maxField "max"
         MinT -> maxMin $ PBinaryOpInfo minField "min"
-        _ -> throwError $ T.concat ["Error en ", showt t, ", esperaba un comienzo de expresión"]
+        _ -> parsingError $ T.concat ["Error en ", showt t, ", esperaba un comienzo de expresión"]
 
 -- name --> (AtT NameT ArrowT NameT EqualT NameT)?
 name :: String -> Parser Expression
