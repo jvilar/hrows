@@ -32,6 +32,7 @@ library:
   - gi-gdk
   - gi-gtk
   - haskell-gi-base
+  - lens
   - megaparsec
   - mtl
   - text
