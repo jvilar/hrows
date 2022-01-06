@@ -50,14 +50,16 @@ type Parser = Parsec Void Text
 analyze :: ListatabInfo -> Parser (Maybe [Text], DataSource)
 analyze ltInfo = do
   let sep = ltInputSeparator ltInfo
+      inNameChar = TM.try (char '\\' >> (char '>' <|> char '\\'))
+                   <|> noneOf (">" :: String)
   h <- case ltHeaderType ltInfo of
           NoHeader -> return Nothing
           FirstLine -> Just <$> sepBy (stringParser sep) (char sep)
           Comment -> optional $
                          between (char '#') (char '\n')
-                                   ( many ( T.pack <$> between (char '<')
-                                                    (char '>')
-                                                    (many $ noneOf (">":: String))
+                                   ( many ( T.pack <$> (char '<'
+                                                        *> many inNameChar
+                                                        <* char '>')
                                           )
                                    )
   rs <- flip endBy (char '\n') $
@@ -66,7 +68,7 @@ analyze ltInfo = do
   return (h, rs)
 
 stringParser :: Char -> Parser Text
-stringParser sep = T.pack <$> ((char '"' *> (many inStringChar <* char '"'))
+stringParser sep = T.pack <$> ((char '"' *> many inStringChar <* char '"')
                                <|> many (noneOf [sep, '\n']))
     where inStringChar = TM.try (char '\\' >> ( char '\\'
                                        <|> (char 'n' >> return '\n')
@@ -90,10 +92,13 @@ writeListatab info mfp mNames ds = do
                         Just ns -> case ltHeaderType info of
                                      NoHeader -> return ()
                                      FirstLine -> writeSeparated sep h ns
-                                     Comment -> T.hPutStrLn h $ T.concat ["#<", T.intercalate "><" ns, ">"]
+                                     Comment -> T.hPutStrLn h $ T.concat ["#<", T.intercalate "><" (map encodeName ns), ">"]
                      mapM_ (writeRow sep h) ds
                      hClose h
         Left e -> exception e
+
+encodeName :: Text -> Text
+encodeName = T.replace ">" "\\>" . T.replace "\\" "\\\\"
 
 writeRow :: Char -> Handle -> Row -> IO ()
 writeRow sep h = writeSeparated sep h . map toString
