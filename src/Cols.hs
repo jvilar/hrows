@@ -6,7 +6,7 @@
 
 import Control.Exception qualified as E
 import Control.Monad(unless, when)
-import Control.Lens(makeLenses, over, set, (^.), Traversal', (%~), Lens')
+import Control.Lens(makeLenses, over, set, (^.), Traversal', (%~), Lens', traversed, (&))
 import Data.Default(Default(def))
 import Data.Maybe(isJust)
 import Data.Text qualified as T
@@ -25,16 +25,16 @@ import Model.RowStore
 import Model.SourceInfo
 import Model.Expression.Evaluation
 import Model.Expression.Manipulate
-import Model.Expression.Lexer (Token(EOFT, CommaT, LessThanT, ColonT, GreaterThanT, ErrorT))
+import Model.Expression.Lexer (Token(EOFT, CommaT, ColonT, ErrorT))
 import Model.Expression.Parser
 import Model.Expression.RecursionSchemas
-import Model.RowStore.ListatabInfo (ListatabInfo(ListatabInfo))
+import Control.Lens.Combinators (beside)
 
 
-data Col = Formula Expression | Range Expression Expression deriving Show
+data Col = Single Expression | Range Expression Expression deriving Show
 
 expressionT :: Traversal' Col Expression
-expressionT f (Formula e) = Formula <$> f e
+expressionT f (Single e) = Single <$> f e
 expressionT f (Range e1 e2) = Range <$> f e1 <*> f e2
 
 data Options = Options { _help :: Bool
@@ -51,7 +51,7 @@ defOpts :: Options
 defOpts = Options { _help = False
                   , _iOptions = def
                   , _oOptions = def
-                  , _cols = [Formula $ mkPosition 0]
+                  , _cols = [Range (mkPosition 0) (mkPosition 0)]
                   , _inputFileName = Nothing
                   , _confFileName = Nothing
                   }
@@ -75,7 +75,7 @@ options = processOptions $ do
                'O' ~: "oNoHeader" ==> NoArg (setHeader oOptions NoHeader) ~: "Do not use header in the output. Must be used after -0 if both are present."
                '1' ~: "iHeader1" ==> NoArg (setHeader iOptions FirstLine . setHeader oOptions FirstLine) ~: "Use the first line as header in the input."
                'f' ~: "oHeader1" ==> NoArg (setHeader oOptions FirstLine) ~: "Use the first line as header in the output"
-               'c' ~: "cols" ==> ReqArg (set cols . parseCols) "COLS" ~: "Column specification. A list of fields separated by comas. A field can specify a column with an integer or a string between simple or double inverted commas, or it can specify a range with two integers separated by a minus sign."
+               'c' ~: "cols" ==> ReqArg (set cols . parseCols) "COLS" ~: "Column specification. A list of expressions separated by commas in the format of the formulas of hrows. Also, a range can be specified by two column names or positions separated by a colon and surrounded by square brackes like [$1:$4] or [Name:Surname]."
                'h' ~: "help" ==> NoArg (set help True) ~: "This help."
                's' ~: "separator" ==> ReqArg (\s -> let c = parseSeparator s in setSeparator iOptions c . setSeparator oOptions c) "CHAR" ~:
                         ("Field separator for the input and output. (Default: " ++ show (ltInputSeparator $ defOpts ^. iOptions) ++ ").")
@@ -96,12 +96,6 @@ getOptions = do
                    _ -> myError "Too many filenames"
 
 
-{-
-toRange :: Int -> Maybe Int -> Field
-toRange n Nothing = Numeric n
-toRange n (Just n') = Range n n'
--}
-
 parseCols :: String -> [Col]
 parseCols s = case parse colParser (T.pack s) of
                  Left err -> myError $ "Bad cols specification: " ++ T.unpack err
@@ -112,7 +106,7 @@ colParser = do
     t <- current
     c <- case t of
              ErrorT "[" -> rangeParser
-             _ -> Formula <$> expression
+             _ -> Single <$> expression
     check EOFT >>= \case
         True -> return [c]
         False -> expect CommaT "a comma" >> (c:) <$> colParser
@@ -121,7 +115,7 @@ rangeParser :: Parser Col
 rangeParser = do
     advance
     e1 <- expression
-    expect ColonT "a colon" 
+    expect ColonT "a colon"
     e2 <- expression
     expect (ErrorT "]")  "a closing square bracket"
     return $ Range e1 e2
@@ -167,10 +161,12 @@ main = do
           writeRowStoreStdout (opts ^. oOptions) rst'
 
 process :: Options -> RowStore -> RowStore
-process opts rst = fromRowsNames "cols" ns . map (processRow cs) $ rows rst
-    where cs = map (expressionT %~ addPositions rst) (opts ^. cols)
+process opts rst = case names rst of
+                      Nothing -> fromRows "cols" . map (processRow cs) $ rows rst
+                      Just _ -> fromRowsNames "cols" ns . map (processRow cs) $ rows rst
+    where cs = opts ^. cols & traversed . expressionT %~ addPositions rst
           ns = concatMap toName cs
-          toName (Formula e) = [toFormula e]
+          toName (Single e) = [toFormula e]
           toName (Range e1 e2) = case names rst of
                    Nothing -> [ T.pack ("Column " ++ show i) | i <- [p1 + 1..p2 + 1] ]
                    Just xs -> slice p1 p2 xs
@@ -179,7 +175,7 @@ process opts rst = fromRowsNames "cols" ns . map (processRow cs) $ rows rst
 
 processRow :: [Col] -> Row -> Row
 processRow cs r = concatMap f cs
-    where f (Formula e) = [evaluate r [] e]
+    where f (Single e) = [evaluate r [] e]
           f (Range e1 e2) = slice (pos e1) (pos e2) r
 
 slice :: Int -> Int -> [a] -> [a]
