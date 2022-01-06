@@ -65,7 +65,7 @@ rangeParser = do
 
 checkPosition :: Expression -> Parser ()
 checkPosition (In (Position _)) = return ()
-checkPosition (In (NamedPosition _ (Just _))) = return ()
+checkPosition (In (NamedPosition _ _)) = return ()
 checkPosition e = parsingError $ T.concat [ "Expression "
                                           , toFormula e
                                           , " does not represent a position"
