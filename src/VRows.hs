@@ -12,9 +12,11 @@ import System.Directory (doesFileExist)
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
+import System.IO.Unsafe(unsafePerformIO)
 
 import System.Console.JMVOptions
 
+import Col
 import HRowsException
 import Model.DefaultFileNames
 import Model.RowStore
@@ -25,6 +27,7 @@ data Options = Options { _help :: Bool
                        , _inputFileName :: Maybe FilePath
                        , _confFileName :: Maybe FilePath
                        , _inputOptions :: ListatabInfo
+                       , _cols :: [Col]
                        }
 
 makeLenses ''Options
@@ -34,6 +37,7 @@ instance Default Options where
                    , _inputFileName = Nothing
                    , _confFileName = Nothing
                    , _inputOptions = def
+                   , _cols = [AllCols]
                    }
 
 defValue :: Show a => Getting a Options a -> String
@@ -50,10 +54,16 @@ setSeparator c = over inputOptions (\oc -> oc { ltInputSeparator = c })
 setHeader :: HeaderType -> Options -> Options
 setHeader h = over inputOptions (\oc -> oc { ltHeaderType = h })
 
+setCols :: String -> Options -> Options
+setCols s = case parseCols (T.pack s) of
+                 Left e -> myError $ "Bad column espcification: " ++ T.unpack e
+                 Right cs -> set cols cs
+
 options :: [OptDescr (Options -> Options)]
 options = processOptions $ do
               '0' ~: "NoHeader" ==> NoArg (setHeader NoHeader) ~: "Do not use header in the input."
               '1' ~: "Header1" ==> NoArg (setHeader FirstLine) ~: "Use the first line as header in the input."
+              'c' ~: "cols" ==> ReqArg setCols "COLS" ~: "Column specification. A list of expressions separated by commas in the format of the formulas of hrows. Also, a range can be specified by two column names or positions separated by a colon and surrounded by square brackes like [$1:$4] or [Name:Surname]."
               'h' ~: s "help" ==> NoArg (set help True) ~: s "This help."
               's' ~: s "separator" ==> ReqArg (setSeparator . parseSeparator) "SEP" ~: s "Separator for input of listatab files. " ++ defValue inputOptions
           where s :: String -> String
@@ -77,8 +87,8 @@ helpMessage :: String
 helpMessage = usageInfo header options
               where header = "Usage: vrows [Options] <file> [<conf>]"
 
-myError :: String -> IO a
-myError m = do
+myError :: String -> a
+myError m = unsafePerformIO $ do
               n <- getProgName
               hPutStrLn stderr $ n ++ " error: " ++ m
               exitFailure
@@ -102,7 +112,7 @@ main = do
 
   r <- try $ readRowStore sinfo
   case r of
-      Right (rst, _) -> startTUI rst
+      Right (rst, _) -> startTUI $ applyCols (opts ^. cols) rst
       Left (HRowsException mess) -> myError $ T.unpack mess
 
 
