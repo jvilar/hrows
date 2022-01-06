@@ -54,7 +54,7 @@ analyze ltInfo = do
                    <|> noneOf (">" :: String)
   h <- case ltHeaderType ltInfo of
           NoHeader -> return Nothing
-          FirstLine -> Just <$> sepBy (stringParser sep) (char sep)
+          FirstLine -> Just <$> (sepBy (stringParser sep) (char sep) <* char '\n')
           Comment -> optional $
                          between (char '#') (char '\n')
                                    ( many ( T.pack <$> (char '<'

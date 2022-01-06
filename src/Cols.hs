@@ -28,7 +28,6 @@ import Model.Expression.Manipulate
 import Model.Expression.Lexer (Token(EOFT, CommaT, ColonT, ErrorT))
 import Model.Expression.Parser
 import Model.Expression.RecursionSchemas
-import Control.Lens.Combinators (beside)
 
 
 data Col = Single Expression | Range Expression Expression deriving Show

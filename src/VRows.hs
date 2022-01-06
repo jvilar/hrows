@@ -4,7 +4,7 @@ module Main where
 
 import Control.Exception(try)
 import Control.Monad(unless, when)
-import Control.Lens(makeLenses, Getting, (^.), set)
+import Control.Lens(makeLenses, Getting, (^.), set, over)
 import Data.Default(Default(..))
 import Data.Maybe(isJust)
 import qualified Data.Text as T
@@ -24,7 +24,7 @@ import TUI
 data Options = Options { _help :: Bool
                        , _inputFileName :: Maybe FilePath
                        , _confFileName :: Maybe FilePath
-                       , _inputSeparator :: Char
+                       , _inputOptions :: ListatabInfo
                        }
 
 makeLenses ''Options
@@ -33,16 +33,29 @@ instance Default Options where
     def = Options  { _help = False
                    , _inputFileName = Nothing
                    , _confFileName = Nothing
-                   , _inputSeparator = ltInputSeparator def
+                   , _inputOptions = def
                    }
 
 defValue :: Show a => Getting a Options a -> String
 defValue field = "Default: " ++ show (def ^. field) ++ "."
 
+parseSeparator :: String -> Char
+parseSeparator [c] = c
+parseSeparator "\\t" = '\t'
+parseSeparator s = error $ "Illegal string for separator: " ++ show s
+
+setSeparator :: Char -> Options -> Options
+setSeparator c = over inputOptions (\oc -> oc { ltInputSeparator = c })
+
+setHeader :: HeaderType -> Options -> Options
+setHeader h = over inputOptions (\oc -> oc { ltHeaderType = h })
+
 options :: [OptDescr (Options -> Options)]
 options = processOptions $ do
+              '0' ~: "NoHeader" ==> NoArg (setHeader NoHeader) ~: "Do not use header in the input."
+              '1' ~: "Header1" ==> NoArg (setHeader FirstLine) ~: "Use the first line as header in the input."
               'h' ~: s "help" ==> NoArg (set help True) ~: s "This help."
-              's' ~: s "separator" ==> ReqArg (set inputSeparator . head) "SEP" ~: s "Separator for input of listatab files. " ++ defValue inputSeparator
+              's' ~: s "separator" ==> ReqArg (setSeparator . parseSeparator) "SEP" ~: s "Separator for input of listatab files. " ++ defValue inputOptions
           where s :: String -> String
                 s = id
 
@@ -85,8 +98,7 @@ main = do
                          then Just defFn
                          else Nothing
   let pc = PathAndConf fn cnf
-      ltinfo = def { ltInputSeparator = opts ^. inputSeparator }
-      sinfo =  mkSourceInfo Nothing pc ltinfo
+      sinfo =  mkSourceInfo Nothing pc $ opts ^. inputOptions
 
   r <- try $ readRowStore sinfo
   case r of
