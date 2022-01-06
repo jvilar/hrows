@@ -1,36 +1,46 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE LambdaCase #-}
 
 import Control.Exception qualified as E
-import Control.Monad(liftM, unless, when)
-import Control.Lens(makeLenses, over, set, (^.))
+import Control.Monad(unless, when)
+import Control.Lens(makeLenses, over, set, (^.), Traversal', (%~), Lens')
 import Data.Default(Default(def))
-import Data.List(elemIndex)
-import Data.Maybe(fromJust, isJust)
+import Data.Maybe(isJust)
 import Data.Text qualified as T
 import System.Directory(doesFileExist)
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
-import System.IO(hPutStrLn, stderr, stdout)
-
-import Text.Parsec(alphaNum, between, char, digit, letter, many, many1, noneOf, oneOf, parse, sepBy1, try, (<|>))
-
+import System.IO(hPutStrLn, stderr)
+import System.IO.Unsafe(unsafePerformIO)
 
 import System.Console.JMVOptions
 
 import HRowsException
 import Model.DefaultFileNames
 import Model.Row
-import Model.RowStore hiding (Field)
+import Model.RowStore
 import Model.SourceInfo
+import Model.Expression.Evaluation
+import Model.Expression.Manipulate
+import Model.Expression.Lexer (Token(EOFT, CommaT, LessThanT, ColonT, GreaterThanT, ErrorT))
+import Model.Expression.Parser
+import Model.Expression.RecursionSchemas
+import Model.RowStore.ListatabInfo (ListatabInfo(ListatabInfo))
 
 
-data Field = Numeric Int | Literal String | Range Int Int
+data Col = Formula Expression | Range Expression Expression deriving Show
+
+expressionT :: Traversal' Col Expression
+expressionT f (Formula e) = Formula <$> f e
+expressionT f (Range e1 e2) = Range <$> f e1 <*> f e2
 
 data Options = Options { _help :: Bool
                        , _iOptions :: ListatabInfo
                        , _oOptions :: ListatabInfo
-                       , _cols :: [Field]
+                       , _cols :: [Col]
                        , _inputFileName :: Maybe FilePath
                        , _confFileName :: Maybe FilePath
                        }
@@ -41,7 +51,7 @@ defOpts :: Options
 defOpts = Options { _help = False
                   , _iOptions = def
                   , _oOptions = def
-                  , _cols = [Numeric 1]
+                  , _cols = [Formula $ mkPosition 0]
                   , _inputFileName = Nothing
                   , _confFileName = Nothing
                   }
@@ -53,8 +63,10 @@ parseSeparator [c] = c
 parseSeparator "\\t" = '\t'
 parseSeparator s = error $ "Illegal string for separator: " ++ show s
 
+setSeparator :: Lens' Options ListatabInfo -> Char -> Options -> Options
 setSeparator l s = over l (\oc -> oc { ltInputSeparator = s })
 
+setHeader :: Lens' Options ListatabInfo -> HeaderType -> Options -> Options
 setHeader l c = over l (\oc -> oc { ltHeaderType = c })
 
 options :: [OptDescr (Options -> Options)]
@@ -77,37 +89,45 @@ getOptions = do
                 let opt = foldl (flip id) defOpts o
                 when (opt ^. help) $ putStrLn helpMessage >> exitSuccess
                 unless (null e) $ myError $ concat e ++ helpMessage
-                case a of
-                   [] -> return opt
-                   [f] -> return $ set inputFileName (Just f) opt
-                   [f, c] -> return $ set inputFileName (Just f)
-                                    $ set confFileName (Just c) opt
+                return $ case a of
+                   [] -> opt
+                   [f] -> set inputFileName (Just f) opt
+                   [f, c] -> set inputFileName (Just f) $ set confFileName (Just c) opt
                    _ -> myError "Too many filenames"
 
 
+{-
 toRange :: Int -> Maybe Int -> Field
 toRange n Nothing = Numeric n
 toRange n (Just n') = Range n n'
+-}
 
-parseCols :: String -> [Field]
-parseCols s = case parse parser "" s of
-                     Left _ -> error "Incorrect column especification."
-                     Right fs -> fs
-                  where parser = flip sepBy1 (char ',') $
-                                   try ( Literal <$> ((:) <$> letter <*> many alphaNum)
-                                       ) <|>
-                                       ( Literal <$>
-                                           between (oneOf "\"'")
-                                                   (oneOf "\"'")
-                                                   (many $ noneOf "\"'")
-                                       ) <|>
-                                       ( toRange <$> (read <$> many1 digit)
-                                                 <*> ((Just . read) <$> ((char '-') *> many1 digit)
-                                                       <|> return Nothing)
-                                       )
+parseCols :: String -> [Col]
+parseCols s = case parse colParser (T.pack s) of
+                 Left err -> myError $ "Bad cols specification: " ++ T.unpack err
+                 Right xs -> xs
 
-myError :: String -> IO a
-myError m = do
+colParser :: Parser [Col]
+colParser = do
+    t <- current
+    c <- case t of
+             ErrorT "[" -> rangeParser
+             _ -> Formula <$> expression
+    check EOFT >>= \case
+        True -> return [c]
+        False -> expect CommaT "a comma" >> (c:) <$> colParser
+
+rangeParser :: Parser Col
+rangeParser = do
+    advance
+    e1 <- expression
+    expect ColonT "a colon" 
+    e2 <- expression
+    expect (ErrorT "]")  "a closing square bracket"
+    return $ Range e1 e2
+
+myError :: String -> a
+myError m = unsafePerformIO $ do
               n <- getProgName
               hPutStrLn stderr $ n ++ " error: " ++ m
               exitFailure
@@ -115,9 +135,6 @@ myError m = do
 helpMessage :: String
 helpMessage = usageInfo header options
               where header = "Usage: cols [Options] [files]"
-
--- load :: Options -> DataSource
--- load opts | opts ^. inputFileName == Nothing -> 
 
 load :: Options -> IO RowStore
 load opts = do
@@ -140,77 +157,37 @@ load opts = do
         Left (HRowsException mess) -> myError $ T.unpack mess
 
 
-
 main :: IO ()
 main = do
           opts <- getOptions
-          lsts <- case opts ^. inputFileName of
-                     Nothing -> error "No file name"
-                     Just fs -> load opts
-          {-
-          let cs = toIndices (opts ^. cols) lsts
-              ncs = map (normalize $ map width lsts) cs
-          escribe (opts ^. oOptions) stdout $ process lsts cs
-          -}
-          print $ size lsts
+          rst <- case opts ^. inputFileName of
+                     Nothing -> readRowStoreStdin $ opts ^. iOptions
+                     Just _ -> load opts
+          let rst' = process opts rst
+          writeRowStoreStdout (opts ^. oOptions) rst'
 
-{-
-process :: [DataSource] -> [Int] -> DataSource
-process lsts cs = let
-                      ncs = map (normalize $ map width lsts) cs
-                      rs = [ pick ncs l | l <-  toRows $ map registros lsts ]
-                      h = if all (isJust . cabecera) lsts
-                          then Just $ zip (pick ncs (map (map fst . fromJust . cabecera) lsts)) [1..]
-                          else Nothing
-                  in mkListatab h rs
+process :: Options -> RowStore -> RowStore
+process opts rst = fromRowsNames "cols" ns . map (processRow cs) $ rows rst
+    where cs = map (expressionT %~ addPositions rst) (opts ^. cols)
+          ns = concatMap toName cs
+          toName (Formula e) = [toFormula e]
+          toName (Range e1 e2) = case names rst of
+                   Nothing -> [ T.pack ("Column " ++ show i) | i <- [p1 + 1..p2 + 1] ]
+                   Just xs -> slice p1 p2 xs
+               where p1 = pos e1
+                     p2 = pos e2
 
--- |Given a list of pairs index and list index returns the
--- corresponding elements from a list of lists of Strings.
-pick :: [(Int, Int)] -> [[String]] -> [String]
-pick nks ls = map (\(n, k) -> tk (ls !! k) n) nks
-  where tk [] _ = ""
-        tk (x:_) 0 = x
-        tk (_:xs) n = tk xs (n-1)
+processRow :: [Col] -> Row -> Row
+processRow cs r = concatMap f cs
+    where f (Formula e) = [evaluate r [] e]
+          f (Range e1 e2) = slice (pos e1) (pos e2) r
 
--- |Given  a list of `widths` ws and an index `i`, return the
---  index of the list in which i falls and the position within
---  it.
-normalize :: [Int] -> Int -> (Int, Int)
-normalize = go 0
-    where go _ [] _ = error "Field number outside the range"
-          go k (w:ws) i | i <= w = (i - 1, k)
-                        | otherwise = go (k+1) ws (i-w)
+slice :: Int -> Int -> [a] -> [a]
+slice p1 p2 = take (p2 - p1 + 1) . drop p1
 
--- |Combine a list of columns of lists into a list of rows of
--- lists. I.e, from [["a", "b", "c"], ["1", "2", "3"]] to [["a", "1"],
--- ["b", "2"], ["c", "3"]]. Gaps are filled with empty lists.  Note
--- that in our listatabs, there is still one more level of listness,
--- ie, the registers are lists of lists of strings and we have a list
--- of those.
-toRows :: [[[a]]] -> [[[a]]]
-toRows l | all null l = []
-         | otherwise = map sHead l : toRows (map sTail l)
-             where sHead [] = []
-                   sHead (x:_) = x
-                   sTail [] = []
-                   sTail (_:t) = t
-
-pad :: Int -> [[a]] -> [[a]]
-pad n l = l ++ replicate n []
-
-
-toIndices :: [Field] -> [DataSource] -> [Int]
-toIndices cs lsts = let
-                       names = do
-                                 l <- lsts
-                                 case cabecera l of
-                                    Nothing -> []
-                                    Just h -> pad (width l) (map fst h)
-                       pos c = case elemIndex c names of
-                                  Nothing -> error $ "Column " ++ c ++ " not found."
-                                  Just n -> n + 1
-                       change (Literal c) =  [pos c]
-                       change (Numeric n) = [n]
-                       change (Range n n') = [n..n']
-                     in concatMap change cs
--}
+pos :: Expression -> Int
+pos (In (Position n)) = n
+pos (In (NamedPosition _ (Just n))) = n
+pos e = myError $ "Expression "
+                ++ T.unpack (toFormula e)
+                ++ " does not represent a position"

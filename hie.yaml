@@ -3,6 +3,12 @@ cradle:
     - path: "./lib"
       component: "hrows:lib"
 
+    - path: "././src/Cols.hs"
+      component: "hrows:exe:cols"
+
+    - path: "././Paths_hrows.hs"
+      component: "hrows:exe:cols"
+
     - path: "././src/Main.hs"
       component: "hrows:exe:hrows"
 

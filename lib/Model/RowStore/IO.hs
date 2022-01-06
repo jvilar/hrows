@@ -3,6 +3,7 @@
 module Model.RowStore.IO ( readRowStore
                          , readRowStoreStdin
                          , writeRowStore
+                         , writeRowStoreStdout
                          ) where
 
 import Control.Exception (throwIO, try)
@@ -41,6 +42,7 @@ readRowStore si = do
                return $ setUnchanged $ foldr addRowStore rs sources
        return (rst, mconf)
 
+-- |Read a `RowStore` from `stdin`
 readRowStoreStdin :: ListatabInfo -> IO RowStore
 readRowStoreStdin info = do
     (h, ds) <- readListatab info Nothing
@@ -53,7 +55,7 @@ writeRowStore :: SourceInfo -> [SourceInfo] -> RowStore -> IO ()
 writeRowStore si sInfos rs = do
       let PathAndConf fp mconfFp = siPathAndConf si
           ListatabFormat ltInfo = siFormat si
-      writeListatab ltInfo fp (names rs) (rows rs)
+      writeListatab ltInfo (Just fp) (names rs) (rows rs)
       case mconfFp of
           Nothing -> return ()
           Just conf -> do
@@ -62,6 +64,9 @@ writeRowStore si sInfos rs = do
                   Right () -> return ()
                   Left e -> exception e
 
+-- |Write a `RowStore` to `stdout`
+writeRowStoreStdout :: ListatabInfo -> RowStore -> IO ()
+writeRowStoreStdout info rs = writeListatab info Nothing (names rs) (rows rs)
 
 parseConfFile :: BS.ByteString -> Either String RowStoreConf
 parseConfFile bs = case (decode bs :: Maybe Value) of

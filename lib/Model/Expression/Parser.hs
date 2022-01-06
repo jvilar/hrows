@@ -16,6 +16,8 @@ module Model.Expression.Parser (
     , expectName
     , many
     , match
+    -- *Parsers
+    , expression
 ) where
 
 import Control.Monad(unless)

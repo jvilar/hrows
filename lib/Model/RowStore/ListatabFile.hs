@@ -17,7 +17,7 @@ import Data.Text(Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as T
 import Data.Void(Void)
-import System.IO (Handle, hClose, hPutStrLn, openFile, IOMode(WriteMode))
+import System.IO (Handle, hClose, hPutStrLn, openFile, IOMode(WriteMode), stdout)
 import Text.Megaparsec (many, sepBy, endBy, between, noneOf, optional, parse, Parsec, errorBundlePretty, (<|>))
 import Text.Megaparsec.Char(char)
 import Text.Megaparsec qualified as TM
@@ -75,12 +75,14 @@ stringParser sep = T.pack <$> ((char '"' *> (many inStringChar <* char '"'))
                                        <|> noneOf ("\n\"" ::String)))
                          <|> noneOf ("\n\"" :: String)
 
--- |Writes a `RowStore` to a listatab file.
--- |Writes a `DataSource` to a listatab file.
-writeListatab :: ListatabInfo -> FilePath -> Maybe [Text] -> DataSource -> IO ()
-writeListatab info fp mNames ds = do
+-- |Writes a `DataSource` to a listatab file. If the `FilePath` is `Nothing`
+-- writes to stdout.
+writeListatab :: ListatabInfo -> Maybe FilePath -> Maybe [Text] -> DataSource -> IO ()
+writeListatab info mfp mNames ds = do
     let sep = ltOutputSeparator info
-    mh <- try (openFile fp WriteMode)
+    mh <- case mfp of
+            Just fp -> try (openFile fp WriteMode)
+            Nothing -> return $ Right stdout
     case mh of
         Right h -> do
                      case mNames of

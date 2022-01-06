@@ -25,6 +25,7 @@ module Model.RowStore (
              , readRowStore
              , readRowStoreStdin
              , writeRowStore
+             , writeRowStoreStdout
              -- **Updating
              , setName
              , sortRows
