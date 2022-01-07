@@ -6,7 +6,7 @@
 
 import Control.Exception qualified as E
 import Control.Monad(unless, when)
-import Control.Lens(makeLenses, over, set, (^.), Traversal', (%~), Lens', traversed, (&))
+import Control.Lens(makeLenses, over, set, (^.), Lens')
 import Data.Default(Default(def))
 import Data.Maybe(isJust)
 import Data.Text qualified as T
@@ -21,14 +21,8 @@ import System.Console.JMVOptions
 import Col
 import HRowsException
 import Model.DefaultFileNames
-import Model.Row
 import Model.RowStore
 import Model.SourceInfo
-import Model.Expression.Evaluation
-import Model.Expression.Manipulate
-import Model.Expression.Lexer (Token(EOFT, CommaT, ColonT, ErrorT))
-import Model.Expression.Parser
-import Model.Expression.RecursionSchemas
 
 
 data Options = Options { _help :: Bool
