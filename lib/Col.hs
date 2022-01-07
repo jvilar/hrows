@@ -21,7 +21,7 @@ import Model.Row
 import Model.RowStore
 import Model.Expression.Evaluation
 import Model.Expression.Manipulate
-import Model.Expression.Lexer (Token(EOFT, CommaT, ColonT, OpenSBT, CloseSBT))
+import Model.Expression.Lexer (Token(EOFT, CommaT, ColonT, OpenSBT, CloseSBT, StringT))
 import Model.Expression.Parser
 import Model.Expression.RecursionSchemas
 
@@ -30,10 +30,12 @@ import Model.Expression.RecursionSchemas
 -- expressions especify a column, a couple of expressions that correspond
 -- each to a column, especify a range. And `AllCols` espcifies all the cols
 -- in the input.
-data Col = Single Expression | Range Expression Expression | AllCols deriving Show
+data Col = Single Expression (Maybe Text)
+         | Range Expression Expression
+         | AllCols deriving Show
 
 expressionT :: Traversal' Col Expression
-expressionT f (Single e) = Single <$> f e
+expressionT f (Single e mn) = Single <$> f e <*> pure mn
 expressionT f (Range e1 e2) = Range <$> f e1 <*> f e2
 expressionT _ AllCols = pure AllCols
 
@@ -44,10 +46,22 @@ parseCols = parse colParser
 
 colParser :: Parser [Col]
 colParser = do
-    t <- current
-    c <- case t of
+    c <- current >>= \case
              OpenSBT -> rangeParser
-             _ -> Single <$> expression
+             _ -> do
+                    e <- expression
+                    check OpenSBT >>= \case
+                        False -> return $ Single e Nothing
+                        True -> do
+                            advance
+                            current >>= \case
+                                StringT s -> do
+                                    advance
+                                    expect CloseSBT "a closing square bracket"
+                                    return $ Single e (Just $ T.pack s)
+                                t -> parsingError $ T.concat ["Expected a name for the column, found a "
+                                                             , T.pack $ show t]
+
     check EOFT >>= \case
         True -> return [c]
         False -> expect CommaT "a comma" >> (c:) <$> colParser
@@ -75,11 +89,13 @@ checkPosition e = parsingError $ T.concat [ "Expression "
 -- `RowStore`.
 applyCols :: [Col] -> RowStore -> RowStore
 applyCols cs0 rst = case names rst of
-                      Nothing -> fromRows "cols" . map (processRow cs) $ rows rst
-                      Just _ -> fromRowsNames "cols" ns . map (processRow cs) $ rows rst
-    where cs = cs0 & traversed . expressionT %~ addPositions rst
+                      Nothing -> fromRows rn . map (processRow cs) $ rows rst
+                      Just _ -> fromRowsNames rn ns . map (processRow cs) $ rows rst
+    where rn = getName rst
+          cs = cs0 & traversed . expressionT %~ addPositions rst
           ns = concatMap toName cs
-          toName (Single e) = [toFormula e]
+          toName (Single e Nothing) = [toFormula e]
+          toName (Single _ (Just n)) = [n]
           toName (Range e1 e2) = case names rst of
                    Nothing -> [ T.pack ("Column " ++ show i) | i <- [p1 + 1..p2 + 1] ]
                    Just xs -> slice p1 p2 xs
@@ -89,7 +105,7 @@ applyCols cs0 rst = case names rst of
 
 processRow :: [Col] -> Row -> Row
 processRow cs r = concatMap f cs
-    where f (Single e) = [evaluate r [] e]
+    where f (Single e _) = [evaluate r [] e]
           f (Range e1 e2) = slice (pos e1) (pos e2) r
           f AllCols = r
 
