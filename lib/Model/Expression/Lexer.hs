@@ -30,6 +30,8 @@ data Token = IntT Int
            | DivT
            | OpenT
            | CloseT
+           | OpenSBT
+           | CloseSBT
            | EqualT
            | NotEqualT
            | LessThanT
@@ -155,6 +157,8 @@ tokenizer =
                        , (c == '/' , emit DivT)
                        , (c == '(' , emit OpenT)
                        , (c == ')' , emit CloseT)
+                       , (c == '[' , emit OpenSBT)
+                       , (c == ']' , emit CloseSBT)
                        , (c == '=' , equal)
                        , (c == '<' , less)
                        , (c == '>' , greater)

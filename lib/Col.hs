@@ -21,7 +21,7 @@ import Model.Row
 import Model.RowStore
 import Model.Expression.Evaluation
 import Model.Expression.Manipulate
-import Model.Expression.Lexer (Token(EOFT, CommaT, ColonT, ErrorT))
+import Model.Expression.Lexer (Token(EOFT, CommaT, ColonT, OpenSBT, CloseSBT))
 import Model.Expression.Parser
 import Model.Expression.RecursionSchemas
 
@@ -46,7 +46,7 @@ colParser :: Parser [Col]
 colParser = do
     t <- current
     c <- case t of
-             ErrorT "[" -> rangeParser
+             OpenSBT -> rangeParser
              _ -> Single <$> expression
     check EOFT >>= \case
         True -> return [c]
@@ -60,7 +60,7 @@ rangeParser = do
     expect ColonT "a colon"
     e2 <- expression
     checkPosition e2
-    expect (ErrorT "]")  "a closing square bracket"
+    expect CloseSBT "a closing square bracket"
     return $ Range e1 e2
 
 checkPosition :: Expression -> Parser ()
