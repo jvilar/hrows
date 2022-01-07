@@ -10,11 +10,12 @@ import Brick.Widgets.Border
 import Brick.Widgets.Center
 import Brick.Widgets.Dialog
 import Brick.Widgets.List
+import Brick.Widgets.Table
 import Data.Maybe(isJust, fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Vector as V
-import Graphics.Vty.Attributes(defAttr, reverseVideo, withStyle)
+import Graphics.Vty.Attributes(defAttr, bold, reverseVideo, withStyle)
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl))
 
 import Model.RowStore
@@ -28,6 +29,8 @@ data State = State { sRowStore :: RowStore
                    , sValueList :: List Name Text
                    , sZoom :: Maybe Zoom
                    , sSearch :: Maybe (SearchDialog Name)
+                   , sTable :: Table Name
+                   , sIsTable :: Bool
                    }
 
 
@@ -72,6 +75,8 @@ initialState rst = State { sRowStore = rst
                          , sValueList = valueList 0 rst
                          , sZoom = Nothing
                          , sSearch = Nothing
+                         , sTable = buildTable rst
+                         , sIsTable = False
                          }
                     where fl = fieldList rst
 
@@ -84,22 +89,38 @@ valueList :: Int -> RowStore -> List Name Text
 valueList pos rst = list ValueList (V.fromList $ map toString $ row pos rst) 1
 
 
+buildTable :: RowStore -> Table Name
+buildTable rst = table $ case names rst of
+    Nothing -> rws
+    Just ns -> map (withAttr "title" . myTxt) ns : rws
+  where rws = map (map $ myTxt . toString) (rows rst)
+
+
 type EventType = ()
+
 
 data Name = FieldList | ValueList | SearchList deriving (Eq, Ord, Show)
 
 draw :: State -> [Widget Name]
 draw s = [
     renderFront s,
-    joinBorders $ center $
+    if sIsTable s
+    then renderAsTable s
+    else renderRow s
+   ]
+
+renderRow :: State -> Widget Name
+renderRow s = joinBorders $ center $
        borderWithLabel (txt $ title s) $
        renderFields s
        <=>
        hBorder
        <=>
-       hCenter (txt "Enter: zoom field, C-f: find, C-q: exit")
-    ]
+       hCenter (txt "Enter: zoom field, t: table view, C-f: find, C-q: exit")
 
+
+renderAsTable :: State -> Widget Name
+renderAsTable = renderTable . sTable
 
 tshow :: Int -> Text
 tshow = T.pack . show
@@ -124,7 +145,7 @@ renderFields State {..} = Widget Greedy Fixed $ do
 
 
 renderName :: Bool -> Text -> Widget Name
-renderName = renderElement
+renderName = (withAttr "title" .) . renderElement
 
 
 renderValue :: Bool -> Text -> Widget Name
@@ -213,6 +234,7 @@ handleKeyStandard KPageDown [] = forward
 handleKeyStandard KEnter [] = zoom
 handleKeyStandard KEsc [] = unZoom
 handleKeyStandard (KChar 'f') [MCtrl] = activateSearch
+handleKeyStandard (KChar 't') [] = toggleTable
 handleKeyStandard k [] | k `elem` listKeys = moveLists (EvKey k [])
 handleKeyStandard _ _ = continue
 
@@ -263,6 +285,10 @@ activateSearch s@State{..} = do
 
 deactivateSearch :: State -> EventM Name (Next State)
 deactivateSearch s = continue s { sSearch = Nothing }
+
+
+toggleTable :: State -> EventM Name (Next State)
+toggleTable s = continue s { sIsTable = not $ sIsTable s }
 
 
 moveLists :: Event -> State -> EventM Name (Next State)
@@ -317,6 +343,7 @@ moveTo pos s@State{..}
 myAttrMap :: AttrMap
 myAttrMap = attrMap defAttr [ ("selectedElement", withStyle defAttr reverseVideo)
                             , (buttonSelectedAttr, withStyle defAttr reverseVideo)
+                            , ("title", withStyle defAttr bold)
                             ]
 
 
