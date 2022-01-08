@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RankNTypes #-}
 
 module TUI (
   startTUI
@@ -12,7 +13,7 @@ import Brick.Widgets.Dialog
 import Brick.Widgets.List
 import Brick.Widgets.Table
 import Control.Lens hiding (index, Zoom, zoom)
-import Data.Maybe(isJust, fromMaybe)
+import Data.Maybe(isJust, fromMaybe, isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -36,7 +37,6 @@ data State = State { _sRowStore :: RowStore
                    , _sIsTable :: Bool
                    }
 
-
 type Zoom = (Text, Text)
 
 data SearchDialog n = SearchDialog { _sdTitle :: Text
@@ -48,6 +48,9 @@ data RowViewer = RowViewer { _rvFieldList :: List Name Text
                            , _rvFieldWidth :: Int
                            , _rvValueList :: List Name Text
                            }
+
+rvLists :: Traversal' RowViewer (List Name Text)
+rvLists f (RowViewer fl fw vl) = RowViewer <$> f fl <*> pure fw <*> f vl
 
 makeLenses ''RowViewer
 makeLenses ''SearchDialog
@@ -70,9 +73,7 @@ renderSearchDialog sd = renderDialog (sd ^. sdDialog) $
 
 
 handleSearchDialogEvent :: Event -> SearchDialog n -> EventM n (SearchDialog n)
-handleSearchDialogEvent ev sd = do
-    d' <- handleDialogEvent ev $ sd ^. sdDialog
-    return $ set sdDialog d' sd
+handleSearchDialogEvent = traverseOf sdDialog . handleDialogEvent
 
 
 initialState :: RowStore -> State
@@ -108,7 +109,6 @@ buildTable rst = table $ case names rst of
 
 
 type EventType = ()
-
 
 
 draw :: State -> [Widget Name]
@@ -263,9 +263,8 @@ forward s = updateZoom $ moveTo (s ^. sIndex + 1) s
 
 
 updateZoom :: State -> EventM Name (Next State)
-updateZoom s = case s ^. sZoom of
-    Nothing -> continue s
-    Just _ -> zoom s
+updateZoom s | isNothing (s ^. sZoom) = continue s
+             | otherwise = zoom s
 
 
 unZoom :: State -> EventM Name (Next State)
@@ -300,20 +299,15 @@ toggleTable = continue . over sIsTable not
 
 moveLists :: Event -> State -> EventM Name (Next State)
 moveLists e s = do
-    fl <- handleListEvent e $ s ^. sRowViewer . rvFieldList
-    vl <- handleListEvent e $ s ^. sRowViewer . rvValueList
-    let cf = fromMaybe 0 $ listSelected fl
-    updateZoom $ over sRowViewer (set rvFieldList fl . set rvValueList vl)
-               $ set sCurrentField cf
-               s
+    s' <- traverseOf (sRowViewer . rvLists) (handleListEvent e) s
+    let cf = fromMaybe 0 $ listSelected (s' ^. sRowViewer . rvFieldList)
+    updateZoom $ set sCurrentField cf s'
 
 
 moveSearchList :: Event -> State -> EventM Name (Next State)
 moveSearchList e s = do
-    let Just sd = s ^. sSearch
-    vs' <- handleListEvent e (sd ^. sdValues)
-    let sd' = set sdValues vs' sd
-    continue $ set sSearch (Just sd') s
+    sd <- sequence (traverseOf sdValues (handleListEvent e) <$> s ^. sSearch)
+    continue $ set sSearch sd s
 
 
 moveToSelected :: State -> EventM Name (Next State)
@@ -331,9 +325,8 @@ moveToSelected s = do
 
 handleInSearchDialog :: Event -> State -> EventM Name (Next State)
 handleInSearchDialog ev s = do
-    let Just sd = s ^. sSearch
-    sd' <- handleSearchDialogEvent ev sd
-    continue $ set sSearch (Just sd') s
+    sd <- sequence (handleSearchDialogEvent ev <$> s ^. sSearch)
+    continue $ set sSearch sd s
 
 
 moveTo :: Int -> State -> State
