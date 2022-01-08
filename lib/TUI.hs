@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module TUI (
@@ -12,7 +11,7 @@ import Brick.Widgets.Center
 import Brick.Widgets.Dialog
 import Brick.Widgets.List
 import Brick.Widgets.Table
-import Control.Lens hiding (Zoom, zoom)
+import Control.Lens hiding (index, Zoom, zoom)
 import Data.Maybe(isJust, fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -40,9 +39,9 @@ data State = State { _sRowStore :: RowStore
 
 type Zoom = (Text, Text)
 
-data SearchDialog n = SearchDialog { sdTitle :: Text
-                                   , sdValues :: List n Text
-                                   , sdDialog :: Dialog DialogButton
+data SearchDialog n = SearchDialog { _sdTitle :: Text
+                                   , _sdValues :: List n Text
+                                   , _sdDialog :: Dialog DialogButton
                                    }
 
 data RowViewer = RowViewer { _rvFieldList :: List Name Text
@@ -51,6 +50,7 @@ data RowViewer = RowViewer { _rvFieldList :: List Name Text
                            }
 
 makeLenses ''RowViewer
+makeLenses ''SearchDialog
 makeLenses ''State
 
 searchDialog :: n -> Int -> Text -> [Text] -> SearchDialog n
@@ -64,15 +64,15 @@ searchDialog n w ttle values = SearchDialog ttle
 
 
 renderSearchDialog :: SearchDialog Name -> Widget Name
-renderSearchDialog SearchDialog {..} = renderDialog sdDialog $
-                                           vLimit (V.length $ listElements sdValues)
-                                                  (renderList renderValue False sdValues)
+renderSearchDialog sd = renderDialog (sd ^. sdDialog) $
+                           vLimit (V.length $ listElements $ sd ^. sdValues)
+                                  (renderList renderValue False $ sd ^. sdValues)
 
 
 handleSearchDialogEvent :: Event -> SearchDialog n -> EventM n (SearchDialog n)
-handleSearchDialogEvent ev sd@SearchDialog{..} = do
-    d' <- handleDialogEvent ev sdDialog
-    return sd { sdDialog = d' }
+handleSearchDialogEvent ev sd = do
+    d' <- handleDialogEvent ev $ sd ^. sdDialog
+    return $ set sdDialog d' sd
 
 
 initialState :: RowStore -> State
@@ -142,13 +142,13 @@ title s = T.concat [ getName $ s ^. sRowStore
                    ]
 
 renderRowViewer :: RowViewer -> Widget Name
-renderRowViewer RowViewer {..} = Widget Greedy Fixed $ do
+renderRowViewer rv = Widget Greedy Fixed $ do
     h <- availHeight <$> getContext
-    let v = min (V.length $ listElements _rvFieldList) (h-2)
+    let v = min (V.length $ listElements $ rv ^. rvFieldList) (h-2)
     render $ vLimit v $ hBox [
-                hLimit _rvFieldWidth (renderList renderName False _rvFieldList)
+                hLimit (rv ^. rvFieldWidth) (renderList renderName False $ rv ^. rvFieldList)
                 , vBorder
-                , renderList renderValue False _rvValueList
+                , renderList renderValue False $ rv ^. rvValueList
               ]
 
 
@@ -310,17 +310,17 @@ moveLists e s = do
 
 moveSearchList :: Event -> State -> EventM Name (Next State)
 moveSearchList e s = do
-    let Just sd@SearchDialog{..} = s ^. sSearch
-    vs' <- handleListEvent e sdValues
-    let sd' = sd { sdValues = vs' }
+    let Just sd = s ^. sSearch
+    vs' <- handleListEvent e (sd ^. sdValues)
+    let sd' = set sdValues vs' sd
     continue $ set sSearch (Just sd') s
 
 
 moveToSelected :: State -> EventM Name (Next State)
 moveToSelected s = do
-    let Just SearchDialog{..} = s ^. sSearch
-    case dialogSelection sdDialog of
-        Just OkButton -> case listSelectedElement sdValues of
+    let Just sd = s ^. sSearch
+    case dialogSelection $ sd ^. sdDialog of
+        Just OkButton -> case listSelectedElement $ sd ^. sdValues of
                              Nothing -> deactivateSearch s
                              Just (_, t) -> let
                                   pos = nextPos (fromIntegral $ s ^. sCurrentField) t (s ^. sIndex) (s ^. sRowStore)
