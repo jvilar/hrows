@@ -257,7 +257,7 @@ app = App { appDraw = draw
 
 
 listKeys :: [Key]
-listKeys = [KDown, KUp, KPageUp, KPageDown, KHome, KEnd]
+listKeys = [KDown, KUp, KPageUp, KPageDown, KHome, KEnd, KLeft, KRight]
 
 
 handleEvent :: State -> BrickEvent Name EventType -> EventM Name (Next State)
@@ -271,8 +271,6 @@ handleKey s k m
 
 handleKeyStandard :: Key -> [Modifier] -> State -> EventM Name (Next State)
 handleKeyStandard (KChar 'q') [MCtrl] = halt
-handleKeyStandard KPageUp [] = backward
-handleKeyStandard KPageDown [] = forward
 handleKeyStandard KEnter [] = zoom
 handleKeyStandard KEsc [] = unZoom
 handleKeyStandard (KChar 'f') [MCtrl] = activateSearch
@@ -330,12 +328,24 @@ deactivateSearch = continue .set sSearch Nothing
 toggleTable :: State -> EventM Name (Next State)
 toggleTable = continue . over sIsTable not
 
-
 moveLists :: Event -> State -> EventM Name (Next State)
-moveLists e s = do
+moveLists e s | s ^. sIsTable = moveListsTables e s
+              | otherwise = moveListsRows e s
+
+moveListsRows :: Event -> State -> EventM Name (Next State)
+moveListsRows (EvKey KPageUp []) s = backward s
+moveListsRows (EvKey KPageDown []) s = forward s
+moveListsRows e s = do
     s' <- traverseOf (sRowViewer . rvLists) (handleListEvent e) s
     let cf = fromMaybe 0 $ listSelected (s' ^. sRowViewer . rvFieldNames)
     updateZoom $ set sCurrentField cf s'
+
+moveListsTables :: Event -> State -> EventM Name (Next State)
+moveListsTables (EvKey KLeft []) s = moveListsRows (EvKey KUp []) s
+moveListsTables (EvKey KRight []) s = moveListsRows (EvKey KDown []) s
+moveListsTables e s = do
+    l <- handleListEvent e (head $ s ^. sTableViewer . tvColumns)
+    updateZoom $ moveTo (fromMaybe 0 $ listSelected l) s
 
 
 moveSearchList :: Event -> State -> EventM Name (Next State)
