@@ -11,8 +11,8 @@ import Brick.Widgets.Border
 import Brick.Widgets.Center
 import Brick.Widgets.Dialog
 import Brick.Widgets.List
-import Brick.Widgets.Table
 import Control.Lens hiding (index, Zoom, zoom)
+import Data.List(transpose, intersperse)
 import Data.Maybe(isJust, fromMaybe, isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -23,7 +23,10 @@ import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl))
 import Model.RowStore
 import Graphics.Vty (imageWidth, imageHeight, translate)
 
-data Name = FieldList | ValueList | SearchList deriving (Eq, Ord, Show)
+maxWidth :: Int
+maxWidth = 40
+
+data Name = FieldNames | ValueList | SearchList | ValueColumn Int deriving (Eq, Ord, Show)
 
 data DialogButton = OkButton | CancelButton
 
@@ -33,37 +36,44 @@ data State = State { _sRowStore :: RowStore
                    , _sRowViewer :: RowViewer
                    , _sZoom :: Maybe Zoom
                    , _sSearch :: Maybe (SearchDialog Name)
-                   , _sTable :: Table Name
+                   , _sTableViewer :: TableViewer
                    , _sIsTable :: Bool
                    }
 
 type Zoom = (Text, Text)
 
-data SearchDialog n = SearchDialog { _sdTitle :: Text
-                                   , _sdValues :: List n Text
+data SearchDialog n = SearchDialog { _sdValues :: List n Text
                                    , _sdDialog :: Dialog DialogButton
                                    }
 
-data RowViewer = RowViewer { _rvFieldList :: List Name Text
+data RowViewer = RowViewer { _rvFieldNames :: List Name Text
                            , _rvFieldWidth :: Int
                            , _rvValueList :: List Name Text
                            }
 
+data TableViewer = TableViewer { _tvFieldNames :: [Text]
+                               , _tvColWidths :: [Int]
+                               , _tvColumns :: [List Name Text]
+                               }
+
 rvLists :: Traversal' RowViewer (List Name Text)
 rvLists f (RowViewer fl fw vl) = RowViewer <$> f fl <*> pure fw <*> f vl
+
+tvLists :: Traversal' TableViewer (List Name Text)
+tvLists f (TableViewer fl cw cs) = TableViewer fl cw <$> traverse f cs
 
 makeLenses ''RowViewer
 makeLenses ''SearchDialog
 makeLenses ''State
+makeLenses ''TableViewer
 
 searchDialog :: n -> Int -> Text -> [Text] -> SearchDialog n
-searchDialog n w ttle values = SearchDialog ttle
-                                           (list n (V.fromList values) 1)
-                                           (dialog (Just $ T.unpack ttle)
-                                                   (Just (0, [ ("OK", OkButton)
-                                                             , ("Cancel", CancelButton)]))
-                                                   w
-                                           )
+searchDialog n w ttle values = SearchDialog (list n (V.fromList values) 1)
+                                            (dialog (Just $ T.unpack ttle)
+                                                    (Just (0, [ ("OK", OkButton)
+                                                              , ("Cancel", CancelButton)]))
+                                                    w
+                                            )
 
 
 renderSearchDialog :: SearchDialog Name -> Widget Name
@@ -83,29 +93,32 @@ initialState rst = State { _sRowStore = rst
                          , _sRowViewer = initialRowViewer rst
                          , _sZoom = Nothing
                          , _sSearch = Nothing
-                         , _sTable = buildTable rst
+                         , _sTableViewer = buildTable rst
                          , _sIsTable = False
                          }
 
 initialRowViewer :: RowStore -> RowViewer
-initialRowViewer rst = RowViewer { _rvFieldList = listMoveTo 0 fl
-                                 , _rvFieldWidth = min 40 (V.maximum . V.map T.length $ listElements fl)
+initialRowViewer rst = RowViewer { _rvFieldNames = listMoveTo 0 fl
+                                 , _rvFieldWidth = min maxWidth (V.maximum . V.map T.length $ listElements fl)
                                  , _rvValueList = valueList 0 rst
                                  }
                             where fl = fieldList rst
 
 fieldList :: RowStore -> List Name Text
-fieldList rst = list FieldList (V.fromList $ fnames rst) 1
+fieldList rst = list FieldNames (V.fromList $ fnames rst) 1
 
 valueList :: Int -> RowStore -> List Name Text
 valueList pos rst = list ValueList (V.fromList $ map toString $ row pos rst) 1
 
 
-buildTable :: RowStore -> Table Name
-buildTable rst = table $ case names rst of
-    Nothing -> rws
-    Just ns -> map (withAttr "title" . myTxt) ns : rws
-  where rws = map (map $ myTxt . toString) (rows rst)
+buildTable :: RowStore -> TableViewer
+buildTable rst = TableViewer ns ws cls
+    where cs = transpose $ map (map toString) $ rows rst
+          cls = zipWith f [0..] cs
+          f n r = list (ValueColumn n) (V.fromList r) 1
+          ns = fnames rst
+          ws = zipWith max (map T.length ns)
+                           $ map (maximum . map T.length) cs
 
 
 type EventType = ()
@@ -115,21 +128,19 @@ draw :: State -> [Widget Name]
 draw s = [ renderFront s, renderBack s ]
 
 renderBack :: State -> Widget Name
-renderBack s | s ^. sIsTable = renderAsTable s
-             | otherwise     = renderRow s
-
-renderRow :: State -> Widget Name
-renderRow s = joinBorders $ center $
-       borderWithLabel (txt $ title s) $
-       renderRowViewer (s ^. sRowViewer)
+renderBack s = joinBorders $ center $
+       borderWithLabel (withAttr "title" . txt $ title s) $
+       content
        <=>
        hBorder
        <=>
-       hCenter (txt "Enter: zoom field, t: table view, C-f: find, C-q: exit")
+       hCenter (txt help)
+  where
+    content | s ^. sIsTable = renderTableViewer (s ^. sTableViewer)
+            | otherwise = renderRowViewer (s ^. sRowViewer)
+    help    | s ^. sIsTable = "Enter: zoom field, t: return to field view, C-f: find, C-q: exit"
+            | otherwise = "Enter: zoom field, t: table view, C-f: find, C-q: exit"
 
-
-renderAsTable :: State -> Widget Name
-renderAsTable = renderTable . view sTable
 
 tshow :: Int -> Text
 tshow = T.pack . show
@@ -144,13 +155,36 @@ title s = T.concat [ getName $ s ^. sRowStore
 renderRowViewer :: RowViewer -> Widget Name
 renderRowViewer rv = Widget Greedy Fixed $ do
     h <- availHeight <$> getContext
-    let v = min (V.length $ listElements $ rv ^. rvFieldList) (h-2)
+    let v = min (V.length $ listElements $ rv ^. rvFieldNames) (h-2)
     render $ vLimit v $ hBox [
-                hLimit (rv ^. rvFieldWidth) (renderList renderName False $ rv ^. rvFieldList)
+                hLimit (rv ^. rvFieldWidth) (renderList renderName False $ rv ^. rvFieldNames)
                 , vBorder
                 , renderList renderValue False $ rv ^. rvValueList
               ]
 
+renderTableViewer :: TableViewer -> Widget Name
+renderTableViewer tv = Widget Greedy Fixed $ do
+    h <- availHeight <$> getContext
+    let v = min (V.length $ listElements $ head $ tv ^. tvColumns) (h-4)
+    render $ vLimit v
+           ( vLimit 1 (hBox $ withWidths (withAttr "title" . myTxt)
+                               (tv ^. tvColWidths)
+                               (tv ^. tvFieldNames)
+                      )
+             <=>
+             hBorder
+             <=>
+             hBox ( withWidths (renderList renderValue False)
+                               (tv ^. tvColWidths)
+                               (tv ^. tvColumns)
+                  )
+           )
+
+withWidths :: (a -> Widget Name) -> [Int] -> [a] -> [Widget Name]
+withWidths f = (intersperse vBorder .) . zipWith (withWidth f)
+
+withWidth :: (a -> Widget Name) -> Int -> a -> Widget Name
+withWidth f w = hLimit w . padRight Max . f
 
 renderName :: Bool -> Text -> Widget Name
 renderName = (withAttr "title" .) . renderElement
@@ -187,7 +221,7 @@ renderZoom s = case s ^. sZoom of
     Nothing -> emptyWidget
     Just (lbl, t) -> myCenter $ joinBorders $
                        hLimitPercent 95 $
-                       borderWithLabel (txt lbl) $
+                       borderWithLabel (withAttr "title" $ txt lbl) $
                          txtWrap (if T.null t
                                   then " "
                                   else t)
@@ -274,7 +308,7 @@ unZoom = continue . set sZoom Nothing
 zoom :: State -> EventM Name (Next State)
 zoom s = do
   let z = do
-             lbl <- snd <$> listSelectedElement (s ^. sRowViewer . rvFieldList)
+             lbl <- snd <$> listSelectedElement (s ^. sRowViewer . rvFieldNames)
              t <- snd <$> listSelectedElement (s ^. sRowViewer . rvValueList)
              return (lbl, t)
   continue $ set sZoom z s
@@ -283,9 +317,9 @@ zoom s = do
 activateSearch :: State -> EventM Name (Next State)
 activateSearch s = do
   let (index, tle) = fromMaybe (0, "") $ do
-                        listSelectedElement (s ^. sRowViewer . rvFieldList)
+                        listSelectedElement (s ^. sRowViewer . rvFieldNames)
       vs = fieldValues (fromIntegral index) (s ^. sRowStore)
-      sd = searchDialog SearchList 40 tle vs
+      sd = searchDialog SearchList maxWidth tle vs
   continue $ set sSearch (Just sd) s
 
 
@@ -300,13 +334,13 @@ toggleTable = continue . over sIsTable not
 moveLists :: Event -> State -> EventM Name (Next State)
 moveLists e s = do
     s' <- traverseOf (sRowViewer . rvLists) (handleListEvent e) s
-    let cf = fromMaybe 0 $ listSelected (s' ^. sRowViewer . rvFieldList)
+    let cf = fromMaybe 0 $ listSelected (s' ^. sRowViewer . rvFieldNames)
     updateZoom $ set sCurrentField cf s'
 
 
 moveSearchList :: Event -> State -> EventM Name (Next State)
 moveSearchList e s = do
-    sd <- sequence (traverseOf sdValues (handleListEvent e) <$> s ^. sSearch)
+    sd <- traverseOf (_Just . sdValues) (handleListEvent e) $ s ^. sSearch
     continue $ set sSearch sd s
 
 
@@ -325,17 +359,19 @@ moveToSelected s = do
 
 handleInSearchDialog :: Event -> State -> EventM Name (Next State)
 handleInSearchDialog ev s = do
-    sd <- sequence (handleSearchDialogEvent ev <$> s ^. sSearch)
+    sd <- traverse (handleSearchDialogEvent ev) $ s ^. sSearch
     continue $ set sSearch sd s
 
 
 moveTo :: Int -> State -> State
 moveTo pos s
-  | valid = set sIndex pos $ set (sRowViewer . rvValueList) vlist s
+  | valid = set sIndex pos
+          $ over (sTableViewer . tvLists) (listMoveTo pos)
+          $ set (sRowViewer . rvValueList) vlist s
   | otherwise = s
     where valid = 0 <= pos && pos < size (s ^. sRowStore)
           vl = valueList pos (s ^. sRowStore)
-          vlist = case listSelected (s ^. sRowViewer . rvFieldList) of
+          vlist = case listSelected (s ^. sRowViewer . rvFieldNames) of
                     Nothing -> vl
                     Just n -> listMoveTo n vl
 
