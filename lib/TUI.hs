@@ -142,7 +142,7 @@ renderBack s = joinBorders $ center $
             | otherwise = "Enter: zoom field, t: table view, C-f: find, C-q: exit"
 
 
-tshow :: Int -> Text
+tshow :: Show a => a -> Text
 tshow = T.pack . show
 
 
@@ -166,18 +166,17 @@ renderTableViewer :: TableViewer -> Widget Name
 renderTableViewer tv = Widget Greedy Fixed $ do
     h <- availHeight <$> getContext
     let v = min (V.length $ listElements $ head $ tv ^. tvColumns) (h-4)
-    render $ vLimit v
-           ( vLimit 1 (hBox $ withWidths (withAttr "title" . myTxt)
+    render ( vLimit 1 (hBox $ withWidths (withAttr "title" . myTxt)
                                (tv ^. tvColWidths)
                                (tv ^. tvFieldNames)
                       )
              <=>
              hBorder
              <=>
-             hBox ( withWidths (renderList renderValue False)
+             vLimit v ( hBox $ withWidths (renderList renderValue False)
                                (tv ^. tvColWidths)
                                (tv ^. tvColumns)
-                  )
+                      )
            )
 
 withWidths :: (a -> Widget Name) -> [Int] -> [a] -> [Widget Name]
