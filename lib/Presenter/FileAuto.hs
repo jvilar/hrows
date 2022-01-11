@@ -17,7 +17,6 @@ import HRowsException
 import Model
 import Model.DefaultFileNames
 import Model.RowStore.RowStoreConf
-import Model.SourceInfo
 import Presenter.Input
 import Presenter.Auto
 

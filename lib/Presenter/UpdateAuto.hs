@@ -7,7 +7,6 @@ module Presenter.UpdateAuto (
 import Control.Arrow(first)
 import Control.Auto(accumM_)
 import Control.Exception(throwIO)
-import Control.Monad(guard)
 import Control.Monad.IO.Class(liftIO)
 import Data.Text(Text)
 import qualified Data.Text as T

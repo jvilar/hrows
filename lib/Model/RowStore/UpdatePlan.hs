@@ -1,12 +1,11 @@
-{-# LANGUAGE OverloadedStrings
-           , TupleSections #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 
 module Model.RowStore.UpdatePlan ( mkUpdatePlan ) where
 
 import Data.IntMap(IntMap)
 import qualified Data.IntMap.Strict as IM
 import qualified Data.IntSet as IS
-import Data.Maybe(isJust)
 import Data.List(foldl', sortOn)
 
 import Model.Expression
@@ -24,7 +23,7 @@ mkUpdatePlan exps = let
     updatePars im (i, vars) = foldr (IM.adjust (i:)) im vars
 
     edges = foldl' updateEdges [] dependencies
-    isExp = IS.fromList [ i | (i, e) <- enumerate exps, isJust e ]
+    isExp = IS.fromList [ i | (i, Just _) <- enumerate exps ]
     updateEdges l (i, vars) = [(v, i) | v <- vars] ++ l
     (order, cycles) = toposort $ mkGraph edges
     goodOrder = filter (`IS.member` isExp) order ++ [ i | (i, []) <- dependencies, i `IS.member` isExp ]
