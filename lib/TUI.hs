@@ -10,7 +10,7 @@ import Brick hiding (getName)
 import Brick.Widgets.Border
 import Brick.Widgets.Center
 import Brick.Widgets.Dialog
-import Brick.Widgets.List
+import Brick.Widgets.List hiding (splitAt, reverse)
 import Control.Lens hiding (index, Zoom, zoom)
 import Data.List(transpose, intersperse)
 import Data.Maybe(isJust, fromMaybe, isNothing)
@@ -136,7 +136,7 @@ renderBack s = joinBorders $ center $
        <=>
        hCenter (txt help)
   where
-    content | s ^. sIsTable = renderTableViewer (s ^. sTableViewer)
+    content | s ^. sIsTable = renderTableViewer (s^. sCurrentField) (s ^. sTableViewer)
             | otherwise = renderRowViewer (s ^. sRowViewer)
     help    | s ^. sIsTable = "Enter: zoom field, t: return to field view, C-f: find, C-q: exit"
             | otherwise = "Enter: zoom field, t: table view, C-f: find, C-q: exit"
@@ -162,22 +162,45 @@ renderRowViewer rv = Widget Greedy Fixed $ do
                 , renderList renderValue False $ rv ^. rvValueList
               ]
 
-renderTableViewer :: TableViewer -> Widget Name
-renderTableViewer tv = Widget Greedy Fixed $ do
+renderTableViewer :: Int -> TableViewer -> Widget Name
+renderTableViewer curF tv = Widget Greedy Fixed $ do
     h <- availHeight <$> getContext
+    w <- subtract (length (tv ^. tvColumns)-1) . availWidth <$> getContext
     let v = min (V.length $ listElements $ head $ tv ^. tvColumns) (h-4)
-    render ( vLimit 1 (hBox $ withWidths (withAttr "title" . myTxt)
-                               (tv ^. tvColWidths)
-                               (tv ^. tvFieldNames)
+        ws = allocateWidths curF w $ tv ^. tvColWidths
+    render ( vLimit 1 (hBox $ withWidths (\(i, t) -> 
+                                              if i == curF
+                                              then withAttr "selectedElement" $ myTxt t
+                                              else withAttr "title" $ myTxt t)
+                               ws
+                               (zip [0..] $ tv ^. tvFieldNames)
                       )
              <=>
              hBorder
              <=>
              vLimit v ( hBox $ withWidths (renderList renderValue False)
-                               (tv ^. tvColWidths)
+                               ws
                                (tv ^. tvColumns)
                       )
            )
+
+allocateWidths :: Int -> Int -> [Int] -> [Int]
+allocateWidths cur w ws
+  | w < s = let
+               (lft, wCur:rgt) = splitAt cur ws
+               w0 = min w wCur
+               (ws0, wd0) = ((reverse . upto (w - w0) $ reverse lft) ++ [w0]
+                             , sum ws0)
+               ws1 = ws0 ++ upto (w - wd0) rgt
+            in ws1
+  | otherwise = over (taking n traversed) (+ (dw+1))
+              $ over (dropping n traversed) (+ dw) ws
+  where s = sum ws
+        l = length ws
+        (dw, n) = (w - s) `divMod` l
+        upto _ [] = []
+        upto ml (x:xs) = v:upto (ml-v) xs
+            where v = min ml x
 
 withWidths :: (a -> Widget Name) -> [Int] -> [a] -> [Widget Name]
 withWidths f = (intersperse vBorder .) . zipWith (withWidth f)
@@ -202,8 +225,7 @@ myTxt :: Text -> Widget n
 myTxt t = Widget Fixed Fixed $ do
       w <- availWidth <$> getContext
       let l = T.length t
-          t' | l == 0 = " "
-             | l <= w = t
+          t' | l <= w = T.justifyLeft w ' ' t
              | otherwise = T.take (w-3) t <> "..."
       render $ txt t'
 
