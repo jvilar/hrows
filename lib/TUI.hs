@@ -138,8 +138,8 @@ renderBack s = joinBorders $ center $
   where
     content | s ^. sIsTable = renderTableViewer (s^. sCurrentField) (s ^. sTableViewer)
             | otherwise = renderRowViewer (s ^. sRowViewer)
-    help    | s ^. sIsTable = "Enter: zoom field, t: return to field view, C-f: find, C-q: exit"
-            | otherwise = "Enter: zoom field, t: table view, C-f: find, C-q: exit"
+    help    | s ^. sIsTable = "z: toggle zoom, t: return to field view, C-f: find, C-q: exit"
+            | otherwise = "z: toggle zoom, t: table view, C-f: find, C-q: exit"
 
 
 tshow :: Show a => a -> Text
@@ -249,7 +249,7 @@ renderZoom s = case s ^. sZoom of
                          <=>
                          hBorder
                          <=>
-                         hCenter (txt "Esc to exit zoom")
+                         hCenter (txt "z: close zoom")
 
 
 renderSearch :: State -> Widget Name
@@ -292,10 +292,9 @@ handleKey s k m
 
 handleKeyStandard :: Key -> [Modifier] -> State -> EventM Name (Next State)
 handleKeyStandard (KChar 'q') [MCtrl] = halt
-handleKeyStandard KEnter [] = zoom
-handleKeyStandard KEsc [] = unZoom
 handleKeyStandard (KChar 'f') [MCtrl] = activateSearch
 handleKeyStandard (KChar 't') [] = toggleTable
+handleKeyStandard (KChar 'z') [] = toggleZoom
 handleKeyStandard k [] | k `elem` listKeys = moveLists (EvKey k [])
 handleKeyStandard _ _ = continue
 
@@ -308,29 +307,29 @@ handleKeySearch k ms = handleInSearchDialog (EvKey k ms)
 
 
 backward :: State -> EventM Name (Next State)
-backward s = updateZoom $ moveTo (s ^. sIndex - 1) s
+backward s = continue $ moveTo (s ^. sIndex - 1) s
 
 
 forward :: State -> EventM Name (Next State)
-forward s = updateZoom $ moveTo (s ^. sIndex + 1) s
+forward s = continue $ moveTo (s ^. sIndex + 1) s
 
+toggleZoom :: State -> EventM Name (Next State)
+toggleZoom s | isNothing (s ^. sZoom) = continue $ zoom s
+             | otherwise = continue $ unZoom s
 
-updateZoom :: State -> EventM Name (Next State)
-updateZoom s | isNothing (s ^. sZoom) = continue s
+updateZoom :: State -> State
+updateZoom s | isNothing (s ^. sZoom) = s
              | otherwise = zoom s
 
+unZoom :: State -> State
+unZoom = set sZoom Nothing
 
-unZoom :: State -> EventM Name (Next State)
-unZoom = continue . set sZoom Nothing
-
-
-zoom :: State -> EventM Name (Next State)
-zoom s = do
-  let z = do
+zoom :: State -> State
+zoom s = set sZoom z s
+  where z = do
              lbl <- snd <$> listSelectedElement (s ^. sRowViewer . rvFieldNames)
              t <- snd <$> listSelectedElement (s ^. sRowViewer . rvValueList)
              return (lbl, t)
-  continue $ set sZoom z s
 
 
 activateSearch :: State -> EventM Name (Next State)
@@ -359,14 +358,14 @@ moveListsRows (EvKey KPageDown []) s = forward s
 moveListsRows e s = do
     s' <- traverseOf (sRowViewer . rvLists) (handleListEvent e) s
     let cf = fromMaybe 0 $ listSelected (s' ^. sRowViewer . rvFieldNames)
-    updateZoom $ set sCurrentField cf s'
+    continue $ updateZoom $ set sCurrentField cf s'
 
 moveListsTables :: Event -> State -> EventM Name (Next State)
 moveListsTables (EvKey KLeft []) s = moveListsRows (EvKey KUp []) s
 moveListsTables (EvKey KRight []) s = moveListsRows (EvKey KDown []) s
 moveListsTables e s = do
     l <- handleListEvent e (head $ s ^. sTableViewer . tvColumns)
-    updateZoom $ moveTo (fromMaybe 0 $ listSelected l) s
+    continue $ updateZoom $ moveTo (fromMaybe 0 $ listSelected l) s
 
 
 moveSearchList :: Event -> State -> EventM Name (Next State)
@@ -396,7 +395,8 @@ handleInSearchDialog ev s = do
 
 moveTo :: Int -> State -> State
 moveTo pos s
-  | valid = set sIndex pos
+  | valid = updateZoom
+          $ set sIndex pos
           $ over (sTableViewer . tvLists) (listMoveTo pos)
           $ set (sRowViewer . rvValueList) vlist s
   | otherwise = s
