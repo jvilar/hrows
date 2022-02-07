@@ -54,7 +54,7 @@ childRst = emptyConf "child" conf & ins "one" 1 & ins "two" 2
 
 
 simpleEval :: [Field] -> Formula -> Field
-simpleEval fs = evaluate fs [] . parse
+simpleEval fs = evaluate fs [] . parseExpression
 
 
 testSimpleExpressions :: Spec
@@ -125,10 +125,10 @@ evalInts xs = let
   in evaluate fs []
 
 evalNoNames :: [Int] -> Text -> Field
-evalNoNames xs = evalInts xs . parse
+evalNoNames xs = evalInts xs . parseExpression
 
 evalInRow :: Row -> Text -> Field
-evalInRow r = evaluate r [] . addPositions mainRst . parse
+evalInRow r = evaluate r [] . addPositions mainRst . parseExpression
 
 testAbsolutePositions :: Spec
 testAbsolutePositions = describe "Test absolute positions" $
@@ -139,7 +139,7 @@ evalNames :: [Int] -> RowStore -> Text -> Field
 evalNames xs rst = let
     fs = map toField xs
     dss = getDataSources rst
-  in evaluate fs dss . addPositions mainRst . parse
+  in evaluate fs dss . addPositions mainRst . parseExpression
 
 testNames :: Spec
 testNames = describe "Test names" $ do
@@ -153,14 +153,14 @@ testNames = describe "Test names" $ do
                           evalNames [2, 3] mainRst "first == 2 ? second : second * 3" `shouldBeI` 3
                           evalNames [1, 3] mainRst "first == 2 ? second : second * 3" `shouldBeI` 9
                         it "Checks the substitution of names" $ do
-                          addPositions mainRst (parse "first") `shouldBe` mkKnownNamedPosition "first" 0
-                          addPositions mainRst (parse "second") `shouldBe` mkKnownNamedPosition "second" 1
-                          addPositions mainRst (parse "other @ child <- second <-> value")
+                          addPositions mainRst (parseExpression "first") `shouldBe` mkKnownNamedPosition "first" 0
+                          addPositions mainRst (parseExpression "second") `shouldBe` mkKnownNamedPosition "second" 1
+                          addPositions mainRst (parseExpression "other @ child <- second <-> value")
                              `shouldBe` mkFromSource (mkConstant $ toField (0 :: Int))
                                                      (mkKnownNamedPosition "second" 1)
                                                      (mkKnownNamedPosition "value" 2)
                                                      (mkKnownNamedPosition "other" 3)
-                          addPositions mainRst (parse "first + value @ child <- \"one\" <-> name")
+                          addPositions mainRst (parseExpression "first + value @ child <- \"one\" <-> name")
                              `shouldBe` mkBinary (BinaryOpInfo (+) "+" 4 TrueAssoc)
                                                  (mkKnownNamedPosition "first" 0)
                                                  (mkFromSource (mkConstant $ toField (0 :: Int))
@@ -196,10 +196,11 @@ testLexer = describe "Test the lexer" $ do
 testParser :: Spec
 testParser = describe "Test the parser" $
                it "Checks a from source expression" $
-                 parse "value @ child <- name <-> name2" `shouldBe` mkFromSource (mkNamedPosition "child")
-                                                                                (mkNamedPosition "name")
-                                                                                (mkNamedPosition "name2")
-                                                                                (mkNamedPosition "value")
+                 parseExpression "value @ child <- name <-> name2"
+                       `shouldBe` mkFromSource (mkNamedPosition "child")
+                                               (mkNamedPosition "name")
+                                               (mkNamedPosition "name2")
+                                               (mkNamedPosition "value")
 
 testTypeError :: Spec
 testTypeError = describe "Test a bug found when errors are used in operations" $
@@ -215,7 +216,7 @@ testIsErrorOperator :: Spec
 testIsErrorOperator = describe "Test the new isError operator" $ do
                         it "Check the lexer" $
                            tokenize "? ?! !?" `shouldBe` [QuestionMarkT, IsErrorT, NotT, QuestionMarkT, EOFT]
-                        it "Simple checks" $ do 
+                        it "Simple checks" $ do
                            simpleEval [] "error ?! 2" `shouldBeI` 2
                            simpleEval [] "1/(0 ?! 2)" `shouldBe` (1/0)
                            simpleEval [] "2+3 ?! 1" `shouldBeI` 5
