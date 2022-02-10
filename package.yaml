@@ -43,7 +43,7 @@ library:
 
 executables:
   hrows:
-    main: src/Main.hs
+    main: src/HRows.hs
     ghc-options:
     - -threaded
     - -Wall
