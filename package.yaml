@@ -51,7 +51,6 @@ executables:
     - hrows
     - auto
     - data-default
-    - directory
     - gi-gtk
     - gi-gtk-hs
     - jmvOptions >= 0.2
@@ -71,7 +70,6 @@ executables:
     - -Wall
     dependencies:
     - data-default
-    - directory
     - hrows
     - lens
     - mtl
@@ -85,12 +83,10 @@ executables:
     - -Wall
     dependencies:
     - data-default
-    - directory
     - hrows
     - jmvOptions >= 0.2
     - lens
     - mtl
-    - parsec
     - text
 
 tests:

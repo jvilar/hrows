@@ -8,8 +8,9 @@ module Model.SourceInfo ( SourceInfo
                         , siFilePath
                         , siPathAndConf
                         , siFormat
-                        , FormatInfo(..)
                         , PathAndConf(..)
+                        , mkPathAndConf
+                        , FormatInfo(..)
                         , changeFormatInfo
                         , changePathAndConf
                         , mkSourceInfo
@@ -23,9 +24,11 @@ import Data.Default(Default (def))
 import Data.Maybe(fromMaybe)
 import Data.Text(pack, Text)
 import GHC.Generics (Generic)
+import System.Directory (doesFileExist)
 import System.FilePath(takeFileName)
 
 import Model.RowStore.ListatabInfo
+import Model.DefaultFileNames (defaultConfFileName)
 
 
 -- |The name of a `SourceInfo`
@@ -35,6 +38,19 @@ type SourceName = Text
 -- |The location of a file possibly including the corresponding configuration file
 data PathAndConf = PathAndConf { path :: FilePath, confPath :: Maybe FilePath } deriving Show
 
+-- |Build a `PathAndConf` from the path of the file and a `Maybe` of the configuration.
+-- If the configuration is `Nothing` the file system is tested to see if it is appropriate
+-- to use the default config file name (from `defaultConfFileName`). It will be used if the
+-- file is new and the config does not exist or if both the file and the config file exist.
+mkPathAndConf :: FilePath -> Maybe FilePath -> IO PathAndConf
+mkPathAndConf fn Nothing = do
+    let defFn = defaultConfFileName fn
+    exFn <- doesFileExist fn
+    exCnf <- doesFileExist defFn
+    return . PathAndConf fn $ if exFn == exCnf
+                              then Just defFn
+                              else Nothing
+mkPathAndConf fn cnf = return $ PathAndConf fn cnf
 
 -- |The information about the source of the model. It contains the name,
 -- the file path, and the options related to the format.

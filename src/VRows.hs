@@ -8,7 +8,6 @@ import Control.Lens(makeLenses, Getting, (^.), set, over)
 import Data.Default(Default(..))
 import Data.Maybe(isJust)
 import qualified Data.Text as T
-import System.Directory (doesFileExist)
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
@@ -22,6 +21,7 @@ import Model.DefaultFileNames
 import Model.RowStore
 import Model.SourceInfo
 import TUI
+import Model.SourceInfo (mkPathAndConf)
 
 data Options = Options { _help :: Bool
                        , _inputFileName :: Maybe FilePath
@@ -98,17 +98,8 @@ main :: IO ()
 main = do
   opts <- getOptions
   let Just fn = opts ^. inputFileName
-  cnf <- if isJust $ opts ^. confFileName
-         then return $ opts ^. confFileName
-         else do
-                let defFn = defaultConfFileName fn
-                exFn <- doesFileExist fn
-                exCnf <- doesFileExist defFn
-                return $ if exFn == exCnf
-                         then Just defFn
-                         else Nothing
-  let pc = PathAndConf fn cnf
-      sinfo =  mkSourceInfo Nothing pc $ opts ^. inputOptions
+  pc <- mkPathAndConf fn $ opts ^. confFileName
+  let sinfo =  mkSourceInfo Nothing pc $ opts ^. inputOptions
 
   r <- try $ readRowStore sinfo
   case r of

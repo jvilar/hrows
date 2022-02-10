@@ -8,10 +8,8 @@ import Control.Concurrent.Chan(Chan, newChan, writeChan, writeList2Chan)
 import Control.Lens (makeLenses, (^.), set, Getting)
 import Control.Monad(forM_, unless, void, when)
 import Data.Default(Default(..))
-import Data.Maybe(isJust)
 import Data.GI.Gtk.Threading(postGUIASync)
 import qualified GI.Gtk as Gtk
-import System.Directory (doesFileExist)
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
@@ -86,17 +84,8 @@ main :: IO ()
 main = do
   opts <- getOptions
   let Just fn = opts ^. inputFileName
-  cnf <- if isJust $ opts ^. confFileName
-         then return $ opts ^. confFileName
-         else do
-                let defFn = defaultConfFileName fn
-                exFn <- doesFileExist fn
-                exCnf <- doesFileExist defFn
-                return $ if exFn == exCnf
-                         then Just defFn
-                         else Nothing
-  let pc = PathAndConf fn cnf
-      ltinfo = def { ltInputSeparator = opts ^. inputSeparator,
+  pc <- mkPathAndConf fn $ opts ^. confFileName
+  let ltinfo = def { ltInputSeparator = opts ^. inputSeparator,
                      ltOutputSeparator = opts ^. outputSeparator
                    }
       sinfo =  mkSourceInfo Nothing pc ltinfo

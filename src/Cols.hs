@@ -10,7 +10,6 @@ import Control.Lens(makeLenses, over, set, (^.), Lens')
 import Data.Default(Default(def))
 import Data.Maybe(isJust)
 import Data.Text qualified as T
-import System.Directory(doesFileExist)
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
 import System.IO(hPutStrLn, stderr)
@@ -23,6 +22,7 @@ import HRowsException
 import Model.DefaultFileNames
 import Model.RowStore
 import Model.SourceInfo
+import Model.SourceInfo (mkPathAndConf)
 
 
 data Options = Options { _help :: Bool
@@ -102,17 +102,8 @@ helpMessage = usageInfo header options
 load :: Options -> IO RowStore
 load opts = do
     let Just fn = opts ^. inputFileName
-    cnf <- if isJust $ opts ^. confFileName
-           then return $ opts ^. confFileName
-           else do
-                   let defFn = defaultConfFileName fn
-                   exFn <- doesFileExist fn
-                   exCnf <- doesFileExist defFn
-                   return $ if exFn == exCnf
-                            then Just defFn
-                            else Nothing
-    let pc = PathAndConf fn cnf
-        sinfo =  mkSourceInfo Nothing pc $ opts ^. iOptions
+    pc <- mkPathAndConf fn $ opts ^. confFileName
+    let sinfo =  mkSourceInfo Nothing pc $ opts ^. iOptions
 
     r <- E.try $ readRowStore sinfo
     case r of
