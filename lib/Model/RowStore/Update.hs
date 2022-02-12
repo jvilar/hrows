@@ -13,6 +13,7 @@ module Model.RowStore.Update (
   , fromRowsNames
   , fromRowsConf
   , changeField
+  , mapCol
   , newFields
   , deleteFields
   , renameFields
@@ -159,6 +160,11 @@ changeField r c field rst = let
     in if row !!! c /= field'
        then (rst { _rows = IM.insert r row' (_rows rst), _changed = True }, poss)
        else (rst, [])
+
+-- |Apply a function to a given field in all the rows.
+mapCol :: FieldPos -> (Field -> Field) -> RowStore -> RowStore
+mapCol c f rst = rst { _rows = IM.map apf (_rows rst), _changed  = True }
+    where apf r = fst $ updateField (_updatePlan rst) (f $ r !!! c) c (_dataSources rst) r
 
 -- |Adds a `RowStore` to the store
 addRowStore :: RowStore -> RowStore -> RowStore
