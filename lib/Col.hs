@@ -1,6 +1,5 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE LambdaCase #-}
 
@@ -10,6 +9,8 @@ module Col (
     -- *Functions
     , parseCols
     , applyCols
+    , slice
+    , pos
 ) where
 
 import Control.Lens (Traversal', (%~), traversed, (&))
@@ -94,6 +95,7 @@ applyCols cs0 rst = case names rst of
     where rn = getName rst
           cs = cs0 & traversed . expressionT %~ addPositions rst
           ns = concatMap toName cs
+          toName (Single (In (NamedPosition n _)) Nothing) = [n]
           toName (Single e Nothing) = [toFormula e]
           toName (Single _ (Just n)) = [n]
           toName (Range e1 e2) = case names rst of
