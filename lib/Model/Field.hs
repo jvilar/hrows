@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, FlexibleInstances, OverloadedStrings, RankNTypes, TypeSynonymInstances #-}
+{-# LANGUAGE DeriveGeneric, FlexibleInstances, OverloadedStrings, RankNTypes #-}
 
 module Model.Field ( Field
                    , FieldType(..)

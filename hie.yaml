@@ -9,11 +9,17 @@ cradle:
     - path: "././Paths_hrows.hs"
       component: "hrows:exe:cols"
 
-    - path: "././src/Main.hs"
+    - path: "././src/HRows.hs"
       component: "hrows:exe:hrows"
 
     - path: "././Paths_hrows.hs"
       component: "hrows:exe:hrows"
+
+    - path: "././src/Listing.hs"
+      component: "hrows:exe:listing"
+
+    - path: "././Paths_hrows.hs"
+      component: "hrows:exe:listing"
 
     - path: "././src/testParser.hs"
       component: "hrows:exe:testParser"

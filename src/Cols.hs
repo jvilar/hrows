@@ -59,7 +59,7 @@ setHeader l c = over l (\oc -> oc { ltHeaderType = c })
 
 setCols :: String -> Options -> Options
 setCols s = case parseCols (T.pack s) of
-                 Left e -> myError $ "Bad column espcification: " ++ T.unpack e
+                 Left e -> myError $ "Bad column especification: " ++ T.unpack e
                  Right cs -> set cols cs
 
 options :: [OptDescr (Options -> Options)]

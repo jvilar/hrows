@@ -89,6 +89,19 @@ executables:
     - mtl
     - text
 
+  listing:
+    main: src/Listing.hs
+    ghc-options:
+    - -threaded
+    - -Wall
+    dependencies:
+    - containers
+    - data-default
+    - hrows
+    - jmvOptions >= 0.2
+    - lens
+    - text
+
 tests:
   expression-test:
     main: test/Expression.hs
