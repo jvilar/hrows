@@ -11,8 +11,9 @@ module Model.RowStore.ListatabFile (
 ) where
 
 import Control.Exception (try, throwIO)
+import Control.Monad(unless)
 import Data.List(intercalate)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isNothing)
 import Data.Text(Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as T
@@ -94,7 +95,7 @@ writeListatab info mfp mNames ds = do
                                      FirstLine -> writeSeparated sep h ns
                                      Comment -> T.hPutStrLn h $ T.concat ["#<", T.intercalate "><" (map encodeName ns), ">"]
                      mapM_ (writeRow sep h) ds
-                     hClose h
+                     unless (isNothing mfp) $ hClose h
         Left e -> exception e
 
 encodeName :: Text -> Text
