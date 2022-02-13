@@ -11,9 +11,12 @@ module Col (
     , applyCols
     , slice
     , pos
+    -- *Lenses
+    , expressionT
+    , colF
 ) where
 
-import Control.Lens (Traversal', (%~), traversed, (&))
+import Control.Lens (Traversal', (%~), traversed, (&), Fold, folding)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -35,10 +38,15 @@ data Col = Single Expression (Maybe Text)
          | Range Expression Expression
          | AllCols deriving Show
 
+-- |A traversal of the expressions in the `Col`
 expressionT :: Traversal' Col Expression
 expressionT f (Single e mn) = Single <$> f e <*> pure mn
 expressionT f (Range e1 e2) = Range <$> f e1 <*> f e2
 expressionT _ AllCols = pure AllCols
+
+-- |A fold of the Fields specified by a `Col`
+colF :: Col -> Fold RowStore Row
+colF col = folding (map (processRow [col]) . rows)
 
 -- |Parse a list of expressions separated by commas, return
 -- the corresponding list of `Col` or an error message
@@ -94,15 +102,12 @@ applyCols cs0 rst = case names rst of
                       Just _ -> fromRowsNames rn ns . map (processRow cs) $ rows rst
     where rn = getName rst
           cs = cs0 & traversed . expressionT %~ addPositions rst
-          ns = concatMap toName cs
+          ns = concatMap toName cs0
           toName (Single (In (NamedPosition n _)) Nothing) = [n]
+          toName (Single (In (Position p)) Nothing) = [fnames rst !! p]
           toName (Single e Nothing) = [toFormula e]
           toName (Single _ (Just n)) = [n]
-          toName (Range e1 e2) = case names rst of
-                   Nothing -> [ T.pack ("Column " ++ show i) | i <- [p1 + 1..p2 + 1] ]
-                   Just xs -> slice p1 p2 xs
-               where p1 = pos e1
-                     p2 = pos e2
+          toName (Range e1 e2) = slice (pos e1) (pos e2) $ fnames rst
           toName AllCols = fromMaybe [] (names rst)
 
 processRow :: [Col] -> Row -> Row

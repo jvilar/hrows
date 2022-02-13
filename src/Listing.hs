@@ -3,7 +3,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 
-import Control.Applicative(ZipList(..))
+{-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RankNTypes #-}
+import Control.Applicative(ZipList(..), Alternative ((<|>)))
 import Control.Exception qualified as E
 import Control.Monad(unless, when)
 import Control.Lens
@@ -11,7 +15,7 @@ import Data.Default(def)
 import Data.List(intercalate, sortOn)
 import Data.Map(Map)
 import Data.Map qualified as M
-import Data.Maybe(catMaybes)
+import Data.Maybe(catMaybes, isNothing)
 import Data.Text(Text)
 import Data.Text qualified as T
 import System.Environment(getArgs, getProgName)
@@ -24,10 +28,11 @@ import System.Console.JMVOptions
 import Col
 import HRowsException
 import Model.RowStore
-import Model.RowStore.Update (mapCol)
 import Model.SourceInfo
 
 data Format = HTML | LaTeX | Listatab deriving (Show, Read, Enum)
+
+type AnonDic = Map Text Text
 
 data ColIndices = ColIndices { _keyIndex :: Int
                              , _markStart :: Int
@@ -41,7 +46,8 @@ data ListingRow = Message Text | Fields [Text]
 
 data Options = Options { _help :: Bool
                        , _anonymize :: Bool
-                       , _anonymousFile :: Maybe FilePath
+                       , _anonFile :: Maybe FilePath
+                       , _anonKey :: Col
                        , _anonLength :: Int
                        , _format :: Format
                        , _minPass :: Double
@@ -68,14 +74,15 @@ makeLenses ''Options
 defOpts :: Options
 defOpts = Options { _help = False
                   , _anonymize = False
-                  , _anonymousFile = Nothing
+                  , _anonFile = Nothing
+                  , _anonKey = Single (mkPosition 0) Nothing
                   , _anonLength = 5
                   , _format = LaTeX
                   , _minPass = 5
                   , _canCompensate = 4
                   , _sortByGlobal = False
 
-                  , _key = Range (mkPosition 1) (mkPosition 1)
+                  , _key = Single (mkPosition 0) Nothing
                   , _marks = []
                   , _decimals = 2
                   , _global = Nothing
@@ -132,10 +139,11 @@ options = processOptions $ do
                'S' ~: "oSeparator" ==> ReqArg (setSeparator oOptions . parseSeparator) "CHAR" ~:
                         "Field separator for the output. (Default: same as -s). Must appear after -s when both are present."
                'a' ~: "anonymize" ==> NoArg (set anonymize True) ~: "Anonymize the key column"
-               'A' ~: "anonymousFile" ==> ReqArg ( (set anonymize True .)
-                                                 . set anonymousFile . Just) "FILE"
+               'A' ~: "anonFile" ==> ReqArg ( (set anonymize True .)
+                                                 . set anonFile . Just) "FILE"
                             ~: "Anonymize the key column using the file as reference (implies -a)"
 
+               'K' ~: "anonKey" ==> ReqArg (setSingleCol anonKey "anonKey") "KEY" ~: "Column with the key in the anonymous file. Default: first column."
                'l' ~: "anonLength" ==> ReqArg (set anonLength . read) "INT" ~: "Length of the anoymous keys. " ++ defValue anonLength
                'k' ~: "key" ==> ReqArg (setSingleCol key "key") "KEY" ~: "Column with the key. Default: first column."
                'm' ~: "marks" ==> ReqArg (setCols marks "marks") "COLS" ~: "Columns with the marks. Default: no columns."
@@ -193,9 +201,9 @@ load opts = do
         Left (HRowsException mess) -> myError $ T.unpack mess
 
 
-translate :: Options -> RowStore -> (RowStore, ColIndices)
-translate opts rst = let
-    trKey = getKeyCol opts rst
+translate :: Options -> Maybe AnonDic -> RowStore -> (RowStore, ColIndices)
+translate opts mdic rst = let
+    trKey = getKeyCol opts mdic rst
     trMarks = applyCols (opts ^. marks) rst
     trExtras = applyCols (opts ^. extraCols) rst
     trGlobal = applyCols (catMaybes [opts ^. global]) rst
@@ -215,17 +223,16 @@ translate opts rst = let
         Nothing -> (fromRows (getName rst) allRows, inds)
         Just nms -> (fromRowsNames (getName rst) nms allRows, inds)
 
-getKeyCol :: Options -> RowStore -> RowStore
-getKeyCol opts rst
-    | opts ^. anonymize = mapCol 0 mkAnon col
-    | otherwise = col
+getKeyCol :: Options -> Maybe AnonDic -> RowStore -> RowStore
+getKeyCol opts mdic rst
+    | isNothing mdic = col
+    | otherwise = mapCol 0 mkAnon col
     where col = applyCols [opts ^. key] rst
-          ks = rows col ^.. folded . to head . to toString
-          dic = anonymizeDic (opts ^. anonLength) ks
+          Just dic = mdic
           mkAnon = toField . (dic M.!) . toString
 
-keys :: ColIndices -> RowStore -> [Text]
-keys inds rst = rows rst ^.. folded . element (inds ^. keyIndex) . to toString
+keys :: Col -> RowStore -> [Text]
+keys col rst = rst ^..  colF col . element 0 . to toString
 
 anonymizeDic :: Int -> [Text] -> Map Text Text
 anonymizeDic ml ts = let
@@ -246,6 +253,18 @@ discriminate ref other = T.pack . sel []
           sel d ((r, o):xs) | r /= o = r:d
                             | otherwise = sel (r:d) xs
 
+createAnonDic :: Options -> RowStore -> IO (Maybe AnonDic)
+createAnonDic opts rst = fmap (anonymizeDic (opts ^. anonLength))
+                           <$> sequence (fromFile <|> fromRst)
+    where fromFile = do
+            f <- opts ^. anonFile
+            let sinfo = mkSourceInfo Nothing (PathAndConf f Nothing) def
+            return (keys (opts ^. anonKey) . fst <$> readRowStore sinfo)
+          fromRst = if opts ^. anonymize
+                    then Just . return $ keys (opts ^. key) rst
+                    else Nothing
+
+
 
 main :: IO ()
 main = do
@@ -253,6 +272,7 @@ main = do
           rst <- case opts ^. inputFileName of
                      Nothing -> readRowStoreStdin $ opts ^. iOptions
                      Just _ -> load opts
-          let (rst', inds) = translate opts rst
+          anonDic <- createAnonDic opts rst
+          let (rst', inds) = translate opts anonDic rst
           writeRowStoreStdout (opts ^. oOptions) rst'
 
