@@ -426,6 +426,42 @@ laTeXMessage inds _ n r = T.concat
   where m = toString (r !! (inds ^. messageIndex))
         sp = T.pack $ show $ inds ^. totalCols - 1
 
+listatabFormatter :: Formatter
+listatabFormatter = Formatter {
+    _begin = ""
+    , _end = ""
+    , _titleLine = listatabTitle
+    , _normalLine = listatabLine
+    , _messageLine = listatabMessage
+}
+
+escapeListatab :: Text -> Text
+escapeListatab = T.concatMap charEscape
+    where charEscape '>' = "\\>"
+          charEscape '\\' = "\\\\"
+          charEscape c = T.singleton c
+
+listatabTitle :: [Text] -> Text
+listatabTitle = ("#<" <>) . (<> ">") . T.intercalate "><" . map escapeListatab
+
+listatabLine :: ColIndices -> Options -> Int -> Row -> Text
+listatabLine inds opts _ r = T.concat
+  ( toString (r !! (inds ^. keyIndex))
+  :  [ sep <> fToText (opts ^. decimals) t
+       | t <- segment inds markInterval r
+     ]
+  ++ [ sep <> fToText (opts ^. globalDecimals) t
+     | t <- segment inds globalInterval r
+     ]
+  ++ [ sep <> toString t
+     | t <- segment inds extrasInterval r
+     ]
+  )
+  where sep = T.singleton . ltOutputSeparator $ opts ^. oOptions
+
+listatabMessage :: ColIndices -> Options -> Int -> Row -> Text
+listatabMessage = error "There can be no messages in listatab format"
+
 writeListing :: Formatter -> Options -> ColIndices -> RowStore -> IO ()
 writeListing fmt opts inds rst = do
     unless (T.null $ fmt ^. begin) $ T.putStrLn $ fmt ^. begin
@@ -452,8 +488,9 @@ main = do
                      Just _ -> load opts
           anonDic <- createAnonDic opts rst
           let (rst', inds) = translate opts anonDic rst
-          case opts ^. format of
-              HTML -> writeListing hTMLFormatter opts inds rst'
-              LaTeX -> writeListing laTeXFormatter opts inds rst'
-              Listatab -> writeRowStoreStdout (opts ^. oOptions) rst'
+              formatter = case opts ^. format of
+                            HTML -> hTMLFormatter
+                            LaTeX -> laTeXFormatter
+                            Listatab -> listatabFormatter
+          writeListing formatter opts inds rst'
 
