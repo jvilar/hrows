@@ -35,6 +35,7 @@ module Model.RowStore.Base (
                 , nextPos
                 -- **Updating
                 , sortRows
+                , sortRowsOn
                 , setUnchanged
                 , fieldIndex
                 , setName
@@ -228,14 +229,17 @@ data SortDirection = Ascending | Descending deriving Show
 
 -- |Sort the rows of the store according to the field
 sortRows :: FieldPos -> SortDirection -> RowStore -> RowStore
-sortRows fp dir rst = rst { _changed = True
-                          , _rows = rows'
-                          }
-                      where rs = IM.elems $ _rows rst
-                            sorted = case dir of
-                                        Ascending -> sortOn (!!! fp) rs
-                                        Descending -> sortOn (Down . (!!! fp)) rs
-                            rows' = IM.fromAscList $ zip [0..] sorted
+sortRows fp Ascending = sortRowsOn (!!! fp)
+sortRows fp Descending = sortRowsOn (Down . (!!! fp))
+
+-- |Sort the rows of the store on the provided function
+sortRowsOn :: Ord a => (Row -> a) -> RowStore -> RowStore
+sortRowsOn f rst = rst { _changed = True
+                       , _rows = rows'
+                       }
+                 where rs = IM.elems $ _rows rst
+                       sorted = sortOn f rs
+                       rows' = IM.fromAscList $ zip [0..] sorted
 
 -- |Marks the store as unchanged
 setUnchanged :: RowStore -> RowStore

@@ -30,7 +30,7 @@ import Model.RowStore
 import Model.SourceInfo
 import Numeric (showFFloat)
 
-data Format = HTML | LaTeX | Listatab deriving (Show, Read, Enum)
+data Format = HTML | LaTeX | Listatab deriving (Show, Read, Enum, Eq)
 
 type AnonDic = Map Text Text
 
@@ -121,7 +121,7 @@ defOpts = Options { _help = False
 parseSeparator :: String -> Char
 parseSeparator [c] = c
 parseSeparator "\\t" = '\t'
-parseSeparator s = error $ "Illegal string for separator: " ++ show s
+parseSeparator s = myError $ "Illegal string for separator: " ++ show s
 
 setSeparator :: Lens' Options ListatabInfo -> Char -> Options -> Options
 setSeparator l s = over l (\oc -> oc { ltInputSeparator = s })
@@ -460,7 +460,7 @@ listatabLine inds opts _ r = T.concat
   where sep = T.singleton . ltOutputSeparator $ opts ^. oOptions
 
 listatabMessage :: ColIndices -> Options -> Int -> Row -> Text
-listatabMessage = error "There can be no messages in listatab format"
+listatabMessage = myError "There can be no messages in listatab format"
 
 writeListing :: Formatter -> Options -> ColIndices -> RowStore -> IO ()
 writeListing fmt opts inds rst = do
@@ -483,6 +483,8 @@ writeListing fmt opts inds rst = do
 main :: IO ()
 main = do
           opts <- getOptions
+          unless (opts ^. format /= Listatab || isNothing (opts ^. message))
+            $ myError "There can not be a message column in listatab format"
           rst <- case opts ^. inputFileName of
                      Nothing -> readRowStoreStdin $ opts ^. iOptions
                      Just _ -> load opts
@@ -492,5 +494,11 @@ main = do
                             HTML -> hTMLFormatter
                             LaTeX -> laTeXFormatter
                             Listatab -> listatabFormatter
-          writeListing formatter opts inds rst'
+              ind = fromIntegral $ if opts ^. sortByGlobal
+                                   then inds ^. globalIndex
+                                   else inds ^. keyIndex
+              sorted = if opts ^. sortByGlobal || not (opts ^. anonymize)
+                       then sortRows ind Ascending rst'
+                       else sortRowsOn (T.reverse . toString . (!!! ind)) rst'
+          writeListing formatter opts inds sorted
 
