@@ -3,13 +3,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 
-{-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE RankNTypes #-}
 import Control.Applicative(ZipList(..), Alternative ((<|>)))
+import Control.Arrow((&&&))
 import Control.Exception qualified as E
-import Control.Monad(unless, when)
+import Control.Monad(unless, when, forM_)
 import Control.Lens
 import Data.Default(def)
 import Data.List(intercalate, sortOn)
@@ -18,6 +15,7 @@ import Data.Map qualified as M
 import Data.Maybe(catMaybes, isNothing)
 import Data.Text(Text)
 import Data.Text qualified as T
+import Data.Text.IO qualified as T
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
 import System.IO(hPutStrLn, stderr)
@@ -27,8 +25,10 @@ import System.Console.JMVOptions
 
 import Col
 import HRowsException
+import Model.Row
 import Model.RowStore
 import Model.SourceInfo
+import Numeric (showFFloat)
 
 data Format = HTML | LaTeX | Listatab deriving (Show, Read, Enum)
 
@@ -42,7 +42,26 @@ data ColIndices = ColIndices { _keyIndex :: Int
                              } deriving Show
 makeLenses ''ColIndices
 
-data ListingRow = Message Text | Fields [Text]
+totalCols :: Getter ColIndices Int
+totalCols = messageIndex
+
+markEnd :: Getter ColIndices Int
+markEnd = extrasStart
+
+markInterval :: Getter ColIndices (Int, Int)
+markInterval = to $ view markStart &&& view markEnd
+
+extrasEnd :: Getter ColIndices Int
+extrasEnd = globalIndex
+
+extrasInterval :: Getter ColIndices (Int, Int)
+extrasInterval = to $ view extrasStart &&& view extrasEnd
+
+globalEnd :: Getter ColIndices Int
+globalEnd = messageIndex
+
+globalInterval :: Getter ColIndices (Int, Int)
+globalInterval = to $ view globalIndex &&& view globalEnd
 
 data Options = Options { _help :: Bool
                        , _anonymize :: Bool
@@ -264,7 +283,109 @@ createAnonDic opts rst = fmap (anonymizeDic (opts ^. anonLength))
                     then Just . return $ keys (opts ^. key) rst
                     else Nothing
 
+data Formatter = Formatter { _begin :: Text
+                           , _end :: Text
+                           , _titleLine :: [Text] -> Text
+                           , _normalLine :: ColIndices -> Options -> Int -> Row -> Text
+                           , _messageLine :: ColIndices -> Options -> Int -> Row -> Text
+                           }
 
+makeLenses ''Formatter
+
+hTMLFormatter :: Formatter
+hTMLFormatter = Formatter {
+    _begin = "<TT><TABLE>"
+    , _end = "</TABLE></TT>"
+    , _titleLine = htmlTitle
+    , _normalLine = htmlLine
+    , _messageLine = htmlMessage
+}
+
+htmlTitle :: [Text] -> Text
+htmlTitle ts = T.concat
+         $ "<tr>"
+         : map (\t -> "<TH>&nbsp;<B>" <> t <> "</B>&nbsp;</TH>") ts
+         ++ ["</tr>"]
+
+fToText :: Int -> Field -> Text
+fToText d f = case typeOf f of
+                TypeInt -> toString f <> "." <> T.replicate d "0"
+                TypeDouble -> T.pack $ showFFloat (Just d) (toDouble f) ""
+                _ -> toString f
+
+colorGlobal :: Options -> Field -> Text
+colorGlobal opts f = let
+  v = case typeOf f of
+         TypeInt -> fromIntegral $ toInt f
+         TypeDouble -> toDouble f
+         _ -> opts ^. minPass
+  in if v < opts ^. canCompensate
+     then "red"
+     else if v < opts ^. minPass
+          then "black"
+          else "blue"
+
+trMark :: Int -> Text
+trMark n | odd n = "<TR bgcolor=\"#bbbbbb\">"
+         | otherwise = "<TR>"
+
+segment :: ColIndices -> Getter ColIndices (Int, Int) -> [a] -> [a]
+segment inds g = uncurry slice' (inds ^. g)
+
+htmlLine :: ColIndices -> Options -> Int -> Row -> Text
+htmlLine inds opts n r = T.concat
+  ( trMark n
+  : "<TD>&nbsp;"  -- key
+  : toString (r !! (inds ^. keyIndex))
+  : "&nbsp;</TD>"
+  :  [ "<TD align=\"center\">&nbsp;"
+       <> fToText (opts ^. decimals) t
+       <> "&nbsp;</TD>"
+       | t <- segment inds markInterval r
+     ]
+  ++ [ "<TD align=\"center\"><font color=\""
+          <> colorGlobal opts t <> "\">&nbsp;<b>"
+       <> fToText (opts ^. globalDecimals) t
+       <> "</font></TD>"
+     | t <- segment inds globalInterval r
+     ]
+  ++ [ "<TD align=\"left\">&nbsp;" <> toString t <> "</TD>"
+     | t <- segment inds extrasInterval r
+     ]
+  ++ [ "</TR>" ]
+  )
+
+htmlMessage :: ColIndices -> Options -> Int -> Row -> Text
+htmlMessage inds _ n r = T.concat
+  ( trMark n
+  : "<TD>&nbsp;"  -- key
+  : toString (r !! (inds ^. keyIndex))
+  : "&nbsp;</TD>"
+  : [ "<TD colspan =\"" <> sp <> "\"align = \"left\">"<> m <> "</TD></TR>" ]
+  )
+  where m = toString (r !! (inds ^. messageIndex))
+        sp = T.pack $ show $ inds ^. totalCols - 1
+
+laTeXFormatter :: Formatter
+laTeXFormatter = undefined
+
+writeListing :: Formatter -> Options -> ColIndices -> RowStore -> IO ()
+writeListing fmt opts inds rst = do
+    T.putStrLn $ fmt ^. begin
+    unless (ltHeaderType (opts ^. oOptions) == NoHeader) $ do
+         let nms = fnames rst
+         T.putStrLn $ fmt ^. titleLine $
+            concat [ [nms !! (inds ^. keyIndex)]
+                   , segment inds markInterval nms
+                   , segment inds globalInterval nms
+                   , segment inds extrasInterval nms
+                   ]
+    forM_ (zip [1..] $ rows rst) $ \(n, r) -> do
+         let t = toString (r !! (inds ^. messageIndex))
+         if inds ^. messageIndex >= nFields rst || T.null t
+         then T.putStrLn $ (fmt ^. normalLine) inds opts n r
+         else T.putStrLn $ (fmt ^. messageLine) inds opts n r
+    T.putStrLn $ fmt ^. end
 
 main :: IO ()
 main = do
@@ -274,5 +395,8 @@ main = do
                      Just _ -> load opts
           anonDic <- createAnonDic opts rst
           let (rst', inds) = translate opts anonDic rst
-          writeRowStoreStdout (opts ^. oOptions) rst'
+          case opts ^. format of
+              HTML -> writeListing hTMLFormatter opts inds rst'
+              LaTeX -> writeListing laTeXFormatter opts inds rst'
+              Listatab -> writeRowStoreStdout (opts ^. oOptions) rst'
 

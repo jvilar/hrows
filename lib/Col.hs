@@ -10,6 +10,7 @@ module Col (
     , parseCols
     , applyCols
     , slice
+    , slice'
     , pos
     -- *Lenses
     , expressionT
@@ -46,7 +47,9 @@ expressionT _ AllCols = pure AllCols
 
 -- |A fold of the Fields specified by a `Col`
 colF :: Col -> Fold RowStore Row
-colF col = folding (map (processRow [col]) . rows)
+colF col = folding getRows
+    where getRows rst = map (processRow [col']) $ rows rst
+             where col' = col & expressionT %~ addPositions rst
 
 -- |Parse a list of expressions separated by commas, return
 -- the corresponding list of `Col` or an error message
@@ -116,8 +119,13 @@ processRow cs r = concatMap f cs
           f (Range e1 e2) = slice (pos e1) (pos e2) r
           f AllCols = r
 
+-- The elements of the list from p1 to p2, both included
 slice :: Int -> Int -> [a] -> [a]
 slice p1 p2 = take (p2 - p1 + 1) . drop p1
+
+-- The elements of the list from p1 to p2, p2 excluded
+slice' :: Int -> Int -> [a] -> [a]
+slice' p1 p2 = take (p2 - p1) . drop p1
 
 pos :: Expression -> Int
 pos (In (Position n)) = n

@@ -19,6 +19,7 @@ module Model.Field ( Field
                    , convert
                    , convertKeepText
                    , toInt
+                   , toDouble
                    -- **Operators
                    , andField
                    , orField
@@ -342,6 +343,10 @@ toInt :: Field -> Int
 toInt (AnInt n _) = n
 toInt f = error $ "toInt de un " ++ T.unpack (typeLabel $ typeOf f)
 
+-- |Recover the Double from a double expression or error
+toDouble :: Field -> Double
+toDouble (ADouble d _) = d
+toDouble f = error $ "toDouble de un " ++ T.unpack (typeLabel $ typeOf f)
 
 instance Fractional Field where
     (AnInt n1 _) / (AnInt n2 _) = toField ((fromIntegral n1 / fromIntegral n2)::Double)

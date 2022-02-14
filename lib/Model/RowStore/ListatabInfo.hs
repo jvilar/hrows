@@ -23,7 +23,7 @@ instance FromJSON ListatabInfo
 data HeaderType = NoHeader
                 | FirstLine
                 | Comment
-                deriving (Generic, Show)
+                deriving (Eq, Generic, Show)
 
 instance ToJSON HeaderType where
   toEncoding = genericToEncoding defaultOptions
