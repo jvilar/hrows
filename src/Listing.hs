@@ -361,17 +361,74 @@ htmlMessage inds _ n r = T.concat
   : "<TD>&nbsp;"  -- key
   : toString (r !! (inds ^. keyIndex))
   : "&nbsp;</TD>"
-  : [ "<TD colspan =\"" <> sp <> "\"align = \"left\">"<> m <> "</TD></TR>" ]
+  : [ "<TD colspan =\"" <> sp 
+      <> "\"align = \"left\"><font color=\"red\">"
+      <> m
+      <> "</font></TD></TR>" ]
   )
   where m = toString (r !! (inds ^. messageIndex))
         sp = T.pack $ show $ inds ^. totalCols - 1
 
 laTeXFormatter :: Formatter
-laTeXFormatter = undefined
+laTeXFormatter = Formatter {
+    _begin = ""
+    , _end = ""
+    , _titleLine = laTeXTitle
+    , _normalLine = laTeXLine
+    , _messageLine = laTeXMessage
+}
+
+
+escapeLaTeX :: Text -> Text
+escapeLaTeX = T.concatMap charEscape
+    where charEscape '_' = "\\_"
+          charEscape '$' = "\\$"
+          charEscape '%' = "\\%"
+          charEscape '{' = "\\{"
+          charEscape '}' = "\\}"
+          charEscape '&' = "\\&"
+          charEscape '#' = "\\#"
+          charEscape '<' = "\\textless"
+          charEscape '>' = "\\textgreater"
+          charEscape '~' = "\\textasciitilde"
+          charEscape '\\' = "\\textbackslash"
+          charEscape c = T.singleton c
+
+laTeXTitle :: [Text] -> Text
+laTeXTitle = (<> "\\\\\\hline") . T.intercalate " & " . map escapeLaTeX
+
+laTeXLine :: ColIndices -> Options -> Int -> Row -> Text
+laTeXLine inds opts n r = T.concat
+  ( (if odd n then "\\rowcolor[gray]{0.8}" else "")
+  : toString (r !! (inds ^. keyIndex))
+  :  [ " & " <> fToText (opts ^. decimals) t
+       | t <- segment inds markInterval r
+     ]
+  ++ [ " & \\textcolor{"
+          <> colorGlobal opts t <> "}{"
+       <> fToText (opts ^. globalDecimals) t
+       <> "}"
+     | t <- segment inds globalInterval r
+     ]
+  ++ [ " & " <> toString t
+     | t <- segment inds extrasInterval r
+     ]
+  ++ [ "\\\\" ]
+  )
+
+laTeXMessage :: ColIndices -> Options -> Int -> Row -> Text
+laTeXMessage inds _ n r = T.concat
+  ( (if odd n then "\\rowcolor[gray]{0.8}" else "")
+  : toString (r !! (inds ^. keyIndex))
+  : " & "
+  : [ "\\multicolumn{" <> sp <> "}{l}{\\qquad\\textcolor{red}{"<> m <> "}}\\\\" ]
+  )
+  where m = toString (r !! (inds ^. messageIndex))
+        sp = T.pack $ show $ inds ^. totalCols - 1
 
 writeListing :: Formatter -> Options -> ColIndices -> RowStore -> IO ()
 writeListing fmt opts inds rst = do
-    T.putStrLn $ fmt ^. begin
+    unless (T.null $ fmt ^. begin) $ T.putStrLn $ fmt ^. begin
     unless (ltHeaderType (opts ^. oOptions) == NoHeader) $ do
          let nms = fnames rst
          T.putStrLn $ fmt ^. titleLine $
@@ -385,7 +442,7 @@ writeListing fmt opts inds rst = do
          if inds ^. messageIndex >= nFields rst || T.null t
          then T.putStrLn $ (fmt ^. normalLine) inds opts n r
          else T.putStrLn $ (fmt ^. messageLine) inds opts n r
-    T.putStrLn $ fmt ^. end
+    unless (T.null $ fmt ^. end) $ T.putStrLn $ fmt ^. end
 
 main :: IO ()
 main = do
