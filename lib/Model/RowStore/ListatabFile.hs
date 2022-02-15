@@ -50,7 +50,7 @@ type Parser = Parsec Void Text
 
 analyze :: ListatabInfo -> Parser (Maybe [Text], DataSource)
 analyze ltInfo = do
-  let sep = ltInputSeparator ltInfo
+  let sep = ltSeparator ltInfo
       inNameChar = TM.try (char '\\' >> (char '>' <|> char '\\'))
                    <|> noneOf (">" :: String)
   h <- case ltHeaderType ltInfo of
@@ -82,7 +82,7 @@ stringParser sep = T.pack <$> ((char '"' *> many inStringChar <* char '"')
 -- writes to stdout.
 writeListatab :: ListatabInfo -> Maybe FilePath -> Maybe [Text] -> DataSource -> IO ()
 writeListatab info mfp mNames ds = do
-    let sep = ltOutputSeparator info
+    let sep = ltSeparator info
     mh <- case mfp of
             Just fp -> try (openFile fp WriteMode)
             Nothing -> return $ Right stdout

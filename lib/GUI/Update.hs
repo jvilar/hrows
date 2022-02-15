@@ -116,8 +116,7 @@ unimplemented func control = sendInput control . MessageDialog . ErrorMessage $ 
 sourceInfoFromDialogResult :: (FilePath, Char, HeaderType) -> SourceInfo
 sourceInfoFromDialogResult (fp, c, t) = let
   lti = ListatabInfo {
-          ltInputSeparator = c
-          , ltOutputSeparator = c
+          ltSeparator = c
           , ltHeaderType = t
         }
   in mkSourceInfo Nothing (PathAndConf fp Nothing) lti

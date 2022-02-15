@@ -49,7 +49,7 @@ parseSeparator "\\t" = '\t'
 parseSeparator s = error $ "Illegal string for separator: " ++ show s
 
 setSeparator :: Char -> Options -> Options
-setSeparator c = over inputOptions (\oc -> oc { ltInputSeparator = c })
+setSeparator c = over inputOptions (\oc -> oc { ltSeparator = c })
 
 setHeader :: HeaderType -> Options -> Options
 setHeader h = over inputOptions (\oc -> oc { ltHeaderType = h })

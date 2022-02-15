@@ -35,8 +35,8 @@ instance Default Options where
     def = Options  { _help = False
                    , _inputFileName = Nothing
                    , _confFileName = Nothing
-                   , _inputSeparator = ltInputSeparator def
-                   , _outputSeparator = ltOutputSeparator def
+                   , _inputSeparator = ltSeparator def
+                   , _outputSeparator = ltSeparator def
                    }
 
 defValue :: Show a => Getting a Options a -> String
@@ -46,7 +46,7 @@ options :: [OptDescr (Options -> Options)]
 options = processOptions $ do
               'h' ~: s "help" ==> NoArg (set help True) ~: s "This help."
               's' ~: s "separator" ==> ReqArg ((\c -> set inputSeparator c . set outputSeparator c) . head) "SEP" ~: s "Separator for input of listatab files. " ++ defValue inputSeparator
-              'S' ~: s "oSeparator" ==> ReqArg (set outputSeparator . head) "SEP" ~: s "Separator for output listatab files. Default: use the one passed to separator."
+              -- TODO 'S' ~: s "oSeparator" ==> ReqArg (set outputSeparator . head) "SEP" ~: s "Separator for output listatab files. Default: use the one passed to separator."
           where s :: String -> String
                 s = id
 
@@ -85,9 +85,7 @@ main = do
   opts <- getOptions
   let Just fn = opts ^. inputFileName
   pc <- mkPathAndConf fn $ opts ^. confFileName
-  let ltinfo = def { ltInputSeparator = opts ^. inputSeparator,
-                     ltOutputSeparator = opts ^. outputSeparator
-                   }
+  let ltinfo = def { ltSeparator = opts ^. inputSeparator }
       sinfo =  mkSourceInfo Nothing pc ltinfo
 
   inputChan <- newChan

@@ -52,7 +52,7 @@ parseSeparator "\\t" = '\t'
 parseSeparator s = error $ "Illegal string for separator: " ++ show s
 
 setSeparator :: Lens' Options ListatabInfo -> Char -> Options -> Options
-setSeparator l s = over l (\oc -> oc { ltInputSeparator = s })
+setSeparator l s = over l (\oc -> oc { ltSeparator = s })
 
 setHeader :: Lens' Options ListatabInfo -> HeaderType -> Options -> Options
 setHeader l c = over l (\oc -> oc { ltHeaderType = c })
@@ -71,7 +71,7 @@ options = processOptions $ do
                'c' ~: "cols" ==> ReqArg setCols "COLS" ~: "Column specification. A list of expressions separated by commas in the format of the formulas of hrows. Also, a range can be specified by two column names or positions separated by a colon and surrounded by square brackes like [$1:$4] or [Name:Surname]."
                'h' ~: "help" ==> NoArg (set help True) ~: "This help."
                's' ~: "separator" ==> ReqArg (\s -> let c = parseSeparator s in setSeparator iOptions c . setSeparator oOptions c) "CHAR" ~:
-                        ("Field separator for the input and output. (Default: " ++ show (ltInputSeparator $ defOpts ^. iOptions) ++ ").")
+                        ("Field separator for the input and output. (Default: " ++ show (ltSeparator $ defOpts ^. iOptions) ++ ").")
                'S' ~: "oSeparator" ==> ReqArg (setSeparator oOptions . parseSeparator) "CHAR" ~:
                         "Field separator for the output. (Default: same as -s). Must appear after -s when both are present."
 
