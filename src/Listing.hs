@@ -18,7 +18,7 @@ import Data.Text qualified as T
 import Data.Text.IO qualified as T
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
-import System.IO(hPutStrLn, stderr)
+import System.IO(hPutStrLn, stderr, IOMode (ReadMode), openFile)
 import System.IO.Unsafe(unsafePerformIO)
 
 import System.Console.JMVOptions
@@ -149,6 +149,7 @@ defValue l = "Default: " ++ show (defOpts ^. l) ++ "."
 options :: [OptDescr (Options -> Options)]
 options = processOptions $ do
                'h' ~: "help" ==> NoArg (set help True) ~: "This help."
+               'o' ~: "optionsFile" ==> ReqArg (set optionsFile . Just) "FILE" ~: "Read the options from a file. Each line in the file has a long option. If there is a parameter, it is written after a colon."
                '0' ~: "iNoHeader" ==> NoArg (setHeader iOptions NoHeader . setHeader oOptions NoHeader) ~: "Do not use header in the input."
                'O' ~: "oNoHeader" ==> NoArg (setHeader oOptions NoHeader) ~: "Do not use header in the output. Must be used after -0 if both are present."
                '1' ~: "iHeader1" ==> NoArg (setHeader iOptions FirstLine . setHeader oOptions FirstLine) ~: "Use the first line as header in the input."
@@ -183,9 +184,15 @@ getOptions :: IO Options
 getOptions = do
                 args <- getArgs
                 let (o, a, e) = getOpt Permute options args
-                let opt = foldl (flip id) defOpts o
-                when (opt ^. help) $ putStrLn helpMessage >> exitSuccess
-                unless (null e) $ myError $ concat e ++ helpMessage
+                let opt1 = foldl (&) defOpts o
+                when (opt1 ^. help) $ putStrLn helpMessage >> exitSuccess
+                unless (null e) $ myError $ concat e ++ "\n" ++ helpMessage
+                optf <- traverse  (\f -> openFile f ReadMode >>= optionsFromHandle options)
+                                 (opt1 ^. optionsFile)
+                let opt = case optf of
+                            Nothing -> opt1
+                            Just (o', []) -> foldl (&) defOpts (o' ++ o)
+                            Just (_, e') -> myError $ concat e' ++ "\n" ++ helpMessage
                 return $ case a of
                    [] -> opt
                    [f] -> set inputFileName (Just f) opt
@@ -201,7 +208,7 @@ myError m = unsafePerformIO $ do
 
 helpMessage :: String
 helpMessage = usageInfo header options
-              where header = "Usage: listing [Options] [files]\
+              where header = "Usage: listing [Options] [files]\n\n\
                              \Creates a listing of marks from a listatab file.\n\
                              \Columns can be specified by formulas using hrows syntax.\n\
                              \Options receiving a list of formulas can list them \
