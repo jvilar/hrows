@@ -231,18 +231,18 @@ translate :: Options -> Maybe AnonDic -> RowStore -> (RowStore, ColIndices)
 translate opts mdic rst = let
     trKey = getKeyCol opts mdic rst
     trMarks = applyCols (opts ^. marks) rst
-    trExtras = applyCols (opts ^. extraCols) rst
     trGlobal = applyCols (catMaybes [opts ^. global]) rst
+    trExtras = applyCols (opts ^. extraCols) rst
     trMessage = applyCols (catMaybes [opts ^. message]) rst
-    allTr = [trKey, trMarks, trExtras, trGlobal, trMessage]
+    allTr = [trKey, trMarks, trGlobal, trExtras, trMessage]
     allRows = map concat . getZipList . sequenceA $
                 ZipList . rows <$> allTr
     allNames = concat <$> traverse names allTr
     inds = ColIndices { _keyIndex = 0
                       , _markStart = nFields trKey
-                      , _extrasStart = _markStart inds + nFields trMarks
-                      , _globalIndex = _extrasStart inds + nFields trExtras
-                      , _messageIndex = _globalIndex inds + nFields trGlobal
+                      , _globalIndex = _markStart inds + nFields trMarks
+                      , _extrasStart = _globalIndex inds + nFields trGlobal
+                      , _messageIndex = _extrasStart inds + nFields trExtras
                       }
 
   in case allNames of
@@ -433,48 +433,26 @@ laTeXMessage inds _ n r = T.concat
   where m = toString (r !! (inds ^. messageIndex))
         sp = T.pack $ show $ inds ^. totalCols - 1
 
-listatabFormatter :: Formatter
-listatabFormatter = Formatter {
-    _begin = ""
-    , _end = ""
-    , _titleLine = listatabTitle
-    , _normalLine = listatabLine
-    , _messageLine = listatabMessage
-}
-
-escapeListatab :: Text -> Text
-escapeListatab = T.concatMap charEscape
-    where charEscape '>' = "\\>"
-          charEscape '\\' = "\\\\"
-          charEscape c = T.singleton c
-
-listatabTitle :: [Text] -> Text
-listatabTitle = ("#<" <>) . (<> ">") . T.intercalate "><" . map escapeListatab
-
-listatabLine :: ColIndices -> Options -> Int -> Row -> Text
-listatabLine inds opts _ r = T.concat
-  ( toString (r !! (inds ^. keyIndex))
-  :  [ sep <> fToText (opts ^. decimals) t
-       | t <- segment inds markInterval r
-     ]
-  ++ [ sep <> fToText (opts ^. globalDecimals) t
-     | t <- segment inds globalInterval r
-     ]
-  ++ [ sep <> toString t
-     | t <- segment inds extrasInterval r
-     ]
-  )
-  where sep = T.singleton . ltSeparator $ opts ^. oOptions
-
-listatabMessage :: ColIndices -> Options -> Int -> Row -> Text
-listatabMessage = myError "There can be no messages in listatab format"
-
-writeListing :: Formatter -> Options -> ColIndices -> RowStore -> IO ()
-writeListing fmt opts inds rst = do
-    unless (T.null $ fmt ^. begin) $ T.putStrLn $ fmt ^. begin
+writeListing :: Options -> ColIndices -> RowStore -> IO ()
+writeListing opts inds rst
+  | opts ^. format == Listatab = do
+    let inGlobal = mapCol (fromIntegral $ inds ^. globalIndex)
+                          (toField . fToText (opts ^. globalDecimals))
+        inMarks = [ mapCol (fromIntegral c)
+                           (toField . fToText (opts ^. decimals))
+                  | c <- [ inds ^. markStart .. inds ^. markEnd - 1]
+                  ]
+        rst' = foldl (&) rst (inGlobal : inMarks)
+    writeRowStoreStdout (opts ^. oOptions) rst'
+  | otherwise = do
+    let fmter = case opts ^. format of
+                   HTML -> hTMLFormatter
+                   LaTeX -> laTeXFormatter
+                   Listatab -> error "Impossible. Treated in other case"
+    unless (T.null $ fmter ^. begin) $ T.putStrLn $ fmter ^. begin
     unless (ltHeaderType (opts ^. oOptions) == NoHeader) $ do
          let nms = fnames rst
-         T.putStrLn $ fmt ^. titleLine $
+         T.putStrLn $ fmter ^. titleLine $
             concat [ [nms !! (inds ^. keyIndex)]
                    , segment inds markInterval nms
                    , segment inds globalInterval nms
@@ -483,9 +461,9 @@ writeListing fmt opts inds rst = do
     forM_ (zip [1..] $ rows rst) $ \(n, r) -> do
          let t = toString (r !! (inds ^. messageIndex))
          if inds ^. messageIndex >= nFields rst || T.null t
-         then T.putStrLn $ (fmt ^. normalLine) inds opts n r
-         else T.putStrLn $ (fmt ^. messageLine) inds opts n r
-    unless (T.null $ fmt ^. end) $ T.putStrLn $ fmt ^. end
+         then T.putStrLn $ (fmter ^. normalLine) inds opts n r
+         else T.putStrLn $ (fmter ^. messageLine) inds opts n r
+    unless (T.null $ fmter ^. end) $ T.putStrLn $ fmter ^. end
 
 main :: IO ()
 main = do
@@ -497,15 +475,11 @@ main = do
                      Just _ -> load opts
           anonDic <- createAnonDic opts rst
           let (rst', inds) = translate opts anonDic rst
-              formatter = case opts ^. format of
-                            HTML -> hTMLFormatter
-                            LaTeX -> laTeXFormatter
-                            Listatab -> listatabFormatter
               ind = fromIntegral $ if opts ^. sortByGlobal
                                    then inds ^. globalIndex
                                    else inds ^. keyIndex
               sorted = if opts ^. sortByGlobal || not (opts ^. anonymize)
                        then sortRows ind Ascending rst'
                        else sortRowsOn (T.reverse . toString . (!!! ind)) rst'
-          writeListing formatter opts inds sorted
+          writeListing opts inds sorted
 
