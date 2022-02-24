@@ -48,8 +48,9 @@ expressionT _ AllCols = pure AllCols
 -- |A fold of the Fields specified by a `Col`
 colF :: Col -> Fold RowStore Row
 colF col = folding getRows
-    where getRows rst = map (processRow [col']) $ rows rst
+    where getRows rst = map (processRow dss [col']) $ rows rst
              where col' = col & expressionT %~ addPositions rst
+                   dss = getDataSources rst
 
 -- |Parse a list of expressions separated by commas, return
 -- the corresponding list of `Col` or an error message
@@ -101,11 +102,12 @@ checkPosition e = parsingError $ T.concat [ "Expression "
 -- `RowStore`.
 applyCols :: [Col] -> RowStore -> RowStore
 applyCols cs0 rst = case names rst of
-                      Nothing -> fromRows rn . map (processRow cs) $ rows rst
-                      Just _ -> fromRowsNames rn ns . map (processRow cs) $ rows rst
+                      Nothing -> fromRows rn . map (processRow dss cs) $ rows rst
+                      Just _ -> fromRowsNames rn ns . map (processRow dss cs) $ rows rst
     where rn = getName rst
           cs = cs0 & traversed . expressionT %~ addPositions rst
           ns = concatMap toName cs0
+          dss = getDataSources rst
           toName (Single (In (NamedPosition n _)) Nothing) = [n]
           toName (Single (In (Position p)) Nothing) = [fnames rst !! p]
           toName (Single e Nothing) = [toFormula e]
@@ -113,9 +115,9 @@ applyCols cs0 rst = case names rst of
           toName (Range e1 e2) = slice (pos e1) (pos e2) $ fnames rst
           toName AllCols = fromMaybe [] (names rst)
 
-processRow :: [Col] -> Row -> Row
-processRow cs r = concatMap f cs
-    where f (Single e _) = [evaluate r [] e]
+processRow :: [DataSource] -> [Col] -> Row -> Row
+processRow dss cs r = concatMap f cs
+    where f (Single e _) = [evaluate r dss e]
           f (Range e1 e2) = slice (pos e1) (pos e2) r
           f AllCols = r
 
