@@ -6,9 +6,9 @@
 
 import Control.Exception qualified as E
 import Control.Monad(unless, when)
+import Control.Monad.State.Strict(execState, gets, modify)
 import Control.Lens(makeLenses, over, set, (^.), Lens')
 import Data.Default(Default(def))
-import Data.Maybe(isJust)
 import Data.Text qualified as T
 import System.Environment(getArgs, getProgName)
 import System.Exit(exitFailure, exitSuccess)
@@ -19,16 +19,18 @@ import System.Console.JMVOptions
 
 import Col
 import HRowsException
-import Model.DefaultFileNames
+import Model.Expression.Parser
 import Model.RowStore
 import Model.SourceInfo
-import Model.SourceInfo (mkPathAndConf)
+import Model.Expression.Evaluation
+import Model.Expression.Manipulate (addPositions)
 
 
 data Options = Options { _help :: Bool
                        , _iOptions :: ListatabInfo
                        , _oOptions :: ListatabInfo
                        , _cols :: [Col]
+                       , _rFilter :: Maybe Expression
                        , _inputFileName :: Maybe FilePath
                        , _confFileName :: Maybe FilePath
                        }
@@ -40,6 +42,7 @@ defOpts = Options { _help = False
                   , _iOptions = def
                   , _oOptions = def
                   , _cols = [AllCols]
+                  , _rFilter = Nothing
                   , _inputFileName = Nothing
                   , _confFileName = Nothing
                   }
@@ -62,13 +65,19 @@ setCols s = case parseCols (T.pack s) of
                  Left e -> myError $ "Bad column especification: " ++ T.unpack e
                  Right cs -> set cols cs
 
+setFilter :: String -> Options -> Options
+setFilter s = case parse expression $ T.pack s of
+                   Left e -> myError $ "Bad expression in the filter: " ++ T.unpack e
+                   Right ex -> set rFilter $ Just ex
+
 options :: [OptDescr (Options -> Options)]
 options = processOptions $ do
                '0' ~: "iNoHeader" ==> NoArg (setHeader iOptions NoHeader . setHeader oOptions NoHeader) ~: "Do not use header in the input."
                'O' ~: "oNoHeader" ==> NoArg (setHeader oOptions NoHeader) ~: "Do not use header in the output. Must be used after -0 if both are present."
                '1' ~: "iHeader1" ==> NoArg (setHeader iOptions FirstLine . setHeader oOptions FirstLine) ~: "Use the first line as header in the input."
-               'f' ~: "oHeader1" ==> NoArg (setHeader oOptions FirstLine) ~: "Use the first line as header in the output"
+               'H' ~: "oHeader1" ==> NoArg (setHeader oOptions FirstLine) ~: "Use the first line as header in the output"
                'c' ~: "cols" ==> ReqArg setCols "COLS" ~: "Column specification. A list of expressions separated by commas in the format of the formulas of hrows. Also, a range can be specified by two column names or positions separated by a colon and surrounded by square brackes like [$1:$4] or [Name:Surname]."
+               'f' ~: "filter" ==> ReqArg setFilter "FILTER" ~: "An integer expression that will be used to filter the rows. Those for which the result is greater than 0"
                'h' ~: "help" ==> NoArg (set help True) ~: "This help."
                's' ~: "separator" ==> ReqArg (\s -> let c = parseSeparator s in setSeparator iOptions c . setSeparator oOptions c) "CHAR" ~:
                         ("Field separator for the input and output. (Default: " ++ show (ltSeparator $ defOpts ^. iOptions) ++ ").")
@@ -114,9 +123,16 @@ load opts = do
 main :: IO ()
 main = do
           opts <- getOptions
-          rst <- case opts ^. inputFileName of
+          rst0 <- case opts ^. inputFileName of
                      Nothing -> readRowStoreStdin $ opts ^. iOptions
                      Just _ -> load opts
-          let rst' = applyCols (opts ^. cols) rst
-          writeRowStoreStdout (opts ^. oOptions) rst'
+          let rst = flip execState rst0 $ do
+                       case opts ^. rFilter of
+                            Nothing -> return ()
+                            Just e -> do
+                                         dss <- gets getDataSources
+                                         ex <- gets $ flip addPositions e
+                                         modify . filterRows $ (> 0) . toInt . (\r -> evaluate r dss ex)
+                       modify $ applyCols (opts ^. cols)
+          writeRowStoreStdout (opts ^. oOptions) rst
 
