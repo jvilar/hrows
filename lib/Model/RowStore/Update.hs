@@ -14,6 +14,7 @@ module Model.RowStore.Update (
   , fromRowsConf
   , changeField
   , mapCol
+  , filterRows
   , newFields
   , deleteFields
   , renameFields
@@ -165,6 +166,10 @@ changeField r c field rst = let
 mapCol :: FieldPos -> (Field -> Field) -> RowStore -> RowStore
 mapCol c f rst = rst { _rows = IM.map apf (_rows rst), _changed  = True }
     where apf r = fst $ updateField (_updatePlan rst) (f $ r !!! c) c (_dataSources rst) r
+
+-- |Return those rows for wich the expression is True.
+filterRows :: (Row -> Bool) -> RowStore -> RowStore
+filterRows f rst = rst { _rows = IM.fromAscList . zip [0..] . filter f $ IM.elems $ _rows rst, _changed = True }
 
 -- |Adds a `RowStore` to the store
 addRowStore :: RowStore -> RowStore -> RowStore
