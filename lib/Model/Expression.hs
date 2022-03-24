@@ -1,11 +1,4 @@
-{-# LANGUAGE DeriveFoldable
-           , DeriveFunctor
-           , DeriveTraversable
-           , FlexibleContexts
-           , FlexibleInstances
-           , OverloadedStrings
-           , TypeSynonymInstances
-#-}
+{-# LANGUAGE DeriveTraversable, FlexibleContexts, FlexibleInstances, OverloadedStrings #-}
 
 module Model.Expression ( -- *Types
                           Expression
