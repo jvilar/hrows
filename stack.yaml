@@ -6,6 +6,6 @@ packages:
 extra-deps:
 - git: https://github.com/jvilar/jmvOptions.git
   commit: 5ddff6621f5f76304340c8431a01b0535c42e313
-- git: ssh://andromeda.dlsi.uji.es/home/jvilar/git/auto.git
-  commit: 6fc83c6f76d62e4771f4e55171c5efa00b000984
+- git: https://github.com/jvilar/auto.git
+  commit: c44b4a5fe12c7818a98eb1fe6f65de202050a0d0
 
