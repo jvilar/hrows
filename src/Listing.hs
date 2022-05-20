@@ -36,8 +36,8 @@ type AnonDic = Map Text Text
 
 data ColIndices = ColIndices { _keyIndex :: Int
                              , _markStart :: Int
-                             , _extrasStart :: Int
                              , _globalIndex :: Int
+                             , _extrasStart :: Int
                              , _messageIndex :: Int
                              } deriving Show
 makeLenses ''ColIndices
@@ -46,7 +46,7 @@ totalCols :: Getter ColIndices Int
 totalCols = messageIndex
 
 markEnd :: Getter ColIndices Int
-markEnd = extrasStart
+markEnd = globalIndex
 
 markInterval :: Getter ColIndices (Int, Int)
 markInterval = to $ view markStart &&& view markEnd
