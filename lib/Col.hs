@@ -8,6 +8,7 @@ module Col (
     -- *Types
     Col(..)
     -- *Functions
+    , readRowStoreFromOptions
     , parseCols
     , applyCols
     , slice
@@ -50,6 +51,9 @@ import System.Exit (exitFailure)
 import System.IO.Unsafe (unsafePerformIO)
 import System.IO (hPutStrLn, stderr)
 import Control.Monad (when)
+import qualified Control.Exception as E
+import HRowsException (HRowsException(HRowsException))
+import Control.Monad.State (execState, gets, modify)
 
 -- |A Col especifies a column of the input in the command line. Single
 -- expressions especify a column, a couple of expressions that correspond
@@ -115,8 +119,10 @@ setHeader l c = over l (\oc -> oc { ltHeaderType = c })
 -- |Parse a String to extract a list of cols and add it to a list
 appendCols :: Lens' o [Col] -> String -> String -> o -> o
 appendCols l n s = case parseCols (T.pack s) of
-                 Left e -> myError $ "Bad column especification in " ++ n ++ ": " ++ T.unpack e
-                 Right cs -> over l (++cs)
+                      Left e -> myError $ "Bad column especification in " ++ n ++ ": " ++ T.unpack e
+                      Right cs -> over l $ appCols cs
+                  where appCols xs [AllCols] = xs
+                        appCols xs ys = ys ++ xs
 
 setFilter :: String -> ColOptions -> ColOptions
 setFilter s = case parse expression $ T.pack s of
@@ -229,3 +235,29 @@ pos (In (NamedPosition _ (Just n))) = n
 pos e = error $ "Expression "
                 ++ T.unpack (toFormula e)
                 ++ " does not represent a position"
+
+load :: ColOptions -> IO RowStore
+load opts = do
+    let Just fn = opts ^. inputFileName
+    pc <- mkPathAndConf fn $ opts ^. confFileName
+    let sinfo =  mkSourceInfo Nothing pc $ opts ^. iOptions
+
+    r <- E.try $ readRowStore sinfo
+    case r of
+        Right (rst, _) -> return rst
+        Left (HRowsException mess) -> myError $ T.unpack mess
+
+-- |Uses the options to read a `RowStore`
+readRowStoreFromOptions :: ColOptions -> IO RowStore
+readRowStoreFromOptions opts = do
+  rst <- case opts ^. inputFileName of
+            Nothing -> readRowStoreStdin $ opts ^. iOptions
+            Just _ -> load opts
+  return $ flip execState rst $ do
+        case opts ^. rFilter of
+             Nothing -> return ()
+             Just e -> do
+                          dss <- gets getDataSources
+                          ex <- gets $ flip addPositions e
+                          modify . filterRows $ (> 0) . toInt . (\r -> evaluate r dss ex)
+

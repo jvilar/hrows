@@ -2,26 +2,15 @@
 
 module Main where
 
-import Control.Exception(try)
 import Control.Monad(unless, when)
-import Control.Monad.State(execState, gets, modify)
-import Control.Lens(makeLenses, Getting, (^.), set, over)
+import Control.Lens(makeLenses, (^.), set)
 import Data.Default(Default(..))
-import qualified Data.Text as T
-import System.Environment(getArgs, getProgName)
-import System.Exit(exitFailure, exitSuccess)
-import System.IO (hPutStrLn, stderr)
-import System.IO.Unsafe(unsafePerformIO)
+import System.Environment(getArgs)
+import System.Exit(exitSuccess)
 
 import System.Console.JMVOptions
 
 import Col
-import HRowsException
-import Model.Expression.Evaluation
-import Model.Expression.Manipulate (addPositions)
-import Model.Expression.Parser
-import Model.RowStore
-import Model.SourceInfo
 import TUI
 
 data Options = Options { _cols :: [Col]
@@ -63,21 +52,8 @@ helpMessage = usageInfo header options
 main :: IO ()
 main = do
   opts <- getOptions
-  let Just fn = opts ^. cOptions . inputFileName
-  pc <- mkPathAndConf fn $ opts ^.  cOptions .confFileName
-  let sinfo =  mkSourceInfo Nothing pc $ opts ^. cOptions .iOptions
-
-  r <- try $ readRowStore sinfo
-  case r of
-      Right (rst, _) -> startTUI $ flip execState rst $ do
-                                      case opts ^. cOptions . rFilter of
-                                           Nothing -> return ()
-                                           Just e -> do
-                                                        dss <- gets getDataSources
-                                                        ex <- gets $ flip addPositions e
-                                                        modify . filterRows $ (> 0) . toInt . (\r -> evaluate r dss ex)
-
-                                      modify $ applyCols (opts ^. cols)
-      Left (HRowsException mess) -> myError $ T.unpack mess
+  rst0 <- readRowStoreFromOptions $ opts ^. cOptions
+  let rst = applyCols (opts ^. cols) rst0
+  startTUI rst
 
 

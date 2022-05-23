@@ -5,7 +5,6 @@
 
 import Control.Applicative(ZipList(..), Alternative ((<|>)))
 import Control.Arrow((&&&))
-import Control.Exception qualified as E
 import Control.Monad(unless, when, forM_)
 import Control.Lens
 import Data.Default(Default(def))
@@ -23,7 +22,6 @@ import System.IO(IOMode (ReadMode), openFile)
 import System.Console.JMVOptions
 
 import Col
-import HRowsException
 import Model.Row
 import Model.RowStore
 import Model.SourceInfo
@@ -114,7 +112,7 @@ setSingleCol l n s = case parseCols (T.pack s) of
                        Right _ -> myError $ "For " ++ n ++ " you have to specify exactly one column"
 
 setMaybeCol :: Lens' Options (Maybe Col) -> String -> String -> Options -> Options
-setMaybeCol l n s = setSingleCol (l . _Just) n s . set l (Just AllCols)
+setMaybeCol l n s = setSingleCol (l . _Just) n s . set l (Just $ def ^. anonKey)
 
 defValue :: Show a => Lens' Options a -> String
 defValue l = "Default: " ++ show (def ^. l) ++ "."
@@ -175,18 +173,6 @@ helpMessage = usageInfo header options
                              \Options receiving a list of formulas can list them \
                              \separated\n\
                              \by commas and also as ranges like [$1:$3] or [Q1:Q4]."
-
-load :: Options -> IO RowStore
-load opts = do
-    let Just fn = opts ^. cOptions . inputFileName
-    pc <- mkPathAndConf fn $ opts ^. cOptions . confFileName
-    let sinfo =  mkSourceInfo Nothing pc $ opts ^. cOptions . iOptions
-
-    r <- E.try $ readRowStore sinfo
-    case r of
-        Right (rst, _) -> return rst
-        Left (HRowsException mess) -> myError $ T.unpack mess
-
 
 translate :: Options -> Maybe AnonDic -> RowStore -> (RowStore, ColIndices)
 translate opts mdic rst = let
@@ -433,9 +419,7 @@ main = do
           opts <- getOptions
           unless (opts ^. format /= Listatab || isNothing (opts ^. message))
             $ myError "There can not be a message column in listatab format"
-          rst <- case opts ^. cOptions . inputFileName of
-                     Nothing -> readRowStoreStdin $ opts ^. cOptions . iOptions
-                     Just _ -> load opts
+          rst <- readRowStoreFromOptions $ opts ^. cOptions
           anonDic <- createAnonDic opts rst
           let (rst', inds) = translate opts anonDic rst
               ind = fromIntegral $ if opts ^. sortByGlobal
