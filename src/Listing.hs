@@ -52,13 +52,13 @@ markInterval :: Getter ColIndices (Int, Int)
 markInterval = to $ view markStart &&& view markEnd
 
 extrasEnd :: Getter ColIndices Int
-extrasEnd = globalIndex
+extrasEnd = messageIndex
 
 extrasInterval :: Getter ColIndices (Int, Int)
 extrasInterval = to $ view extrasStart &&& view extrasEnd
 
 globalEnd :: Getter ColIndices Int
-globalEnd = messageIndex
+globalEnd = extrasStart
 
 globalInterval :: Getter ColIndices (Int, Int)
 globalInterval = to $ view globalIndex &&& view globalEnd
@@ -129,10 +129,10 @@ setSeparator l s = over l (\oc -> oc { ltSeparator = s })
 setHeader :: Lens' Options ListatabInfo -> HeaderType -> Options -> Options
 setHeader l c = over l (\oc -> oc { ltHeaderType = c })
 
-setCols :: Lens' Options [Col] -> String -> String -> Options -> Options
-setCols l n s = case parseCols (T.pack s) of
+appendCols :: Lens' Options [Col] -> String -> String -> Options -> Options
+appendCols l n s = case parseCols (T.pack s) of
                  Left e -> myError $ "Bad column especification in " ++ n ++ ": " ++ T.unpack e
-                 Right cs -> set l cs
+                 Right cs -> over l (++cs)
 
 setSingleCol :: Traversal' Options Col -> String -> String -> Options -> Options
 setSingleCol l n s = case parseCols (T.pack s) of
@@ -166,14 +166,14 @@ options = processOptions $ do
                'K' ~: "anonKey" ==> ReqArg (setSingleCol anonKey "anonKey") "KEY" ~: "Column with the key in the anonymous file. Default: first column."
                'l' ~: "anonLength" ==> ReqArg (set anonLength . read) "INT" ~: "Length of the anoymous keys. " ++ defValue anonLength
                'k' ~: "key" ==> ReqArg (setSingleCol key "key") "KEY" ~: "Column with the key. Default: first column."
-               'm' ~: "marks" ==> ReqArg (setCols marks "marks") "COLS" ~: "Columns with the marks. Default: no columns."
+               'm' ~: "marks" ==> ReqArg (appendCols marks "marks") "COLS" ~: "Columns with the marks. May appear more than once. Default: no columns."
                'g' ~: "global" ==> ReqArg (setMaybeCol global "global") "COL" ~: "Column with the global mark."
                'M' ~: "message" ==> ReqArg (setMaybeCol message "message") "COL" ~: "Column that if not empty overrides the others. Default: no column."
-               'x' ~: "extraCols" ==> ReqArg (setCols extraCols "extraCols") "COLS" ~: "Columns with additional information"
+               'x' ~: "extraCols" ==> ReqArg (appendCols extraCols "extraCols") "COLS" ~: "Columns with additional information. May apper more than once. Default: no extras."
                'd' ~: "decimals" ==> ReqArg (set decimals . read) "DECS" ~: "Number of decimal places. " ++ defValue decimals
                'D' ~: "globalDecimals" ==> ReqArg (set globalDecimals . read) "DECS" ~: "Number of decimal places of the global mark. " ++ defValue globalDecimals
                'p' ~: "minPass" ==> ReqArg (set minPass . read) "MARK" ~: "Minimum passing mark. " ++ defValue minPass
-               'P' ~: "canCompesate" ==> ReqArg (set minPass . read) "MARK" ~: "Minimum mark that can be compensated. " ++ defValue canCompensate
+               'P' ~: "canCompensate" ==> ReqArg (set canCompensate . read) "MARK" ~: "Minimum mark that can be compensated. " ++ defValue canCompensate
                'F' ~: "format" ==> ReqArg (set format . read) "FORMAT" ~: "Format of the output, one of " ++ showEnum HTML ++ ". " ++ defValue format
                'G' ~: "sortByGlobal" ==> NoArg (set sortByGlobal True) ~: "Sort using the global column instead of the key"
 
@@ -315,10 +315,12 @@ htmlTitle ts = T.concat
          ++ ["</tr>"]
 
 fToText :: Int -> Field -> Text
-fToText d f = case typeOf f of
-                TypeInt -> toString f <> "." <> T.replicate d "0"
-                TypeDouble -> T.pack $ showFFloat (Just d) (toDouble f) ""
-                _ -> toString f
+fToText d f
+  |  isError f = toString f
+  |  otherwise = case typeOf f of
+                  TypeInt -> toString f <> "." <> T.replicate d "0"
+                  TypeDouble -> T.pack $ showFFloat (Just d) (toDouble f) ""
+                  _ -> toString f
 
 colorGlobal :: Options -> Field -> Text
 colorGlobal opts f = let
@@ -368,7 +370,7 @@ htmlMessage inds _ n r = T.concat
   : "<TD>&nbsp;"  -- key
   : toString (r !! (inds ^. keyIndex))
   : "&nbsp;</TD>"
-  : [ "<TD colspan =\"" <> sp 
+  : [ "<TD colspan =\"" <> sp
       <> "\"align = \"left\"><font color=\"red\">"
       <> m
       <> "</font></TD></TR>" ]

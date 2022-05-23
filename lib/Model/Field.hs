@@ -248,7 +248,7 @@ compareField cmp f1 f2 | not $ comparable (typeOf f1) (typeOf f2) = AnError Type
 
 ternary :: Field -> Field -> Field -> Field
 ternary (AnInt n1 _) e2 e3 | n1 > 0 = e2
-                          | otherwise = e3
+                           | otherwise = e3
 ternary e1 _ _ = typeError "operador ?" e1
 
 instance Num Field where
@@ -341,12 +341,18 @@ instance Integral Field where
 -- |Recover the Int from an integer expression or error
 toInt :: Field -> Int
 toInt (AnInt n _) = n
-toInt f = error $ "toInt de un " ++ T.unpack (typeLabel $ typeOf f)
+toInt f = error $ concat ["toInt de un "
+                            , T.unpack (typeLabel $ typeOf f)
+                            , " (", show f, ")"
+                            ]
 
 -- |Recover the Double from a double expression or error
 toDouble :: Field -> Double
 toDouble (ADouble d _) = d
-toDouble f = error $ "toDouble de un " ++ T.unpack (typeLabel $ typeOf f)
+toDouble f = error $ concat ["toDouble de un "
+                            , T.unpack (typeLabel $ typeOf f)
+                            , " (", show f, ")"
+                            ]
 
 instance Fractional Field where
     (AnInt n1 _) / (AnInt n2 _) = toField ((fromIntegral n1 / fromIntegral n2)::Double)
