@@ -1,7 +1,8 @@
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Col (
     -- *Types
@@ -15,13 +16,27 @@ module Col (
     -- *Lenses
     , expressionT
     , colF
+    -- *Option processing
+    , ColOptions
+    , IOOptions(..)
+    , colOptions
+    , appendCols
+    , help
+    , iOptions
+    , oOptions
+    , rFilter
+    , inputFileName
+    , confFileName
+    , myError
 ) where
 
-import Control.Lens (Traversal', (%~), traversed, (&), Fold, folding)
+import Control.Lens (Traversal', (%~), traversed, (&), Fold, folding, makeLenses, Lens', over, set, (^.))
+import Data.Default ( def, Default(def) )
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 
+import System.Console.JMVOptions
 import Model.Row
 import Model.RowStore
 import Model.Expression.Evaluation
@@ -29,7 +44,12 @@ import Model.Expression.Manipulate
 import Model.Expression.Lexer (Token(EOFT, CommaT, ColonT, OpenSBT, CloseSBT, StringT))
 import Model.Expression.Parser
 import Model.Expression.RecursionSchemas
-
+import Model.SourceInfo
+import System.Environment (getProgName)
+import System.Exit (exitFailure)
+import System.IO.Unsafe (unsafePerformIO)
+import System.IO (hPutStrLn, stderr)
+import Control.Monad (when)
 
 -- |A Col especifies a column of the input in the command line. Single
 -- expressions especify a column, a couple of expressions that correspond
@@ -39,6 +59,31 @@ data Col = Single Expression (Maybe Text)
          | Range Expression Expression
          | AllCols deriving Show
 
+-- |Options for cols like programs
+
+data ColOptions = ColOptions { _help :: Bool
+                             , _iOptions :: ListatabInfo
+                             , _oOptions :: ListatabInfo
+                             , _rFilter :: Maybe Expression
+                             , _inputFileName :: Maybe FilePath
+                             , _confFileName :: Maybe FilePath
+                             }
+
+makeLenses ''ColOptions
+
+-- |Used to specify whether the program accepts options for formatting
+-- the output.
+data IOOptions = OnlyInputOptions | FullIOOptions deriving Eq
+
+instance Default ColOptions where
+    def = ColOptions { _help = False
+                     , _iOptions = def
+                     , _oOptions = def
+                     , _rFilter = Nothing
+                     , _inputFileName = Nothing
+                     , _confFileName = Nothing
+                     }
+--
 -- |A traversal of the expressions in the `Col`
 expressionT :: Traversal' Col Expression
 expressionT f (Single e mn) = Single <$> f e <*> pure mn
@@ -51,6 +96,55 @@ colF col = folding getRows
     where getRows rst = map (processRow dss [col']) $ rows rst
              where col' = col & expressionT %~ addPositions rst
                    dss = getDataSources rst
+
+
+
+-- Parses a String to a Char representing a separator. Recongizes only
+-- strings with one char or with a scape followed by a t.
+parseSeparator :: String -> Char
+parseSeparator [c] = c
+parseSeparator "\\t" = '\t'
+parseSeparator s = error $ "Illegal string for separator: " ++ show s
+
+setSeparator :: Lens' ColOptions ListatabInfo -> Char -> ColOptions -> ColOptions
+setSeparator l s = over l (\oc -> oc { ltSeparator = s })
+
+setHeader :: Lens' ColOptions ListatabInfo -> HeaderType -> ColOptions -> ColOptions
+setHeader l c = over l (\oc -> oc { ltHeaderType = c })
+
+-- |Parse a String to extract a list of cols and add it to a list
+appendCols :: Lens' o [Col] -> String -> String -> o -> o
+appendCols l n s = case parseCols (T.pack s) of
+                 Left e -> myError $ "Bad column especification in " ++ n ++ ": " ++ T.unpack e
+                 Right cs -> over l (++cs)
+
+setFilter :: String -> ColOptions -> ColOptions
+setFilter s = case parse expression $ T.pack s of
+                   Left e -> myError $ "Bad expression in the filter: " ++ T.unpack e
+                   Right ex -> set rFilter $ Just ex
+
+colOptions :: IOOptions -> Lens' o ColOptions -> [OptDescr (o -> o)]
+colOptions io l = map (fmap $ over l) . processOptions $ do
+               '0' ~: "iNoHeader" ==> NoArg (setHeader iOptions NoHeader . setHeader oOptions NoHeader) ~: "Do not use header in the input."
+               when (io == FullIOOptions) $
+                   'O' ~: "oNoHeader" ==> NoArg (setHeader oOptions NoHeader) ~: "Do not use header in the output. Must be used after -0 if both are present."
+               '1' ~: "iHeader1" ==> NoArg (setHeader iOptions FirstLine . setHeader oOptions FirstLine) ~: "Use the first line as header in the input."
+               when (io == FullIOOptions) $
+                   'H' ~: "oHeader1" ==> NoArg (setHeader oOptions FirstLine) ~: "Use the first line as header in the output"
+               'f' ~: "filter" ==> ReqArg setFilter "FILTER" ~: "An integer expression that will be used to filter the rows. Those for which the result is greater than 0"
+               'h' ~: "help" ==> NoArg (set help True) ~: "This help."
+               's' ~: "separator" ==> ReqArg (\s -> let c = parseSeparator s in setSeparator iOptions c . setSeparator oOptions c) "CHAR" ~:
+                        ("Field separator for the input and output. (Default: " ++ show (ltSeparator $ def ^. iOptions) ++ ").")
+               when (io == FullIOOptions) $
+                   'S' ~: "oSeparator" ==> ReqArg (setSeparator oOptions . parseSeparator) "CHAR" ~:
+                        "Field separator for the output. (Default: same as -s). Must appear after -s when both are present."
+
+
+myError :: String -> a
+myError m = unsafePerformIO $ do
+              n <- getProgName
+              hPutStrLn stderr $ n ++ " error: " ++ m
+              exitFailure
 
 -- |Parse a list of expressions separated by commas, return
 -- the corresponding list of `Col` or an error message
