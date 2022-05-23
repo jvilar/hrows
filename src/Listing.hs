@@ -8,7 +8,7 @@ import Control.Arrow((&&&))
 import Control.Exception qualified as E
 import Control.Monad(unless, when, forM_)
 import Control.Lens
-import Data.Default(def)
+import Data.Default(Default(def))
 import Data.List(intercalate, sortOn)
 import Data.Map(Map)
 import Data.Map qualified as M
@@ -16,10 +16,9 @@ import Data.Maybe(catMaybes, isNothing)
 import Data.Text(Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as T
-import System.Environment(getArgs, getProgName)
-import System.Exit(exitFailure, exitSuccess)
-import System.IO(hPutStrLn, stderr, IOMode (ReadMode), openFile)
-import System.IO.Unsafe(unsafePerformIO)
+import System.Environment(getArgs)
+import System.Exit(exitSuccess)
+import System.IO(IOMode (ReadMode), openFile)
 
 import System.Console.JMVOptions
 
@@ -63,8 +62,7 @@ globalEnd = extrasStart
 globalInterval :: Getter ColIndices (Int, Int)
 globalInterval = to $ view globalIndex &&& view globalEnd
 
-data Options = Options { _help :: Bool
-                       , _anonymize :: Bool
+data Options = Options { _anonymize :: Bool
                        , _anonFile :: Maybe FilePath
                        , _anonKey :: Col
                        , _anonLength :: Int
@@ -82,17 +80,13 @@ data Options = Options { _help :: Bool
                        , _extraCols :: [Col]
 
                        , _optionsFile :: Maybe FilePath
-                       , _iOptions :: ListatabInfo
-                       , _oOptions :: ListatabInfo
-                       , _inputFileName :: Maybe FilePath
-                       , _confFileName :: Maybe FilePath
+                       , _cOptions :: ColOptions
                        }
 
 makeLenses ''Options
 
-defOpts :: Options
-defOpts = Options { _help = False
-                  , _anonymize = False
+instance Default Options where
+    def = Options { _anonymize = False
                   , _anonFile = Nothing
                   , _anonKey = Single (mkPosition 0) Nothing
                   , _anonLength = 5
@@ -110,29 +104,8 @@ defOpts = Options { _help = False
                   , _extraCols = []
 
                   , _optionsFile = Nothing
-                  , _iOptions = def
-                  , _oOptions = def
-                  , _inputFileName = Nothing
-                  , _confFileName = Nothing
+                  , _cOptions = def
                   }
-
--- Parses a String to a Char representing a separator. Recongizes only
--- strings with one char or with a scape followed by a t.
-parseSeparator :: String -> Char
-parseSeparator [c] = c
-parseSeparator "\\t" = '\t'
-parseSeparator s = myError $ "Illegal string for separator: " ++ show s
-
-setSeparator :: Lens' Options ListatabInfo -> Char -> Options -> Options
-setSeparator l s = over l (\oc -> oc { ltSeparator = s })
-
-setHeader :: Lens' Options ListatabInfo -> HeaderType -> Options -> Options
-setHeader l c = over l (\oc -> oc { ltHeaderType = c })
-
-appendCols :: Lens' Options [Col] -> String -> String -> Options -> Options
-appendCols l n s = case parseCols (T.pack s) of
-                 Left e -> myError $ "Bad column especification in " ++ n ++ ": " ++ T.unpack e
-                 Right cs -> over l (++cs)
 
 setSingleCol :: Traversal' Options Col -> String -> String -> Options -> Options
 setSingleCol l n s = case parseCols (T.pack s) of
@@ -144,20 +117,12 @@ setMaybeCol :: Lens' Options (Maybe Col) -> String -> String -> Options -> Optio
 setMaybeCol l n s = setSingleCol (l . _Just) n s . set l (Just AllCols)
 
 defValue :: Show a => Lens' Options a -> String
-defValue l = "Default: " ++ show (defOpts ^. l) ++ "."
+defValue l = "Default: " ++ show (def ^. l) ++ "."
 
 options :: [OptDescr (Options -> Options)]
-options = processOptions $ do
-               'h' ~: "help" ==> NoArg (set help True) ~: "This help."
+options =  colOptions FullIOOptions cOptions ++
+           processOptions (do
                'o' ~: "optionsFile" ==> ReqArg (set optionsFile . Just) "FILE" ~: "Read the options from a file. Each line in the file has a long option. If there is a parameter, it is written after a colon."
-               '0' ~: "iNoHeader" ==> NoArg (setHeader iOptions NoHeader . setHeader oOptions NoHeader) ~: "Do not use header in the input."
-               'O' ~: "oNoHeader" ==> NoArg (setHeader oOptions NoHeader) ~: "Do not use header in the output. Must be used after -0 if both are present."
-               '1' ~: "iHeader1" ==> NoArg (setHeader iOptions FirstLine . setHeader oOptions FirstLine) ~: "Use the first line as header in the input."
-               'H' ~: "oHeader1" ==> NoArg (setHeader oOptions FirstLine) ~: "Use the first line as header in the output"
-               's' ~: "separator" ==> ReqArg (\s -> let c = parseSeparator s in setSeparator iOptions c . setSeparator oOptions c) "CHAR" ~:
-                        ("Field separator for the input and output. (Default: " ++ show (ltSeparator $ defOpts ^. iOptions) ++ ").")
-               'S' ~: "oSeparator" ==> ReqArg (setSeparator oOptions . parseSeparator) "CHAR" ~:
-                        "Field separator for the output. (Default: same as -s). Must appear after -s when both are present."
                'a' ~: "anonymize" ==> NoArg (set anonymize True) ~: "Anonymize the key column"
                'A' ~: "anonFile" ==> ReqArg ( (set anonymize True .)
                                                  . set anonFile . Just) "FILE"
@@ -176,6 +141,7 @@ options = processOptions $ do
                'P' ~: "canCompensate" ==> ReqArg (set canCompensate . read) "MARK" ~: "Minimum mark that can be compensated. " ++ defValue canCompensate
                'F' ~: "format" ==> ReqArg (set format . read) "FORMAT" ~: "Format of the output, one of " ++ showEnum HTML ++ ". " ++ defValue format
                'G' ~: "sortByGlobal" ==> NoArg (set sortByGlobal True) ~: "Sort using the global column instead of the key"
+               )
 
 showEnum :: (Enum a, Show a) => a -> String
 showEnum = intercalate ", " . map show . enumFrom
@@ -184,27 +150,22 @@ getOptions :: IO Options
 getOptions = do
                 args <- getArgs
                 let (o, a, e) = getOpt Permute options args
-                let opt1 = foldl (&) defOpts o
-                when (opt1 ^. help) $ putStrLn helpMessage >> exitSuccess
+                let opt1 = foldl (&) def o
+                when (opt1 ^. cOptions . help) $ putStrLn helpMessage >> exitSuccess
                 unless (null e) $ myError $ concat e ++ "\n" ++ helpMessage
                 optf <- traverse  (\f -> openFile f ReadMode >>= optionsFromHandle options)
                                  (opt1 ^. optionsFile)
                 let opt = case optf of
                             Nothing -> opt1
-                            Just (o', []) -> foldl (&) defOpts (o' ++ o)
+                            Just (o', []) -> foldl (&) def (o' ++ o)
                             Just (_, e') -> myError $ concat e' ++ "\n" ++ helpMessage
                 return $ case a of
                    [] -> opt
-                   [f] -> set inputFileName (Just f) opt
-                   [f, c] -> set inputFileName (Just f) $ set confFileName (Just c) opt
+                   [f] -> set (cOptions . inputFileName) (Just f) opt
+                   [f, c] -> set (cOptions . inputFileName) (Just f)
+                           $ set (cOptions . confFileName) (Just c) opt
                    _ -> myError "Too many filenames"
 
-
-myError :: String -> a
-myError m = unsafePerformIO $ do
-              n <- getProgName
-              hPutStrLn stderr $ n ++ " error: " ++ m
-              exitFailure
 
 helpMessage :: String
 helpMessage = usageInfo header options
@@ -217,9 +178,9 @@ helpMessage = usageInfo header options
 
 load :: Options -> IO RowStore
 load opts = do
-    let Just fn = opts ^. inputFileName
-    pc <- mkPathAndConf fn $ opts ^. confFileName
-    let sinfo =  mkSourceInfo Nothing pc $ opts ^. iOptions
+    let Just fn = opts ^. cOptions . inputFileName
+    pc <- mkPathAndConf fn $ opts ^. cOptions . confFileName
+    let sinfo =  mkSourceInfo Nothing pc $ opts ^. cOptions . iOptions
 
     r <- E.try $ readRowStore sinfo
     case r of
@@ -445,14 +406,14 @@ writeListing opts inds rst
                   | c <- [ inds ^. markStart .. inds ^. markEnd - 1]
                   ]
         rst' = foldl (&) rst (inGlobal : inMarks)
-    writeRowStoreStdout (opts ^. oOptions) rst'
+    writeRowStoreStdout (opts ^. cOptions . oOptions) rst'
   | otherwise = do
     let fmter = case opts ^. format of
                    HTML -> hTMLFormatter
                    LaTeX -> laTeXFormatter
                    Listatab -> error "Impossible. Treated in other case"
     unless (T.null $ fmter ^. begin) $ T.putStrLn $ fmter ^. begin
-    unless (ltHeaderType (opts ^. oOptions) == NoHeader) $ do
+    unless (ltHeaderType (opts ^. cOptions . oOptions) == NoHeader) $ do
          let nms = fnames rst
          T.putStrLn $ fmter ^. titleLine $
             concat [ [nms !! (inds ^. keyIndex)]
@@ -472,8 +433,8 @@ main = do
           opts <- getOptions
           unless (opts ^. format /= Listatab || isNothing (opts ^. message))
             $ myError "There can not be a message column in listatab format"
-          rst <- case opts ^. inputFileName of
-                     Nothing -> readRowStoreStdin $ opts ^. iOptions
+          rst <- case opts ^. cOptions . inputFileName of
+                     Nothing -> readRowStoreStdin $ opts ^. cOptions . iOptions
                      Just _ -> load opts
           anonDic <- createAnonDic opts rst
           let (rst', inds) = translate opts anonDic rst

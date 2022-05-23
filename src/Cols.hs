@@ -7,102 +7,54 @@
 import Control.Exception qualified as E
 import Control.Monad(unless, when)
 import Control.Monad.State.Strict(execState, gets, modify)
-import Control.Lens(makeLenses, over, set, (^.), Lens')
+import Control.Lens(makeLenses, set, (^.))
 import Data.Default(Default(def))
 import Data.Text qualified as T
-import System.Environment(getArgs, getProgName)
-import System.Exit(exitFailure, exitSuccess)
-import System.IO(hPutStrLn, stderr)
-import System.IO.Unsafe(unsafePerformIO)
+import System.Environment(getArgs)
+import System.Exit(exitSuccess)
 
 import System.Console.JMVOptions
 
 import Col
 import HRowsException
-import Model.Expression.Parser
-import Model.RowStore
-import Model.SourceInfo
 import Model.Expression.Evaluation
 import Model.Expression.Manipulate (addPositions)
+import Model.RowStore
+import Model.SourceInfo
 
 
-data Options = Options { _help :: Bool
-                       , _iOptions :: ListatabInfo
-                       , _oOptions :: ListatabInfo
-                       , _cols :: [Col]
-                       , _rFilter :: Maybe Expression
-                       , _inputFileName :: Maybe FilePath
-                       , _confFileName :: Maybe FilePath
+data Options = Options { _cols :: [Col]
+                       , _cOptions :: ColOptions
                        }
 
 makeLenses ''Options
 
-defOpts :: Options
-defOpts = Options { _help = False
-                  , _iOptions = def
-                  , _oOptions = def
-                  , _cols = [AllCols]
-                  , _rFilter = Nothing
-                  , _inputFileName = Nothing
-                  , _confFileName = Nothing
+instance Default Options where
+    def = Options { _cols = [AllCols]
+                  , _cOptions = def
                   }
 
--- Parses a String to a Char representing a separator. Recongizes only
--- strings with one char or with a scape followed by a t.
-parseSeparator :: String -> Char
-parseSeparator [c] = c
-parseSeparator "\\t" = '\t'
-parseSeparator s = error $ "Illegal string for separator: " ++ show s
-
-setSeparator :: Lens' Options ListatabInfo -> Char -> Options -> Options
-setSeparator l s = over l (\oc -> oc { ltSeparator = s })
-
-setHeader :: Lens' Options ListatabInfo -> HeaderType -> Options -> Options
-setHeader l c = over l (\oc -> oc { ltHeaderType = c })
-
-setCols :: String -> Options -> Options
-setCols s = case parseCols (T.pack s) of
-                 Left e -> myError $ "Bad column especification: " ++ T.unpack e
-                 Right cs -> set cols cs
-
-setFilter :: String -> Options -> Options
-setFilter s = case parse expression $ T.pack s of
-                   Left e -> myError $ "Bad expression in the filter: " ++ T.unpack e
-                   Right ex -> set rFilter $ Just ex
-
 options :: [OptDescr (Options -> Options)]
-options = processOptions $ do
-               '0' ~: "iNoHeader" ==> NoArg (setHeader iOptions NoHeader . setHeader oOptions NoHeader) ~: "Do not use header in the input."
-               'O' ~: "oNoHeader" ==> NoArg (setHeader oOptions NoHeader) ~: "Do not use header in the output. Must be used after -0 if both are present."
-               '1' ~: "iHeader1" ==> NoArg (setHeader iOptions FirstLine . setHeader oOptions FirstLine) ~: "Use the first line as header in the input."
-               'H' ~: "oHeader1" ==> NoArg (setHeader oOptions FirstLine) ~: "Use the first line as header in the output"
-               'c' ~: "cols" ==> ReqArg setCols "COLS" ~: "Column specification. A list of expressions separated by commas in the format of the formulas of hrows. Also, a range can be specified by two column names or positions separated by a colon and surrounded by square brackes like [$1:$4] or [Name:Surname]."
-               'f' ~: "filter" ==> ReqArg setFilter "FILTER" ~: "An integer expression that will be used to filter the rows. Those for which the result is greater than 0"
-               'h' ~: "help" ==> NoArg (set help True) ~: "This help."
-               's' ~: "separator" ==> ReqArg (\s -> let c = parseSeparator s in setSeparator iOptions c . setSeparator oOptions c) "CHAR" ~:
-                        ("Field separator for the input and output. (Default: " ++ show (ltSeparator $ defOpts ^. iOptions) ++ ").")
-               'S' ~: "oSeparator" ==> ReqArg (setSeparator oOptions . parseSeparator) "CHAR" ~:
-                        "Field separator for the output. (Default: same as -s). Must appear after -s when both are present."
+options = colOptions FullIOOptions cOptions ++
+          processOptions (
+               'c' ~: "cols" ==> ReqArg (appendCols cols "cols") "COLS" ~: "Column specification. A list of expressions separated by commas in the format of the formulas of hrows. Also, a range can be specified by two column names or positions separated by a colon and surrounded by square brackes like [$1:$4] or [Name:Surname]."
+                        )
 
 getOptions :: IO Options
 getOptions = do
                 args <- getArgs
                 let (o, a, e) = getOpt Permute options args
-                let opt = foldl (flip id) defOpts o
-                when (opt ^. help) $ putStrLn helpMessage >> exitSuccess
+                let opt = foldl (flip id) def o
+                when (opt ^. cOptions . help) $ putStrLn helpMessage >> exitSuccess
                 unless (null e) $ myError $ concat e ++ helpMessage
                 return $ case a of
                    [] -> opt
-                   [f] -> set inputFileName (Just f) opt
-                   [f, c] -> set inputFileName (Just f) $ set confFileName (Just c) opt
+                   [f] -> set (cOptions . inputFileName) (Just f) opt
+                   [f, c] -> set (cOptions . inputFileName) (Just f) 
+                           $ set (cOptions . confFileName) (Just c) opt
                    _ -> myError "Too many filenames"
 
 
-myError :: String -> a
-myError m = unsafePerformIO $ do
-              n <- getProgName
-              hPutStrLn stderr $ n ++ " error: " ++ m
-              exitFailure
 
 helpMessage :: String
 helpMessage = usageInfo header options
@@ -110,9 +62,9 @@ helpMessage = usageInfo header options
 
 load :: Options -> IO RowStore
 load opts = do
-    let Just fn = opts ^. inputFileName
-    pc <- mkPathAndConf fn $ opts ^. confFileName
-    let sinfo =  mkSourceInfo Nothing pc $ opts ^. iOptions
+    let Just fn = opts ^. cOptions . inputFileName
+    pc <- mkPathAndConf fn $ opts ^. cOptions . confFileName
+    let sinfo =  mkSourceInfo Nothing pc $ opts ^. cOptions . iOptions
 
     r <- E.try $ readRowStore sinfo
     case r of
@@ -123,16 +75,16 @@ load opts = do
 main :: IO ()
 main = do
           opts <- getOptions
-          rst0 <- case opts ^. inputFileName of
-                     Nothing -> readRowStoreStdin $ opts ^. iOptions
+          rst0 <- case opts ^. cOptions . inputFileName of
+                     Nothing -> readRowStoreStdin $ opts ^. cOptions . iOptions
                      Just _ -> load opts
           let rst = flip execState rst0 $ do
-                       case opts ^. rFilter of
+                       case opts ^. cOptions . rFilter of
                             Nothing -> return ()
                             Just e -> do
                                          dss <- gets getDataSources
                                          ex <- gets $ flip addPositions e
                                          modify . filterRows $ (> 0) . toInt . (\r -> evaluate r dss ex)
                        modify $ applyCols (opts ^. cols)
-          writeRowStoreStdout (opts ^. oOptions) rst
+          writeRowStoreStdout (opts ^. cOptions . oOptions) rst
 
