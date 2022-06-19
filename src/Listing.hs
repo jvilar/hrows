@@ -270,6 +270,7 @@ fToText d f
                   _ -> toString f
 
 colorGlobal :: Options -> Field -> Text
+colorGlobal _ f | isError f = "black"
 colorGlobal opts f = let
   v = case typeOf f of
          TypeInt -> fromIntegral $ toInt f
