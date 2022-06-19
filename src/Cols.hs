@@ -7,17 +7,22 @@
 import Control.Monad(unless, when)
 import Control.Lens(makeLenses, set, (^.))
 import Data.Default(Default(def))
+import Data.Maybe (isNothing)
 import System.Environment(getArgs)
 import System.Exit(exitSuccess)
 
 import System.Console.JMVOptions
 
 import Col
-import Model.RowStore
+import Model.DefaultFileNames (defaultConfFileName)
+import Model.RowStore (writeRowStore, writeRowStoreStdout, RowStore)
+import Model.SourceInfo (mkSourceInfo, PathAndConf(PathAndConf))
 
 
 data Options = Options { _cols :: [Col]
                        , _cOptions :: ColOptions
+                       , _oFile :: Maybe FilePath
+                       , _genConf :: Bool
                        }
 
 makeLenses ''Options
@@ -25,13 +30,17 @@ makeLenses ''Options
 instance Default Options where
     def = Options { _cols = [AllCols]
                   , _cOptions = def
+                  , _oFile = def
+                  , _genConf = True
                   }
 
 options :: [OptDescr (Options -> Options)]
 options = colOptions FullIOOptions cOptions ++
-          processOptions (
+          processOptions ( do
                'c' ~: "cols" ==> ReqArg (appendCols cols "cols") "COLS" ~: "Column specification. A list of expressions separated by commas in the format of the formulas of hrows. Also, a range can be specified by two column names or positions separated by a colon and surrounded by square brackes like [$1:$4] or [Name:Surname]."
-                        )
+               'o' ~: "output" ==> ReqArg (set oFile . Just) "PATH" ~: "Output file (default stdout)"
+               'C' ~: "noConf" ==> NoArg (set genConf False) ~: "Do not generate conf file when using -o"
+          )
 
 getOptions :: IO Options
 getOptions = do
@@ -43,7 +52,7 @@ getOptions = do
                 return $ case a of
                    [] -> opt
                    [f] -> set (cOptions . inputFileName) (Just f) opt
-                   [f, c] -> set (cOptions . inputFileName) (Just f) 
+                   [f, c] -> set (cOptions . inputFileName) (Just f)
                            $ set (cOptions . confFileName) (Just c) opt
                    _ -> myError "Too many filenames"
 
@@ -53,10 +62,21 @@ helpMessage = usageInfo header options
               where header = "Usage: cols [Options] [files]"
 
 
+doWrite :: Options -> RowStore -> IO ()
+doWrite opts
+    | isNothing (opts ^. oFile) = writeRowStoreStdout (opts ^. cOptions . oOptions)
+    | otherwise = writeRowStore si []
+                  where
+                     Just f = opts ^. oFile
+                     pc = PathAndConf f (if opts ^. genConf
+                                         then Just $ defaultConfFileName f
+                                         else Nothing)
+                     si = mkSourceInfo Nothing pc (opts ^. cOptions . oOptions)
+
+
 main :: IO ()
 main = do
           opts <- getOptions
           rst0 <- readRowStoreFromOptions $ opts ^. cOptions
           let rst = applyCols (opts ^. cols) rst0
-          writeRowStoreStdout (opts ^. cOptions . oOptions) rst
-
+          doWrite opts rst
