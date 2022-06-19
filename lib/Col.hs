@@ -201,12 +201,14 @@ checkPosition e = parsingError $ T.concat [ "Expression "
 -- |Produce a `RowStore` from a list of `Col` and an existing
 -- `RowStore`.
 applyCols :: [Col] -> RowStore -> RowStore
-applyCols cs0 rst = case names rst of
-                      Nothing -> fromRows rn . map (processRow dss cs) $ rows rst
-                      Just _ -> fromRowsNames rn ns . map (processRow dss cs) $ rows rst
+applyCols cs0 rst = ( case names rst of
+                       Nothing -> fromRows rn
+                       Just _ -> fromRowsNames rn ns )
+                    . map (processRow dss cs)
+                    $ rows rst
     where rn = getName rst
           cs = cs0 & traversed . expressionT %~ addPositions rst
-          ns = concatMap toName cs0
+          ns = concatMap toName cs
           dss = getDataSources rst
           toName (Single (In (NamedPosition n _)) Nothing) = [n]
           toName (Single (In (Position p)) Nothing) = [fnames rst !! p]
