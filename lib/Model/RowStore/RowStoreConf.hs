@@ -2,6 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Model.RowStore.RowStoreConf ( RowStoreConf(..)
+                                   , fromFieldNames
+                                   , fromNumberOfFields
                                    , FieldConf(..)
                                    , fromFieldConf
                                    , setSourceInfos
@@ -30,6 +32,21 @@ data FieldConf = FieldConf { nameFC :: Maybe Text
                            , typeFC :: FieldType
                            , formulaFC :: Maybe Formula
                            } deriving (Generic, Show)
+
+-- |Creates a `RowStoreConf` when only the number of fields is known.
+-- The types are set to `TypeString` and the names and formulae to
+-- `Nothing`
+fromNumberOfFields :: Int -> RowStoreConf
+fromNumberOfFields nf = fromFieldConf
+                      . replicate nf
+                      $ FieldConf Nothing TypeString Nothing
+
+-- |Creates a `RowStoreConf` when only the names are known.
+-- The types are set to `TypeString` and the formulae to
+-- `Nothing`
+fromFieldNames :: [Text] -> RowStoreConf
+fromFieldNames = fromFieldConf
+               . map (\n -> FieldConf (Just n) TypeString Nothing)
 
 fromFieldConf :: [FieldConf] -> RowStoreConf
 fromFieldConf fc = empty { fieldConf = fc }
