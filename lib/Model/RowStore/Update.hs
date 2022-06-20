@@ -127,26 +127,12 @@ emptyName name = RowStore { _nameRS = name
 
 -- |Creates a `RowStore` from a list of `Row`s.
 fromRows :: RowStoreName -> [Row] -> RowStore
-fromRows name rs = let
-    infos = foldl' combine [] rs
-    combine xs r = xs ++ map inferInfo (drop (length xs) r)
-    rst = addPlan (emptyName name) { _nFields = length infos
-                               , _fieldInfo = infos
-                               }
-    in (foldl' addRow rst rs) { _changed = False }
-
-inferInfo :: Field -> FieldInfo
-inferInfo f = FieldInfo { _name = Nothing
-                        , _type = typeOf f
-                        , _defaultValue = defaultValue $ typeOf f
-                        , _expression = Nothing
-                        , _formula = Nothing
-                        , _visible = True
-                        }
+fromRows name rs = fromRowsConf name (fromNumberOfFields l) rs
+    where l = maximum $ map length rs
 
 -- |Creates a `RowStore` from a list of `Row`s and a list of names.
 fromRowsNames :: RowStoreName -> [FieldName] -> [Row] -> RowStore
-fromRowsNames n l rs = (setNames l $ fromRows n rs) { _changed = False }
+fromRowsNames name = fromRowsConf name . fromFieldNames
 
 -- |Creates a `RowStore` from a list of `Row`s and a `RowStoreConf`
 fromRowsConf :: RowStoreName -> RowStoreConf -> [Row] -> RowStore
