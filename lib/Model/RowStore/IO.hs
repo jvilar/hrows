@@ -54,12 +54,17 @@ buildRowStore mconf name (mh, ds) = do
 readRowStoreStdin :: ListatabInfo -> IO RowStore
 readRowStoreStdin info = readListatab info Nothing >>= (fst <$>) . buildRowStore Nothing "stdin"
 
+ltHeader :: RowStore -> Maybe ListatabHeader
+ltHeader rs = case names rs of
+                Nothing -> Nothing
+                Just ns -> Just $ zipWith (curry Right) ns (types rs)
+
 -- |Writes a `RowStore` using a `SourceInfo`
 writeRowStore :: SourceInfo -> [SourceInfo] -> RowStore -> IO ()
 writeRowStore si sInfos rs = do
       let PathAndConf fp mconfFp = siPathAndConf si
           ListatabFormat ltInfo = siFormat si
-      writeListatab ltInfo (Just fp) (names rs) (rows rs)
+      writeListatab ltInfo (Just fp) (ltHeader rs) (rows rs)
       case mconfFp of
           Nothing -> return ()
           Just conf -> do
@@ -70,7 +75,7 @@ writeRowStore si sInfos rs = do
 
 -- |Write a `RowStore` to `stdout`
 writeRowStoreStdout :: ListatabInfo -> RowStore -> IO ()
-writeRowStoreStdout info rs = writeListatab info Nothing (names rs) (rows rs)
+writeRowStoreStdout info rs = writeListatab info Nothing (ltHeader rs) (rows rs)
 
 parseConfFile :: BS.ByteString -> Either String RowStoreConf
 parseConfFile bs = case (decode bs :: Maybe Value) of

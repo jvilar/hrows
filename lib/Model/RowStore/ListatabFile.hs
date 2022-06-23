@@ -52,7 +52,7 @@ analyze :: ListatabInfo -> Parser (Maybe ListatabHeader, DataSource)
 analyze ltInfo = do
   let sep = ltSeparator ltInfo
       inNameChar = TM.try (char '\\' >> (char '>' <|> char '\\' <|> char '|'))
-                   <|> noneOf (">" :: String)
+                   <|> noneOf ("|>" :: String)
   h <- case ltHeaderType ltInfo of
           NoHeader -> return Nothing
           FirstLine -> Just <$> (sepBy (Left <$> stringParser sep) (char sep) <* char '\n')
@@ -84,28 +84,39 @@ stringParser sep = T.pack <$> ((char '"' *> many inStringChar <* char '"')
                                        <|> noneOf ("\n\"" ::String)))
                          <|> noneOf ("\n\"" :: String)
 
+hname :: Either Text (Text, FieldType) -> Text
+hname (Left n) = n
+hname (Right (n, _)) = n
+
 -- |Writes a `DataSource` to a listatab file. If the `FilePath` is `Nothing`
 -- writes to stdout.
-writeListatab :: ListatabInfo -> Maybe FilePath -> Maybe [Text] -> DataSource -> IO ()
-writeListatab info mfp mNames ds = do
+writeListatab :: ListatabInfo -> Maybe FilePath -> Maybe ListatabHeader -> DataSource -> IO ()
+writeListatab info mfp mHeader ds = do
     let sep = ltSeparator info
     mh <- case mfp of
             Just fp -> try (openFile fp WriteMode)
             Nothing -> return $ Right stdout
     case mh of
         Right h -> do
-                     case mNames of
+                     case mHeader of
                         Nothing -> return ()
-                        Just ns -> case ltHeaderType info of
+                        Just hdr -> case ltHeaderType info of
                                      NoHeader -> return ()
-                                     FirstLine -> writeSeparated sep h ns
-                                     Comment -> T.hPutStrLn h $ T.concat ["#<", T.intercalate "><" (map encodeName ns), ">"]
+                                     FirstLine -> writeSeparated sep h $ map hname hdr
+                                     Comment -> let
+                                                   items = map item hdr
+                                                   item (Left n) = encodeName n
+                                                   item (Right (n, t)) = encodeName n <> "|" <> T.pack (show t)
+                                                in T.hPutStrLn h
+                                                     $ T.concat [ "#<"
+                                                                , T.intercalate "><" items
+                                                                , ">"]
                      mapM_ (writeRow sep h) ds
                      unless (isNothing mfp) $ hClose h
         Left e -> exception e
 
 encodeName :: Text -> Text
-encodeName = T.replace ">" "\\>" . T.replace "\\" "\\\\"
+encodeName = T.replace ">" "\\>" . T.replace "\\" "\\\\" . T.replace "|" "\\|"
 
 writeRow :: Char -> Handle -> Row -> IO ()
 writeRow sep h = writeSeparated sep h . map toString
