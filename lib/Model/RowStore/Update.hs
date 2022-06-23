@@ -9,9 +9,7 @@ module Model.RowStore.Update (
   , deleteRow
   , emptyConf
   , emptyName
-  , fromRows
-  , fromRowsNames
-  , fromRowsConf
+  , mkRowStore
   , changeField
   , mapCol
   , filterRows
@@ -48,6 +46,7 @@ import Model.Row
 import Model.RowStore.Base
 import Model.RowStore.RowStoreConf
 import Model.RowStore.UpdatePlan
+import Model.RowStore.ListatabFile (ListatabHeader)
 
 updateAll :: UpdatePlan -> [DataSource] -> Row -> Row
 updateAll up dss r = foldr (changeRow $ mkError "Fórmula con dependencias circulares")
@@ -125,18 +124,9 @@ emptyName name = RowStore { _nameRS = name
                           , _changed = False
                           }
 
--- |Creates a `RowStore` from a list of `Row`s.
-fromRows :: RowStoreName -> [Row] -> RowStore
-fromRows name rs = fromRowsConf name (fromNumberOfFields l) rs
-    where l = maximum $ map length rs
-
--- |Creates a `RowStore` from a list of `Row`s and a list of names.
-fromRowsNames :: RowStoreName -> [FieldName] -> [Row] -> RowStore
-fromRowsNames name = fromRowsConf name . fromFieldNames
-
 -- |Creates a `RowStore` from a list of `Row`s and a `RowStoreConf`
-fromRowsConf :: RowStoreName -> RowStoreConf -> [Row] -> RowStore
-fromRowsConf n conf rs = (foldl' addRow  (emptyConf n conf) rs) { _changed = False }
+mkRowStore :: RowStoreName -> RowStoreConf -> [Row] -> RowStore
+mkRowStore n conf rs = (foldl' addRow  (emptyConf n conf) rs) { _changed = False }
 
 -- |Changes one field. Returns the new store and the fields changed.
 changeField :: RowPos -> FieldPos -> Field -> RowStore -> (RowStore, [FieldPos])
@@ -204,14 +194,14 @@ deleteFields fs rst = addPlan rst { _rows = IM.map (del fs) (_rows rst)
                                   }
 
 del :: [FieldPos] -> [a] -> [a]
-del [] l = l
-del pos l = go ps l
-    where go [] l = l
-          go (n:ns) l = let
-              (i, _:t) = splitAt n l
-              in i ++ go ns t
-          spos = sort $ filter (< length l) $ map fromIntegral pos
-          ps = head spos : zipWith (\n m -> n - m - 1) (tail spos) spos
+del = go 0 . sort . map fromIntegral
+    where go _ [] l = l
+          go i (n:ns) l = let
+              (h, t) = splitAt (n - i) l
+            in h ++ case t of
+                      [] -> []
+                      (_:t') -> go (n+1) ns t'
+
 
 -- |Changes the names of the fields to those given.
 renameFields :: [FieldName] -> RowStore -> RowStore

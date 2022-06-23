@@ -54,6 +54,7 @@ import Control.Monad (when)
 import qualified Control.Exception as E
 import HRowsException (HRowsException(HRowsException))
 import Control.Monad.State (execState, gets, modify)
+import Model.RowStore.RowStoreConf (fromNamesTypes)
 
 -- |A Col especifies a column of the input in the command line. Single
 -- expressions especify a column, a couple of expressions that correspond
@@ -201,21 +202,28 @@ checkPosition e = parsingError $ T.concat [ "Expression "
 -- |Produce a `RowStore` from a list of `Col` and an existing
 -- `RowStore`.
 applyCols :: [Col] -> RowStore -> RowStore
-applyCols cs0 rst = ( case names rst of
-                       Nothing -> fromRows rn
-                       Just _ -> fromRowsNames rn ns )
+applyCols cs0 rst = mkRowStore (getName rst) conf
                     . map (processRow dss cs)
                     $ rows rst
-    where rn = getName rst
-          cs = cs0 & traversed . expressionT %~ addPositions rst
-          ns = concatMap toName cs
+    where cs = cs0 & traversed . expressionT %~ addPositions rst
           dss = getDataSources rst
-          toName (Single (In (NamedPosition n _)) Nothing) = [n]
+          ts = colTypes rst cs
+          conf = fromNamesTypes (colNames rst cs) (colTypes rst cs)
+
+colNames :: RowStore -> [Col] -> [Text]
+colNames rst = concatMap toName
+    where toName (Single (In (NamedPosition n _)) Nothing) = [n]
           toName (Single (In (Position p)) Nothing) = [fnames rst !! p]
           toName (Single e Nothing) = [toFormula e]
           toName (Single _ (Just n)) = [n]
           toName (Range e1 e2) = slice (pos e1) (pos e2) $ fnames rst
           toName AllCols = fromMaybe [] (names rst)
+
+colTypes :: RowStore -> [Col] -> [FieldType]
+colTypes rst = concatMap toType
+    where toType (Single e _) = [typeOf $ evaluate (row 0 rst) (getDataSources rst) e]
+          toType (Range e1 e2) = slice (pos e1) (pos e2) $ types rst
+          toType AllCols = types rst
 
 processRow :: [DataSource] -> [Col] -> Row -> Row
 processRow dss cs r = concatMap f cs

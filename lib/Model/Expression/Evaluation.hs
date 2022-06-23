@@ -1,11 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveFoldable
-           , DeriveFunctor
-           , DeriveTraversable
-           , FlexibleContexts
+{-# LANGUAGE FlexibleContexts
            , FlexibleInstances
            , OverloadedStrings
-           , TypeSynonymInstances
 #-}
 
 module Model.Expression.Evaluation ( evaluate
@@ -19,8 +15,6 @@ import TextShow(TextShow(showt))
 import Model.Expression
 import Model.Expression.RecursionSchemas
 import Model.Row
-
-import Debug.Trace
 
 evaluate :: Row -> [DataSource] -> Expression -> Field
 evaluate r dss ex = runReader (eval ex) (r, dss)
