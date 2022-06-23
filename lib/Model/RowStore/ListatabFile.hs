@@ -30,8 +30,8 @@ import Model.RowStore.ListatabInfo
 
 -- |Reads a listatab file. If the `FilePath` is None, reads from the
 -- standard input.
--- Returns (possibly) the list of names and the rows.
-readListatab :: ListatabInfo -> Maybe FilePath -> IO (Maybe [Text], DataSource)
+-- Returns (possibly) the information on the header.
+readListatab :: ListatabInfo -> Maybe FilePath -> IO (Maybe ListatabHeader, DataSource)
 readListatab ltInfo mfp = do
   text <- maybe T.getContents readText mfp
   let fp = fromMaybe "stdin" mfp
@@ -48,19 +48,25 @@ readText fp = try (T.readFile fp) >>= \case
 
 type Parser = Parsec Void Text
 
-analyze :: ListatabInfo -> Parser (Maybe [Text], DataSource)
+analyze :: ListatabInfo -> Parser (Maybe ListatabHeader, DataSource)
 analyze ltInfo = do
   let sep = ltSeparator ltInfo
-      inNameChar = TM.try (char '\\' >> (char '>' <|> char '\\'))
+      inNameChar = TM.try (char '\\' >> (char '>' <|> char '\\' <|> char '|'))
                    <|> noneOf (">" :: String)
   h <- case ltHeaderType ltInfo of
           NoHeader -> return Nothing
-          FirstLine -> Just <$> (sepBy (stringParser sep) (char sep) <* char '\n')
+          FirstLine -> Just <$> (sepBy (Left <$> stringParser sep) (char sep) <* char '\n')
           Comment -> optional $
                          between (char '#') (char '\n')
-                                   ( many ( T.pack <$> (char '<'
-                                                        *> many inNameChar
-                                                        <* char '>')
+                                   ( many (do
+                                              _ <- char '<'
+                                              name <- T.pack <$> many inNameChar
+                                              mtype <- (Just . read <$> (char '|' *> many inNameChar))
+                                                       <|> return Nothing
+                                              _ <- char '>'
+                                              return $ case mtype of
+                                                Nothing -> Left name
+                                                Just t -> Right (name, t)
                                           )
                                    )
   rs <- flip endBy (char '\n') $

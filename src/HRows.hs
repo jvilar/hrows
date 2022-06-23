@@ -18,7 +18,6 @@ import System.Console.JMVOptions
 
 import GUI.Build
 import GUI.Update
-import Model.DefaultFileNames
 import Model.SourceInfo
 import Presenter
 

@@ -2,7 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Model.RowStore.RowStoreConf ( RowStoreConf(..)
-                                   , fromFieldNames
+                                   , fromListatabHeader
+                                   , fromNamesTypes
                                    , fromNumberOfFields
                                    , FieldConf(..)
                                    , fromFieldConf
@@ -41,12 +42,18 @@ fromNumberOfFields nf = fromFieldConf
                       . replicate nf
                       $ FieldConf Nothing TypeString Nothing
 
--- |Creates a `RowStoreConf` when only the names are known.
--- The types are set to `TypeString` and the formulae to
+-- |Creates a `RowStoreConf` from a `ListatabHeader`.
+-- The types of Left fields are set to `TypeString` and all the formulae to
 -- `Nothing`
-fromFieldNames :: [Text] -> RowStoreConf
-fromFieldNames = fromFieldConf
-               . map (\n -> FieldConf (Just n) TypeString Nothing)
+fromListatabHeader :: ListatabHeader -> RowStoreConf
+fromListatabHeader = fromFieldConf
+                     . map (either (\n -> FieldConf (Just n) TypeString Nothing)
+                                   (\(n, t) -> FieldConf (Just n) t Nothing))
+
+-- |Creates a `RowStoreConf` using a list of names of Fields
+-- and their types.
+fromNamesTypes :: [Text] -> [FieldType] -> RowStoreConf
+fromNamesTypes = (fromFieldConf .) . zipWith (\n t -> FieldConf (Just n) t Nothing)
 
 fromFieldConf :: [FieldConf] -> RowStoreConf
 fromFieldConf fc = empty { fieldConf = fc }

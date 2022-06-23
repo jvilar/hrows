@@ -26,6 +26,7 @@ import Model.Row
 import Model.RowStore
 import Model.SourceInfo
 import Numeric (showFFloat)
+import Model.RowStore.RowStoreConf (fromNamesTypes)
 
 data Format = HTML | LaTeX | Listatab deriving (Show, Read, Enum, Eq)
 
@@ -184,17 +185,14 @@ translate opts mdic rst = let
     allTr = [trKey, trMarks, trGlobal, trExtras, trMessage]
     allRows = map concat . getZipList . sequenceA $
                 ZipList . rows <$> allTr
-    allNames = concat <$> traverse names allTr
     inds = ColIndices { _keyIndex = 0
                       , _markStart = nFields trKey
                       , _globalIndex = _markStart inds + nFields trMarks
                       , _extrasStart = _globalIndex inds + nFields trGlobal
                       , _messageIndex = _extrasStart inds + nFields trExtras
                       }
-
-  in case allNames of
-        Nothing -> (fromRows (getName rst) allRows, inds)
-        Just nms -> (fromRowsNames (getName rst) nms allRows, inds)
+    conf = fromNamesTypes (concatMap fnames allTr) (concatMap types allTr)
+  in (mkRowStore (getName rst) conf allRows, inds)
 
 getKeyCol :: Options -> Maybe AnonDic -> RowStore -> RowStore
 getKeyCol opts mdic rst

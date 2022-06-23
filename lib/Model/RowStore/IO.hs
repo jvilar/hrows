@@ -31,24 +31,28 @@ readRowStore si = do
                       Just f -> case formatConf f of
                                     NoFormatInfo -> ltInfo
                                     ListatabFormat inf -> inf
-       (h, ds) <- readListatab info $ Just fp
-       rst <- case mconf of
-           Nothing -> return $ case h of
-                          Nothing -> fromRows name ds
-                          Just ns -> fromRowsNames name ns ds
-           Just cnf -> do
-               let rs = fromRowsConf name cnf ds
-               sources <- map fst <$> mapM readRowStore (sourceInfos cnf)
-               return $ setUnchanged $ foldr addRowStore rs sources
-       return (rst, mconf)
+       readListatab info (Just fp) >>= buildRowStore mconf name
 
+buildRowStore :: Maybe RowStoreConf
+              -> RowStoreName
+              -> (Maybe ListatabHeader, [Row])
+              -> IO (RowStore, Maybe RowStoreConf)
+buildRowStore mconf name (mh, ds) = do
+       let cnf = case mconf of
+                     Just c -> c
+                     Nothing -> case mh of
+                                  Nothing -> fromNumberOfFields $ maximum $ map length ds
+                                  Just h -> fromListatabHeader h
+           rst = mkRowStore name cnf ds
+       case mconf of
+            Nothing -> return (rst, Nothing)
+            Just c -> do
+               sources <- map fst <$> mapM readRowStore (sourceInfos c)
+               return (setUnchanged $ foldr addRowStore rst sources, mconf)
+--
 -- |Read a `RowStore` from `stdin`
 readRowStoreStdin :: ListatabInfo -> IO RowStore
-readRowStoreStdin info = do
-    (h, ds) <- readListatab info Nothing
-    return $ case h of
-                Nothing -> fromRows "stdin" ds
-                Just ns -> fromRowsNames "stdin" ns ds
+readRowStoreStdin info = readListatab info Nothing >>= (fst <$>) . buildRowStore Nothing "stdin"
 
 -- |Writes a `RowStore` using a `SourceInfo`
 writeRowStore :: SourceInfo -> [SourceInfo] -> RowStore -> IO ()

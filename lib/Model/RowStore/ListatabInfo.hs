@@ -3,6 +3,7 @@
 
 module Model.RowStore.ListatabInfo ( ListatabInfo(..)
                                    , HeaderType(..)
+                                   , ListatabHeader
                                    ) where
 
 import Control.Applicative((<|>))
@@ -11,6 +12,8 @@ import Data.Maybe(fromMaybe)
 import GHC.Generics (Generic)
 import Data.Aeson (defaultOptions, genericToEncoding, FromJSON(..), ToJSON(..), Value (Object), (.:?), (.:))
 
+import Model.Field
+import Data.Text (Text)
 
 -- |The information needed to read or write in listatab format
 data ListatabInfo = ListatabInfo { ltSeparator :: Char
@@ -43,4 +46,5 @@ instance FromJSON HeaderType
 instance Default ListatabInfo where
     def = ListatabInfo '\t' Comment
 
+type ListatabHeader = [Either Text (Text, FieldType)]
 

@@ -1,5 +1,3 @@
-{-# LANGUAGE TupleSections #-}
-
 module Model.Expression.RecursionSchemas where
 
 import Control.Arrow((>>>), (<<<), (&&&))
