@@ -78,7 +78,7 @@ makeLenses ''ColOptions
 
 -- |Used to specify whether the program accepts options for formatting
 -- the output.
-data IOOptions = OnlyInputOptions | FullIOOptions deriving Eq
+data IOOptions = OnlyInputOptions | FullIOOptions | OnlyInputNoFilterOptions deriving Eq
 
 instance Default ColOptions where
     def = ColOptions { _help = False
@@ -138,7 +138,8 @@ colOptions io l = map (fmap $ over l) . processOptions $ do
                '1' ~: "iHeader1" ==> NoArg (setHeader iOptions FirstLine . setHeader oOptions FirstLine) ~: "Use the first line as header in the input."
                when (io == FullIOOptions) $
                    'H' ~: "oHeader1" ==> NoArg (setHeader oOptions FirstLine) ~: "Use the first line as header in the output"
-               'f' ~: "filter" ==> ReqArg setFilter "FILTER" ~: "An integer expression that will be used to filter the rows. Those for which the result is greater than 0"
+               when (io /= OnlyInputNoFilterOptions) $
+                   'f' ~: "filter" ==> ReqArg setFilter "FILTER" ~: "An integer expression that will be used to filter the rows. Those for which the result is greater than 0"
                'h' ~: "help" ==> NoArg (set help True) ~: "This help."
                's' ~: "separator" ==> ReqArg (\s -> let c = parseSeparator s in setSeparator iOptions c . setSeparator oOptions c) "CHAR" ~:
                         ("Field separator for the input and output. (Default: " ++ show (ltSeparator $ def ^. iOptions) ++ ").")
