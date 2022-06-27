@@ -24,7 +24,7 @@ module Model.RowStore.Base (
                 , rows
                 , nFields
                 , size
-                , getConf
+                , getFieldConf
                 , formulas
                 , types
                 , isFormula
@@ -152,9 +152,9 @@ toConf inf = FieldConf { nameFC = _name inf
                        }
 
 
--- |Get the current configuration.
-getConf :: RowStore -> RowStoreConf
-getConf = fromFieldConf . map toConf . _fieldInfo
+-- |Get the configuration of the fieds.
+getFieldConf :: RowStore -> [FieldConf]
+getFieldConf = map toConf . _fieldInfo
 
 
 -- |Returns one row of the `RowStore`.
