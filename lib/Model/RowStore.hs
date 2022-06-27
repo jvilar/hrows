@@ -12,7 +12,7 @@ module Model.RowStore (
              , rows
              , nFields
              , size
-             , getConf
+             , getFieldConf
              , formulas
              , types
              , isFormula

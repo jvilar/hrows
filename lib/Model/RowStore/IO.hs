@@ -68,7 +68,9 @@ writeRowStore si sInfos rs = do
       case mconfFp of
           Nothing -> return ()
           Just conf -> do
-              r <- try (BS.writeFile conf . encodePretty . setSourceInfos sInfos $ getConf rs)
+              r <- try ( BS.writeFile conf
+                       . encodePretty
+                       $ mkRowStoreConf (getFieldConf rs) (siFormat si) sInfos)
               case r of
                   Right () -> return ()
                   Left e -> exception e

@@ -2,12 +2,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Model.RowStore.RowStoreConf ( RowStoreConf(..)
+                                   , mkRowStoreConf
                                    , fromListatabHeader
                                    , fromNamesTypes
                                    , fromNumberOfFields
                                    , FieldConf(..)
                                    , fromFieldConf
                                    , setSourceInfos
+                                   , setFieldConf
                                    ) where
 
 import Data.Aeson
@@ -28,6 +30,9 @@ data RowStoreConf = RowStoreConf {
 
 instance Empty RowStoreConf where
   empty = RowStoreConf [] def []
+
+mkRowStoreConf :: [FieldConf] -> FormatInfo -> [SourceInfo] -> RowStoreConf
+mkRowStoreConf = RowStoreConf
 
 data FieldConf = FieldConf { nameFC :: Maybe Text
                            , typeFC :: FieldType
@@ -56,10 +61,13 @@ fromNamesTypes :: [Text] -> [FieldType] -> RowStoreConf
 fromNamesTypes = (fromFieldConf .) . zipWith (\n t -> FieldConf (Just n) t Nothing)
 
 fromFieldConf :: [FieldConf] -> RowStoreConf
-fromFieldConf fc = empty { fieldConf = fc }
+fromFieldConf fc = setFieldConf fc empty
 
 setSourceInfos :: [SourceInfo] -> RowStoreConf -> RowStoreConf
 setSourceInfos si cnf = cnf { sourceInfos = si }
+
+setFieldConf :: [FieldConf] -> RowStoreConf -> RowStoreConf
+setFieldConf fc cnf = cnf { fieldConf = fc }
 
 instance ToJSON RowStoreConf where
     toEncoding = genericToEncoding defaultOptions
