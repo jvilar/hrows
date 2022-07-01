@@ -1,7 +1,6 @@
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module GUI.View 
+module GUI.View
   (
   View(..)
   )
@@ -24,7 +23,7 @@ class View v where
   updatePosition :: RowPos -> Int -> v -> IO ()
 
 instance View LW.ListingWindow where
-  window = LW.window
+  window = LW.windowLW
   changeTitle = LW.changeTitle
   updateNames = LW.updateNames
   updatePosition p _ = LW.updatePosition (p - 1)

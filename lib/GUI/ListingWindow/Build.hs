@@ -1,6 +1,7 @@
+{-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
 
 module GUI.ListingWindow.Build (
     -- *Functions
@@ -11,6 +12,7 @@ module GUI.ListingWindow.Build (
 import Control.Concurrent.Chan (Chan)
 import Control.Monad(void, (>=>))
 import Control.Monad.IO.Class(liftIO)
+import Data.IntMap qualified as IM
 import Data.Maybe(fromJust)
 import Data.Text (Text)
 import GI.Gtk
@@ -31,9 +33,11 @@ buildListingWindow iChan builder = do
     getObject :: CanBeCast obj => Text -> IO obj
     getObject name = builderGetObject builder name >>= doCast . fromJust
   fromIO ListingWindow {
-    window = getObject "listingWindow"
-    , listingView = getObject "listingView"
-    , listingFilterEntry = getObject "listingFilterEntry"
+    windowLW = getObject "listingWindow"
+    , rendererLW = cellRendererTextNew
+    , viewLW = getObject "listingView"
+    , filterEntryLW = getObject "listingFilterEntry"
+    , filteredPosLW = return IM.empty
     , inputChanLW = return iChan
   }
 
@@ -70,7 +74,7 @@ commandFromGlobalKey evk = do
 prepareListingWindow :: ListingWindow -> BuildMonad()
 prepareListingWindow lw = do
   control <- getControl
-  let w = window lw
+  let w = windowLW lw
   _ <- liftIO $ do
     _ <- w `on` #deleteEvent $ const $ do
       liftIO $ sendInput control CloseListingRequested
@@ -87,7 +91,7 @@ prepareListingWindow lw = do
 prepareFilterEntry :: ListingWindow -> BuildMonad ()
 prepareFilterEntry w = do
   control <- getControl
-  let entry = listingFilterEntry w
+  let entry = filterEntryLW w
   _ <- entry `on` #keyPressEvent $ \evk -> do
     n <- get evk #keyval >>= keyvalName
     case n of
@@ -103,9 +107,9 @@ prepareFilterEntry w = do
 
 prepareCursorBindings :: ListingWindow -> BuildMonad ()
 prepareCursorBindings w = do
-  let lv = listingView w
+  let tv = viewLW w
   control <- getControl
-  void $ after lv #cursorChanged $
+  void $ after tv #cursorChanged $
     getCurrentRow w >>= \case
       Nothing -> return ()
       Just r -> liftIO . sendInput control $ MoveHere r
