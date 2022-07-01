@@ -22,36 +22,42 @@ import GUI.ListingWindow
 import Data.Int (Int32)
 import Model (FieldName, RowPos)
 
-
+-- |Change the tile of the `ListingWindow`.
 changeTitle :: Text -> ListingWindow -> IO ()
-changeTitle title lWindow = set (window lWindow) [ windowTitle := title ]
+changeTitle title lWindow = set (windowLW lWindow) [ windowTitle := title ]
 
+-- |Change the titles of the columns in the `ListingWindow`.
 updateNames :: [FieldName] -> ListingWindow -> IO ()
 updateNames names lWindow = do
-  let lv = listingView lWindow
-  adjustColumns (fromIntegral $ length names) lv
-  cols <- #getColumns lv
+  let tv = viewLW lWindow
+  adjustColumns (fromIntegral $ length names) (rendererLW lWindow) tv
+  cols <- #getColumns tv
   forM_ (zip cols names) $ uncurry #setTitle
 
-adjustColumns :: Int32 -> TreeView -> IO ()
-adjustColumns ncols tv = do
+-- |Add or delete columns necessary to make that the `TreeView` has
+-- the given number of columns.
+adjustColumns :: Int32 -> CellRendererText -> TreeView -> IO ()
+adjustColumns ncols renderer tv = do
   current <- fromIntegral <$> #getNColumns tv
   unless (current == ncols) $ clear tv #model
   case compare current ncols of
-    LT -> addColumns tv [current .. ncols - 1]
+    LT -> addColumns tv renderer [current .. ncols - 1]
     EQ -> return ()
     GT -> delColumns tv [ncols .. current - 1]
 
-addColumns :: TreeView -> [Int32] -> IO ()
-addColumns tv ns =
+-- |Add columns in the positions given by the list. The columns
+-- will have a default name.
+addColumns :: TreeView -> CellRendererText -> [Int32] -> IO ()
+addColumns tv renderer ns =
   forM_ ns $ \n -> do
     col <- treeViewColumnNew
-    renderer <- cellRendererTextNew
     #packStart col renderer True
     #addAttribute col renderer "text" n
     #setTitle col "nuevo"
     #appendColumn tv col
 
+-- |Delete the columns in the positions given by the list. 
+-- The list is assumed to be ordered.
 delColumns :: TreeView -> [Int32] -> IO ()
 delColumns tv ns =
   forM_ (reverse ns) $ \n-> do
@@ -60,23 +66,23 @@ delColumns tv ns =
     #clear col
 
 showFullListing :: [[Text]] -> ListingWindow -> IO ()
-showFullListing [] lw = clear (listingView lw) #model
+showFullListing [] lw = clear (viewLW lw) #model
 showFullListing tss lw = do
-  let lv = listingView lw
+  let tv = viewLW lw
       ncols = length $ head tss
       types = replicate ncols gtypeString
-  adjustColumns (fromIntegral ncols) lv
-  clear lv #model
+  adjustColumns (fromIntegral ncols) (rendererLW lw) tv
+  clear tv #model
   ls <- listStoreNew types
   forM_ tss $ \ts -> do
     iter <- #append ls
     fillRow iter ls $ zip [0..] ts
-  #setModel lv $ Just ls
+  #setModel tv $ Just ls
 
 showFieldsRow :: RowPos -> [FieldInfo] -> ListingWindow -> IO ()
 showFieldsRow pos fis lw = do
-  let lv = listingView lw
-  Just model <- #getModel lv
+  let tv = viewLW lw
+  Just model <- #getModel tv
   Just listStore <- castTo ListStore model
   path <- rowPos2Path pos
   iter <- #getIter model path >>= \case
@@ -99,6 +105,6 @@ updatePosition :: RowPos -> ListingWindow -> IO ()
 updatePosition pos lw = do
   cRow <- getCurrentRow lw
   unless (cRow == Just pos) $ do
-    let lv = listingView lw
+    let tv = viewLW lw
     path <- rowPos2Path pos
-    #setCursor lv path (Nothing :: Maybe TreeViewColumn) False
+    #setCursor tv path (Nothing :: Maybe TreeViewColumn) False

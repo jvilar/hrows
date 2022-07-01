@@ -21,7 +21,7 @@ import GUI.Control
 import GUI.DialogManager.Actions
 import GUI.MainWindow hiding (window)
 import GUI.MainWindow.Update (setTextField, showFields, disableTextViews)
-import GUI.ListingWindow hiding (window)
+import GUI.ListingWindow
 import GUI.ListingWindow.Update (showFullListing, showFieldsRow)
 import GUI.View
 import Model.SourceInfo
