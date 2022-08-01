@@ -33,7 +33,6 @@ module Col (
 
 import Control.Lens (Traversal', (%~), traversed, (&), Fold, folding, makeLenses, Lens', over, set, (^.))
 import Data.Default ( def, Default(def) )
-import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 
@@ -54,7 +53,7 @@ import Control.Monad (when)
 import qualified Control.Exception as E
 import HRowsException (HRowsException(HRowsException))
 import Control.Monad.State (execState, gets, modify)
-import Model.RowStore.RowStoreConf (fromNamesTypes)
+import Model.RowStore.RowStoreConf (fromNamesTypes, fromTypes)
 
 -- |A Col especifies a column of the input in the command line. Single
 -- expressions especify a column, a couple of expressions that correspond
@@ -216,8 +215,9 @@ applyCols cs0 rst = mkRowStore (getName rst) conf
                     $ rows rst
     where cs = cs0 & traversed . expressionT %~ addPositions rst
           dss = getDataSources rst
-          ts = colTypes rst cs
-          conf = fromNamesTypes (colNames rst cs) (colTypes rst cs)
+          conf = case names rst of
+                    Just _ -> fromNamesTypes (colNames rst cs) (colTypes rst cs)
+                    Nothing -> fromTypes (colTypes rst cs)
 
 colNames :: RowStore -> [Col] -> [Text]
 colNames rst = concatMap toName
@@ -226,7 +226,7 @@ colNames rst = concatMap toName
           toName (Single e Nothing) = [toFormula e]
           toName (Single _ (Just n)) = [n]
           toName (Range e1 e2) = slice (pos e1) (pos e2) $ fnames rst
-          toName AllCols = fromMaybe [] (names rst)
+          toName AllCols = fnames rst
 
 colTypes :: RowStore -> [Col] -> [FieldType]
 colTypes rst = concatMap toType
