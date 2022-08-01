@@ -70,6 +70,7 @@ data ColOptions = ColOptions { _help :: Bool
                              , _iOptions :: ListatabInfo
                              , _oOptions :: ListatabInfo
                              , _rFilter :: Maybe Expression
+                             , _sortExpr :: Maybe Expression
                              , _inputFileName :: Maybe FilePath
                              , _confFileName :: Maybe FilePath
                              }
@@ -85,6 +86,7 @@ instance Default ColOptions where
                      , _iOptions = def
                      , _oOptions = def
                      , _rFilter = Nothing
+                     , _sortExpr = Nothing
                      , _inputFileName = Nothing
                      , _confFileName = Nothing
                      }
@@ -130,6 +132,11 @@ setFilter s = case parse expression $ T.pack s of
                    Left e -> myError $ "Bad expression in the filter: " ++ T.unpack e
                    Right ex -> set rFilter $ Just ex
 
+setSort :: String -> ColOptions -> ColOptions
+setSort s = case parse expression $ T.pack s of
+                   Left e -> myError $ "Bad expression in the sort criterion: " ++ T.unpack e
+                   Right ex -> set sortExpr $ Just ex
+
 colOptions :: IOOptions -> Lens' o ColOptions -> [OptDescr (o -> o)]
 colOptions io l = map (fmap $ over l) . processOptions $ do
                '0' ~: "iNoHeader" ==> NoArg (setHeader iOptions NoHeader . setHeader oOptions NoHeader) ~: "Do not use header in the input."
@@ -138,8 +145,9 @@ colOptions io l = map (fmap $ over l) . processOptions $ do
                '1' ~: "iHeader1" ==> NoArg (setHeader iOptions FirstLine . setHeader oOptions FirstLine) ~: "Use the first line as header in the input."
                when (io == FullIOOptions) $
                    'H' ~: "oHeader1" ==> NoArg (setHeader oOptions FirstLine) ~: "Use the first line as header in the output"
-               when (io /= OnlyInputNoFilterOptions) $
+               when (io /= OnlyInputNoFilterOptions) $ do
                    'f' ~: "filter" ==> ReqArg setFilter "FILTER" ~: "An integer expression that will be used to filter the rows. Those for which the result is greater than 0"
+                   'R' ~: "sort" ==> ReqArg setSort "EXPR" ~: "Use this expression to sort the rows. (Default: do no sort)"
                'h' ~: "help" ==> NoArg (set help True) ~: "This help."
                's' ~: "separator" ==> ReqArg (\s -> let c = parseSeparator s in setSeparator iOptions c . setSeparator oOptions c) "CHAR" ~:
                         ("Field separator for the input and output. (Default: " ++ show (ltSeparator $ def ^. iOptions) ++ ").")
@@ -271,4 +279,10 @@ readRowStoreFromOptions opts = do
                           dss <- gets getDataSources
                           ex <- gets $ flip addPositions e
                           modify . filterRows $ (> 0) . toInt . (\r -> evaluate r dss ex)
+        case opts ^. sortExpr of
+             Nothing -> return ()
+             Just e -> do
+                          dss <- gets getDataSources
+                          ex <- gets $ flip addPositions e
+                          modify . sortRowsOn $ (\r -> evaluate r dss ex)
 
