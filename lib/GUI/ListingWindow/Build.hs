@@ -92,8 +92,10 @@ prepareFilterEntry :: ListingWindow -> BuildMonad ()
 prepareFilterEntry w = do
   control <- getControl
   let entry = filterEntryLW w
+  entry `set` [ #sensitive := True ]
   _ <- entry `on` #keyPressEvent $ \evk -> do
     n <- get evk #keyval >>= keyvalName
+    print n -- TODO
     case n of
       Just "Return" -> do
             buffer <- textViewGetBuffer entry
