@@ -36,6 +36,8 @@ updateGUI (ShowFields pos fis) = \control -> do
                                     ifListingVisible (showFieldsRow pos fis) control
 updateGUI (ShowNames names) = inBothWindows $ updateNames names
 updateGUI (ShowIteration iter) = showIteration iter
+updateGUI ShowFilterOK = inBothWindows $ showFilterStatus True
+updateGUI ShowFilterError = inBothWindows $ showFilterStatus False
 updateGUI DisableTextViews = disableTextViews . mainWindow
 updateGUI ShowListing = widgetShowAll . window . listingWindow
 updateGUI HideListing = widgetHide . window . listingWindow
@@ -108,7 +110,6 @@ showIteration (ShowSources srcs) = \control -> showSources (dialogManager contro
 showIteration DisplayAbout = \control -> showAboutDialog (dialogManager control) (window $ mainWindow control)
 
 showIteration it = unimplemented (T.pack $ show it)
-
 
 unimplemented :: Text -> GUIControl -> IO ()
 unimplemented func control = sendInput control . MessageDialog . ErrorMessage $ T.concat ["Función ", func, " no implementada"]

@@ -93,18 +93,13 @@ prepareFilterEntry w = do
   control <- getControl
   let entry = filterEntryLW w
   entry `set` [ #sensitive := True ]
-  _ <- entry `on` #keyPressEvent $ \evk -> do
-    n <- get evk #keyval >>= keyvalName
-    print n -- TODO
-    case n of
-      Just "Return" -> do
-            buffer <- textViewGetBuffer entry
-            begin <- #getStartIter buffer
-            end <- #getEndIter buffer
-            f <- #getText buffer begin end False
-            liftIO $ sendInput control (ListingFilterChanged f)
-            return True
-      _ -> return False
+  _ <- entry `on` #keyReleaseEvent $ \evk -> do
+    buffer <- textViewGetBuffer entry
+    begin <- #getStartIter buffer
+    end <- #getEndIter buffer
+    f <- #getText buffer begin end False
+    liftIO $ sendInput control (ChangeFilter f)
+    return True
   return ()
 
 prepareCursorBindings :: ListingWindow -> BuildMonad ()

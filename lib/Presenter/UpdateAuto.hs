@@ -16,6 +16,7 @@ import HRowsException
 import Model
 import Presenter.Auto
 import Presenter.Input
+import Model.Expression.Parser (expression, eof, parse)
 
 data UndoZipper a = UndoZipper [a] a [a]
 
@@ -80,6 +81,7 @@ update model (UpdateField fpos v, pos) = do
     return model'
 update _ (ChangeModel model, _) =
     completeRefresh 0 model
+update model (ChangeFilter filterExpression, _) = processFilter filterExpression >> return model
 update model (DoNothing, _) = return model
 update model (NewRow, _) = do
     sendInputM MoveEnd
@@ -119,6 +121,13 @@ update model (DeleteSources ns, pos) =
 update _ (Undo, _) = liftIO $ throwIO $ HRowsException "No puede llegar un Undo al método update de UpdateAuto"
 update _ (Redo, _) = liftIO $ throwIO $ HRowsException "No puede llegar un Redo al método update de UpdateAuto"
 update _ (BlockUndo, _) = liftIO $ throwIO $ HRowsException "No puede llegar un BlockUndo al método update de UpdateAuto"
+
+processFilter :: Text -> PresenterM ()
+processFilter filterExpression | T.null filterExpression = sendGUIM ShowFilterOK 
+processFilter filterExpression = do
+    case parse (expression <* eof) filterExpression of
+         Left _ -> sendGUIM ShowFilterError
+         Right _ -> sendGUIM ShowFilterOK
 
 cnames :: RowStore -> [FieldName]
 cnames = map (`T.append` ": ") . fnames
