@@ -4,6 +4,7 @@
 module Model.RowStore.RowStoreConf ( RowStoreConf(..)
                                    , mkRowStoreConf
                                    , fromListatabHeader
+                                   , fromTypes
                                    , fromNamesTypes
                                    , fromNumberOfFields
                                    , FieldConf(..)
@@ -54,6 +55,11 @@ fromListatabHeader :: ListatabHeader -> RowStoreConf
 fromListatabHeader = fromFieldConf
                      . map (either (\n -> FieldConf (Just n) TypeString Nothing)
                                    (\(n, t) -> FieldConf (Just n) t Nothing))
+
+-- |Creates a `RowStoreConf` using a list of names of Fields
+-- and their types.
+fromTypes :: [FieldType] -> RowStoreConf
+fromTypes = fromFieldConf . map (\t -> FieldConf Nothing t Nothing)
 
 -- |Creates a `RowStoreConf` using a list of names of Fields
 -- and their types.
