@@ -10,6 +10,7 @@ module GUI.MainWindow.Update (
   , updateNames
   , disableTextViews
   , setTextField
+  , showFilterStatus
 ) where
 
 import Control.Concurrent.Chan(writeChan)
@@ -242,6 +243,9 @@ setTextField fieldPos t mWindow = do
   when editable $ do
     buffer <- #getBuffer textView
     #setText buffer t (fromIntegral $ T.length t)
+
+showFilterStatus :: Bool -> MainWindow -> IO ()
+showFilterStatus isOK mWindow = return ()
 
 unimplemented :: String -> GUIControl -> IO ()
 unimplemented func control = sendInput control . MessageDialog . ErrorMessage $ T.concat ["Función ", T.pack func, " no implementada"]

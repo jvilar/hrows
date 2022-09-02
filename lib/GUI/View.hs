@@ -21,15 +21,19 @@ class View v where
   changeTitle :: Text -> v -> IO ()
   updateNames :: [FieldName] -> v -> IO ()
   updatePosition :: RowPos -> Int -> v -> IO ()
+  showFilterStatus :: Bool -> v -> IO ()
 
 instance View LW.ListingWindow where
   window = LW.windowLW
   changeTitle = LW.changeTitle
   updateNames = LW.updateNames
   updatePosition p _ = LW.updatePosition (p - 1)
+  showFilterStatus = LW.showFilterStatus
+
 
 instance View MW.MainWindow where
   window = MW.window
   changeTitle = MW.changeTitle
   updateNames = MW.updateNames
   updatePosition = MW.updatePosition
+  showFilterStatus = MW.showFilterStatus

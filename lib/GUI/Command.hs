@@ -16,6 +16,8 @@ data GUICommand = ChangeTitle Text -- ^Change the title of the window
                 | ShowFields RowPos [FieldInfo] -- ^Show the position and the fields in that position
                 | ShowNames [FieldName] -- ^Show the names of the fields
                 | ShowIteration Iteration -- ^Open an iteration with the user
+                | ShowFilterOK -- ^Show that the filter is OK
+                | ShowFilterError -- ^Show that the filter has a problem
                 | DisableTextViews -- ^Do not allow text input
                 | ShowListing -- ^Show the listing window
                 | HideListing -- ^Hide the listing window

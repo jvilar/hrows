@@ -7,7 +7,8 @@ module GUI.ListingWindow.Update (
   updateNames,
   showFullListing,
   showFieldsRow,
-  updatePosition
+  updatePosition,
+  showFilterStatus
 ) where
 
 import Control.Monad(forM_, unless)
@@ -108,3 +109,8 @@ updatePosition pos lw = do
     let tv = viewLW lw
     path <- rowPos2Path pos
     #setCursor tv path (Nothing :: Maybe TreeViewColumn) False
+
+showFilterStatus:: Bool -> ListingWindow -> IO ()
+showFilterStatus isOK lw = #setName (filterEntryLW lw) $ if isOK
+                                                         then "normal"
+                                                         else "error"
