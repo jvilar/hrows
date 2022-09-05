@@ -33,7 +33,7 @@ module Model.Field ( Field
                    ) where
 
 import Data.Aeson
-import Data.Maybe(fromJust)
+import Data.Maybe(fromJust, fromMaybe)
 import Data.Text(Text)
 import qualified Data.Text as T
 import Data.Text.Read(decimal, signed, double)
@@ -90,7 +90,7 @@ typeLabels = [ (TypeString, "Cadena")
              ]
 
 typeLabel :: FieldType -> Text
-typeLabel = fromJust . flip lookup typeLabels
+typeLabel = fromMaybe "Vacío" . (`lookup` typeLabels)
 
 -- |The operators used for casting in formulas.
 typeOperators :: [(FieldType, Text)]
