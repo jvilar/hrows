@@ -47,6 +47,8 @@ configureListingWindow w = do
                 prepareFilterEntry w
                 prepareCursorBindings w
                 prepareFileMenu
+                prepareFieldMenu
+                prepareRecordMenu
 
 globalKeys :: [ ((Text, [ModifierType]), Input)]
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
@@ -117,3 +119,9 @@ prepareFileMenu = mapM_ (uncurry menuItemInput)
                         [("openMenuItemListing", toInput LoadFileDialog)
                         ,("quitMenuItemListing", toInput ExitRequested)
                         ]
+
+prepareFieldMenu :: BuildMonad ()
+prepareFieldMenu = menuItemInput "showHideMenuItemListing" $ toInput ShowHideFieldsDialog
+
+prepareRecordMenu :: BuildMonad ()
+prepareRecordMenu = menuItemInput "sortRowsMenuItemListing" $ toInput SortRowsDialog
