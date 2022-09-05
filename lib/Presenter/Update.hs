@@ -7,11 +7,10 @@ module Presenter.Update (
 ) where
 
 import Model
-import Data.Text (Text)
 
 data UpdateCommand = UpdateField FieldPos Field
                    | ChangeModel Model
-                   | ChangeFilter Text
+                   | ChangeFilter Formula
                    | DoNothing
                    | NewRow
                    | DeleteRow
