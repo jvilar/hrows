@@ -11,7 +11,7 @@ module GUI.ListingWindow.Update (
   showFilterStatus
 ) where
 
-import Control.Monad(forM_, unless)
+import Control.Monad(forM_, unless, zipWithM_)
 import Data.GI.Base.Attributes(clear)
 import Data.GI.Base.GType(gtypeString)
 import Data.Text (Text)
@@ -33,14 +33,13 @@ updateNames names lWindow = do
   let tv = viewLW lWindow
   adjustColumns (fromIntegral $ length names) (rendererLW lWindow) tv
   cols <- #getColumns tv
-  forM_ (zip cols names) $ uncurry #setTitle
+  zipWithM_ #setTitle cols names
 
 -- |Add or delete columns necessary to make that the `TreeView` has
 -- the given number of columns.
 adjustColumns :: Int32 -> CellRendererText -> TreeView -> IO ()
 adjustColumns ncols renderer tv = do
   current <- fromIntegral <$> #getNColumns tv
-  unless (current == ncols) $ clear tv #model
   case compare current ncols of
     LT -> addColumns tv renderer [current .. ncols - 1]
     EQ -> return ()
@@ -89,7 +88,7 @@ showFieldsRow pos fis lw = do
   iter <- #getIter model path >>= \case
                (True, it) -> return it
                (False, _) -> #append listStore
-  fillRow iter listStore [(indexFI fi, textFI fi) | fi <- fis]
+  fillRow iter listStore [(indexFI fi, textFI fi) | fi <- fis, isVisibleFI fi]
   #rowChanged model path iter
 
 fillRow :: TreeIter -> ListStore -> [(Int32, Text)] -> IO ()
