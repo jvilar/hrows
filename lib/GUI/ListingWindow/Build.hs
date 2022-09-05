@@ -46,6 +46,7 @@ configureListingWindow w = do
                 prepareListingWindow w
                 prepareFilterEntry w
                 prepareCursorBindings w
+                prepareFileMenu
 
 globalKeys :: [ ((Text, [ModifierType]), Input)]
 globalKeys = [ (("Page_Down", []), toInput MoveNext)
@@ -110,3 +111,9 @@ prepareCursorBindings w = do
     getCurrentRow w >>= \case
       Nothing -> return ()
       Just r -> liftIO . sendInput control $ MoveHere r
+
+prepareFileMenu :: BuildMonad ()
+prepareFileMenu = mapM_ (uncurry menuItemInput)
+                        [("openMenuItemListing", toInput LoadFileDialog)
+                        ,("quitMenuItemListing", toInput ExitRequested)
+                        ]
