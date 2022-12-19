@@ -263,7 +263,9 @@ fToText :: Int -> Field -> Text
 fToText d f
   |  isError f = toString f
   |  otherwise = case typeOf f of
-                  TypeInt -> toString f <> "." <> T.replicate d "0"
+                  TypeInt -> case d of
+                                0 -> toString f
+                                _ -> toString f <> "." <> T.replicate d "0"
                   TypeDouble -> T.pack $ showFFloat (Just d) (toDouble f) ""
                   _ -> toString f
 
