@@ -164,16 +164,16 @@ sendInputMW :: IsInput cmd => MainWindow -> cmd -> IO ()
 sendInputMW mWindow = writeChan (inputChanMW mWindow) . toInput
 
 createFieldLabel :: FieldPos -> MainWindow -> IO EventBox
-createFieldLabel f mWindow = do
+createFieldLabel pos mWindow = do
          lbl <- labelNew $ Just ""
          #setHalign lbl AlignStart
          ebox <- eventBoxNew
-         #dragSourceSet ebox [ModifierTypeButton1Mask] Nothing [DragActionMove] -- Check the Nothing, I have no idea if it is correct
+         #dragSourceSet ebox [ModifierTypeButton1Mask] Nothing [DragActionMove] -- TODO Check the Nothing, I have no idea if it is correct
          #dragSourceSetTargetList ebox (Just $ targetList mWindow)
-         #dragDestSet ebox [DestDefaultsAll] Nothing [DragActionMove] -- Ditto for Nothing
+         #dragDestSet ebox [DestDefaultsAll] Nothing [DragActionMove] -- TODO Ditto for Nothing
          #dragDestSetTargetList ebox (Just $ targetList mWindow)
          _ <- ebox `on` #dragDataGet $ \_ sdata _ _ -> do
-                                   let (t,l) = (showt f, fromIntegral $ T.length t)
+                                   let (t,l) = (showt pos, fromIntegral $ T.length t)
                                    ok <- selectionDataSetText sdata t l
                                    unless ok (liftIO $ dndError mWindow)
          _ <- ebox `on` #dragDataReceived $ \_ _ _ sdata _ _ -> do
@@ -182,8 +182,8 @@ createFieldLabel f mWindow = do
                                           Nothing -> dndError mWindow
                                           Just v -> let
                                                       from = read $ T.unpack v
-                                                    in when (from /= f)
-                                                            (sendInputMW mWindow $ MoveField from f)
+                                                    in when (from /= pos)
+                                                            (sendInputMW mWindow $ MoveField from pos)
 
          #add ebox lbl
          return ebox
