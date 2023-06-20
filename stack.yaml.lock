@@ -6,18 +6,18 @@
 packages:
 - completed:
     name: jmvOptions
-    pantry-tree:
-      sha256: 2c8e5d4bcd9590490944ff9b38915a09911d154c55e2cebd12d17d158db4b66f
-      size: 231
-    commit: 5ddff6621f5f76304340c8431a01b0535c42e313
-    git: https://github.com/jvilar/jmvOptions.git
     version: '0.2'
-  original:
-    commit: 5ddff6621f5f76304340c8431a01b0535c42e313
     git: https://github.com/jvilar/jmvOptions.git
+    pantry-tree:
+      size: 231
+      sha256: 2c8e5d4bcd9590490944ff9b38915a09911d154c55e2cebd12d17d158db4b66f
+    commit: 5ddff6621f5f76304340c8431a01b0535c42e313
+  original:
+    git: https://github.com/jvilar/jmvOptions.git
+    commit: 5ddff6621f5f76304340c8431a01b0535c42e313
 snapshots:
 - completed:
-    sha256: 6d1532d40621957a25bad5195bfca7938e8a06d923c91bc52aa0f3c41181f2d4
-    size: 619204
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/33.yaml
-  original: lts-19.33
+    size: 650475
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/26.yaml
+    sha256: 5a59b2a405b3aba3c00188453be172b85893cab8ebc352b1ef58b0eae5d248a2
+  original: lts-20.26

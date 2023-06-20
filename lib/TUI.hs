@@ -1,12 +1,15 @@
+{-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module TUI (
   startTUI
 ) where
 
-import Brick hiding (getName)
+import Brick hiding (getName, zoom)
+import Brick qualified as B
 import Brick.Widgets.Border
 import Brick.Widgets.Center
 import Brick.Widgets.Dialog
@@ -15,8 +18,8 @@ import Control.Lens hiding (index, Zoom, zoom)
 import Data.List(transpose, intersperse)
 import Data.Maybe(isJust, fromMaybe, isNothing)
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Vector as V
+import Data.Text qualified as T
+import Data.Vector qualified as V
 import Graphics.Vty.Attributes(defAttr, bold, reverseVideo, withStyle)
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl))
 
@@ -82,8 +85,8 @@ renderSearchDialog sd = renderDialog (sd ^. sdDialog) $
                                   (renderList renderValue False $ sd ^. sdValues)
 
 
-handleSearchDialogEvent :: Event -> SearchDialog n -> EventM n (SearchDialog n)
-handleSearchDialogEvent = traverseOf sdDialog . handleDialogEvent
+-- handleSearchDialogEvent :: Event -> SearchDialog n -> EventM n (SearchDialog n)
+-- handleSearchDialogEvent = traverseOf sdDialog . handleDialogEvent
 
 
 initialState :: RowStore -> State
@@ -129,7 +132,7 @@ draw s = [ renderFront s, renderBack s ]
 
 renderBack :: State -> Widget Name
 renderBack s = joinBorders $ center $
-       borderWithLabel (withAttr "title" . txt $ title s) $
+       borderWithLabel (withAttr titleAttr . txt $ title s) $
        content
        <=>
        hBorder
@@ -168,10 +171,10 @@ renderTableViewer curF tv = Widget Greedy Fixed $ do
     w <- subtract (length (tv ^. tvColumns)-1) . availWidth <$> getContext
     let v = min (V.length $ listElements $ head $ tv ^. tvColumns) (h-4)
         ws = allocateWidths curF w $ tv ^. tvColWidths
-    render ( vLimit 1 (hBox $ withWidths (\(i, t) -> 
+    render ( vLimit 1 (hBox $ withWidths (\(i, t) ->
                                               if i == curF
-                                              then withAttr "selectedElement" $ myTxt t
-                                              else withAttr "title" $ myTxt t)
+                                              then withAttr selectedElementAttr $ myTxt t
+                                              else withAttr titleAttr $ myTxt t)
                                ws
                                (zip [0..] $ tv ^. tvFieldNames)
                       )
@@ -209,7 +212,7 @@ withWidth :: (a -> Widget Name) -> Int -> a -> Widget Name
 withWidth f w = hLimit w . padRight Max . f
 
 renderName :: Bool -> Text -> Widget Name
-renderName = (withAttr "title" .) . renderElement
+renderName = (withAttr titleAttr .) . renderElement
 
 
 renderValue :: Bool -> Text -> Widget Name
@@ -218,7 +221,7 @@ renderValue = renderElement
 
 renderElement :: Bool -> Text -> Widget Name
 renderElement False = myTxt
-renderElement True = withAttr "selectedElement" . myTxt
+renderElement True = withAttr selectedElementAttr . myTxt
 
 
 myTxt :: Text -> Widget n
@@ -242,7 +245,7 @@ renderZoom s = case s ^. sZoom of
     Nothing -> emptyWidget
     Just (lbl, t) -> myCenter $ joinBorders $
                        hLimitPercent 95 $
-                       borderWithLabel (withAttr "title" $ txt lbl) $
+                       borderWithLabel (withAttr titleAttr $ txt lbl) $
                          txtWrap (if T.null t
                                   then " "
                                   else t)
@@ -272,7 +275,7 @@ app :: App State EventType Name
 app = App { appDraw = draw
           , appChooseCursor = showFirstCursor
           , appHandleEvent = handleEvent
-          , appStartEvent = return
+          , appStartEvent = return ()
           , appAttrMap = const myAttrMap
           }
 
@@ -281,41 +284,45 @@ listKeys :: [Key]
 listKeys = [KDown, KUp, KPageUp, KPageDown, KHome, KEnd, KLeft, KRight]
 
 
-handleEvent :: State -> BrickEvent Name EventType -> EventM Name (Next State)
-handleEvent s (VtyEvent (EvKey k ms)) = handleKey s k ms
-handleEvent s _ = continue s
+handleEvent :: BrickEvent Name EventType -> EventM Name State ()
+handleEvent (VtyEvent (EvKey k ms)) = handleKey k ms
+handleEvent _ = return ()
 
-handleKey :: State -> Key -> [Modifier] -> EventM Name (Next State)
-handleKey s k m
-            | isJust (s ^. sSearch) = handleKeySearch k m s
-            | otherwise = handleKeyStandard k m s
+handleKey :: Key -> [Modifier] -> EventM Name State ()
+handleKey k m = use sSearch
+                >>= (\case
+                        Just _ -> handleKeySearch k m
+                        Nothing -> handleKeyStandard k m)
 
-handleKeyStandard :: Key -> [Modifier] -> State -> EventM Name (Next State)
+handleKeyStandard :: Key -> [Modifier] -> EventM Name State ()
 handleKeyStandard (KChar 'q') [MCtrl] = halt
 handleKeyStandard (KChar 'f') [MCtrl] = activateSearch
 handleKeyStandard (KChar 't') [] = toggleTable
 handleKeyStandard (KChar 'z') [] = toggleZoom
 handleKeyStandard k [] | k `elem` listKeys = moveLists (EvKey k [])
-handleKeyStandard _ _ = continue
+handleKeyStandard _ _ = return ()
 
 
-handleKeySearch :: Key -> [Modifier] -> State -> EventM Name (Next State)
+handleKeySearch :: Key -> [Modifier] -> EventM Name State ()
 handleKeySearch k [] | k `elem` listKeys = moveSearchList (EvKey k [])
 handleKeySearch KEnter [] = moveToSelected
 handleKeySearch KEsc [] = deactivateSearch
 handleKeySearch k ms = handleInSearchDialog (EvKey k ms)
 
 
-backward :: State -> EventM Name (Next State)
-backward s = continue $ moveTo (s ^. sIndex - 1) s
+backward :: EventM Name State ()
+backward = uses sIndex (subtract 1) >>= modify . moveTo
 
 
-forward :: State -> EventM Name (Next State)
-forward s = continue $ moveTo (s ^. sIndex + 1) s
+forward :: EventM Name State ()
+forward = uses sIndex (+ 1) >>= modify . moveTo
 
-toggleZoom :: State -> EventM Name (Next State)
-toggleZoom s | isNothing (s ^. sZoom) = continue $ zoom s
-             | otherwise = continue $ unZoom s
+toggleZoom :: EventM Name State ()
+toggleZoom = use sZoom
+             >>= (\case
+                     Nothing -> modify zoom
+                     Just _ -> modify unZoom)
+
 
 updateZoom :: State -> State
 updateZoom s | isNothing (s ^. sZoom) = s
@@ -332,65 +339,69 @@ zoom s = set sZoom z s
              return (lbl, t)
 
 
-activateSearch :: State -> EventM Name (Next State)
-activateSearch s = do
-  let (index, tle) = fromMaybe (0, "") $ do
-                        listSelectedElement (s ^. sRowViewer . rvFieldNames)
-      vs = fieldValues (fromIntegral index) (s ^. sRowStore)
-      sd = searchDialog SearchList maxWidth tle vs
-  continue $ set sSearch (Just sd) s
+activateSearch :: EventM Name State ()
+activateSearch = do
+   (index, tle) <- uses (sRowViewer . rvFieldNames)
+                        (fromMaybe (0, "") . listSelectedElement)
+   vs <- uses sRowStore (fieldValues (fromIntegral index))
+   sSearch .= Just (searchDialog SearchList maxWidth tle vs)
 
 
-deactivateSearch :: State -> EventM Name (Next State)
-deactivateSearch = continue .set sSearch Nothing
+deactivateSearch :: EventM Name State ()
+deactivateSearch = sSearch .= Nothing
 
 
-toggleTable :: State -> EventM Name (Next State)
-toggleTable = continue . over sIsTable not
+toggleTable :: EventM Name State ()
+toggleTable = sIsTable %= not
 
-moveLists :: Event -> State -> EventM Name (Next State)
-moveLists e s | s ^. sIsTable = moveListsTables e s
-              | otherwise = moveListsRows e s
+moveLists :: Event -> EventM Name State ()
+moveLists e = use sIsTable >>= (\case
+                   True -> moveListsTables e
+                   False -> moveListsRows e)
 
-moveListsRows :: Event -> State -> EventM Name (Next State)
-moveListsRows (EvKey KPageUp []) s = backward s
-moveListsRows (EvKey KPageDown []) s = forward s
-moveListsRows e s = do
-    s' <- traverseOf (sRowViewer . rvLists) (handleListEvent e) s
-    let cf = fromMaybe 0 $ listSelected (s' ^. sRowViewer . rvFieldNames)
-    continue $ updateZoom $ set sCurrentField cf s'
-
-moveListsTables :: Event -> State -> EventM Name (Next State)
-moveListsTables (EvKey KLeft []) s = moveListsRows (EvKey KUp []) s
-moveListsTables (EvKey KRight []) s = moveListsRows (EvKey KDown []) s
-moveListsTables e s = do
-    l <- handleListEvent e (head $ s ^. sTableViewer . tvColumns)
-    continue $ updateZoom $ moveTo (fromMaybe 0 $ listSelected l) s
+moveListsRows :: Event -> EventM Name State ()
+moveListsRows (EvKey KPageUp []) = backward
+moveListsRows (EvKey KPageDown []) = forward
+moveListsRows e = do
+    B.zoom (sRowViewer . rvLists) $ handleListEvent e
+    cf <- uses (sRowViewer . rvFieldNames) (fromMaybe 0 . listSelected)
+    sCurrentField .= cf
+    modify updateZoom
 
 
-moveSearchList :: Event -> State -> EventM Name (Next State)
-moveSearchList e s = do
-    sd <- traverseOf (_Just . sdValues) (handleListEvent e) $ s ^. sSearch
-    continue $ set sSearch sd s
+moveListsTables :: Event -> EventM Name State ()
+moveListsTables (EvKey KLeft []) = moveListsRows (EvKey KUp [])
+moveListsTables (EvKey KRight []) = moveListsRows (EvKey KDown [])
+moveListsTables e = do
+    cols <- use (sTableViewer . tvColumns)
+    let col = head cols
+    (col', ()) <- nestEventM col $ handleListEvent e
+    sTableViewer . tvColumns .= col' : tail cols
+    modify $ updateZoom . moveTo (fromMaybe 0 $ listSelected col')
 
 
-moveToSelected :: State -> EventM Name (Next State)
-moveToSelected s = do
-    let Just sd = s ^. sSearch
-    case dialogSelection $ sd ^. sdDialog of
-        Just OkButton -> case listSelectedElement $ sd ^. sdValues of
-                             Nothing -> deactivateSearch s
-                             Just (_, t) -> let
-                                  pos = nextPos (fromIntegral $ s ^. sCurrentField) t (s ^. sIndex) (s ^. sRowStore)
-                                in deactivateSearch $ moveTo pos s
-        Just CancelButton -> deactivateSearch s
-        Nothing -> continue s
+moveSearchList :: Event -> EventM Name State ()
+moveSearchList e = B.zoom (sSearch . _Just . sdValues) $ handleListEvent e
 
 
-handleInSearchDialog :: Event -> State -> EventM Name (Next State)
-handleInSearchDialog ev s = do
-    sd <- traverse (handleSearchDialogEvent ev) $ s ^. sSearch
-    continue $ set sSearch sd s
+moveToSelected :: EventM Name State ()
+moveToSelected = use sSearch >>= maybe (return ()) (\ss -> do
+                     case dialogSelection (ss ^. sdDialog) of
+                         Just OkButton -> do
+                                            deactivateSearch
+                                            case listSelectedElement (ss ^. sdValues) of
+                                               Nothing -> return ()
+                                               Just (_, t) -> do
+                                                   s <- get
+                                                   let pos = nextPos (fromIntegral $ s ^. sCurrentField) t (s ^. sIndex) (s ^. sRowStore)
+                                                   modify $ moveTo pos
+                         Just CancelButton -> deactivateSearch
+                         Nothing -> return ()
+                 )
+
+
+handleInSearchDialog :: Event -> EventM Name State ()
+handleInSearchDialog ev = B.zoom (sSearch . _Just . sdDialog) $ handleDialogEvent ev
 
 
 moveTo :: Int -> State -> State
@@ -407,10 +418,16 @@ moveTo pos s
                     Just n -> listMoveTo n vl
 
 
+selectedElementAttr :: AttrName
+selectedElementAttr = attrName "selectedElement"
+
+titleAttr :: AttrName
+titleAttr = attrName "title"
+
 myAttrMap :: AttrMap
-myAttrMap = attrMap defAttr [ ("selectedElement", withStyle defAttr reverseVideo)
+myAttrMap = attrMap defAttr [ (selectedElementAttr, withStyle defAttr reverseVideo)
                             , (buttonSelectedAttr, withStyle defAttr reverseVideo)
-                            , ("title", withStyle defAttr bold)
+                            , (titleAttr, withStyle defAttr bold)
                             ]
 
 
