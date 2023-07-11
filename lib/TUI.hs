@@ -168,7 +168,7 @@ renderRowViewer rv = Widget Greedy Fixed $ do
 renderTableViewer :: Int -> TableViewer -> Widget Name
 renderTableViewer curF tv = Widget Greedy Fixed $ do
     h <- availHeight <$> getContext
-    w <- subtract (length (tv ^. tvColumns)-1) . availWidth <$> getContext
+    w <- availWidth <$> getContext
     let v = min (V.length $ listElements $ head $ tv ^. tvColumns) (h-4)
         ws = allocateWidths curF w $ tv ^. tvColWidths
     render ( vLimit 1 (hBox $ withWidths (\(i, t) ->
@@ -187,26 +187,30 @@ renderTableViewer curF tv = Widget Greedy Fixed $ do
                       )
            )
 
+
 allocateWidths :: Int -> Int -> [Int] -> [Int]
-allocateWidths cur w ws
+allocateWidths curF w ws
   | w < s = let
-               (lft, wCur:rgt) = splitAt cur ws
-               w0 = min w wCur
-               (ws0, wd0) = ((reverse . upto (w - w0) $ reverse lft) ++ [w0]
-                             , sum ws0)
-               ws1 = ws0 ++ upto (w - wd0) rgt
-            in ws1
+               (lft, wcurF:rgt) = splitAt curF ws1
+               wCurrent = min w (wcurF - 1)
+               wsLeft= reverse . upto (w - wCurrent) $ reverse lft
+               wRest = w - wCurrent - sum wsLeft
+            in map (max 0 . subtract 1) $ wsLeft ++ [wCurrent + 1] ++ upto wRest rgt
   | otherwise = over (taking n traversed) (+ (dw+1))
               $ over (dropping n traversed) (+ dw) ws
-  where s = sum ws
-        l = length ws
+  where ws1 = map succ ws
+        s = sum ws1
+        l = length ws1
         (dw, n) = (w - s) `divMod` l
         upto _ [] = []
         upto ml (x:xs) = v:upto (ml-v) xs
             where v = min ml x
 
 withWidths :: (a -> Widget Name) -> [Int] -> [a] -> [Widget Name]
-withWidths f = (intersperse vBorder .) . zipWith (withWidth f)
+withWidths f ws l = intersperse vBorder
+                  $ map (uncurry $ withWidth f)
+                  $ filter ((>0) . fst)
+                  $ zip ws l
 
 withWidth :: (a -> Widget Name) -> Int -> a -> Widget Name
 withWidth f w = hLimit w . padRight Max . f
