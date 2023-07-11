@@ -1,4 +1,4 @@
-{ mkDerivation, aeson, aeson-pretty, auto, base, brick, bv
+{ pkgs, mkDerivation, aeson, aeson-pretty, auto, base, brick, bv
 , bytestring, containers, data-default, directory, filepath, gi-gdk
 , gi-gtk, gi-gtk-hs, haskeline, haskell-gi-base, hspec, jmvOptions
 , lens, lib, megaparsec, mtl, text, text-show, transformers, vector
@@ -22,6 +22,11 @@ mkDerivation {
     jmvOptions lens mtl text
   ];
   testHaskellDepends = [ aeson base bytestring hspec text ];
+  executableSystemDepends = [ pkgs.makeWrapper ];
+ 
+  postInstall = ''
+    wrapProgram $out/bin/hrows --prefix XDG_DATA_DIRS : "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}"
+  '';
   description = "A program to handle data in form of rows";
   license = lib.licenses.gpl2Only;
 }
