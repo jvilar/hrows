@@ -44,6 +44,15 @@ many p = do
         Just x -> (x:) <$> many p
         Nothing -> return []
 
+-- |Return a list of parses separated by a token.
+separated :: Parser a -> Token -> Parser [a]
+separated p t = do
+    x <- p
+    c <- check t
+    if c
+    then advance >> (x:) <$> separated p t
+    else return [x]
+
 -- |Read the current token.
 current :: Parser Token
 current = lift $ gets head
@@ -189,8 +198,8 @@ base = do
         NotT -> mkUnary (UnaryOpInfo notField "!") <$> base
         CastT ft -> mkCast ft <$> parenthesized
         OpenT -> expression <* close
-        MaxT -> maxMin $ PBinaryOpInfo maxField "max"
-        MinT -> maxMin $ PBinaryOpInfo minField "min"
+        MaxT -> maxMin $ PrefixOpInfo maxField "max"
+        MinT -> maxMin $ PrefixOpInfo minField "min"
         _ -> parsingError $ T.concat ["Error en ", showt t, ", esperaba un comienzo de expresión"]
 
 -- name --> (AtT NameT ArrowT NameT EqualT NameT)?
@@ -220,11 +229,5 @@ close = expect CloseT "un paréntesis cerrado"
 colon :: Parser ()
 colon = expect ColonT "dos puntos"
 
-maxMin :: PBinaryOpInfo -> Parser Expression
-maxMin op = do
-              open
-              left <- expression
-              expect CommaT "una coma"
-              right <- expression
-              close
-              return $ mkPBinary op left right
+maxMin :: PrefixOpInfo -> Parser Expression
+maxMin op = mkPrefix op <$> (open *> separated expression CommaT <* close)

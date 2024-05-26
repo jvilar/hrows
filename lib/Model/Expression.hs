@@ -7,7 +7,7 @@ module Model.Expression ( -- *Types
                         , BinaryOp
                         , UnaryOp
                         , BinaryOpInfo(..)
-                        , PBinaryOpInfo(..)
+                        , PrefixOpInfo(..)
                         , UnaryOpInfo(..)
                         , Priority
                         , Associativity(..)
@@ -18,7 +18,7 @@ module Model.Expression ( -- *Types
                         , mkConstant
                         , mkUnary
                         , mkBinary
-                        , mkPBinary
+                        , mkPrefix
                         , mkTernary
                         , mkErrorCheck
                         , mkCast
@@ -34,6 +34,7 @@ module Model.Expression ( -- *Types
                         ) where
 
 import Data.Char(isAlphaNum)
+import Data.List(intercalate)
 import Data.Text(Text)
 import qualified Data.Text as T
 import TextShow(TextShow(showt))
@@ -63,7 +64,7 @@ instance Show Expression where
                    gshow (Constant f) = "Constant " ++ show f
                    gshow (Unary u ex) = concat ["Unary ", show u, " (", ex, ")" ]
                    gshow (Binary b ex1 ex2) = concat ["Binary ", show b, " (", ex1,", ", ex2, ")" ]
-                   gshow (PrefixBinary b ex1 ex2) = concat ["PrefixBinary ", show b, " (", ex1,", ", ex2, ")" ]
+                   gshow (Prefix b exs) = concat ["Prefix", show b, " ("] ++ intercalate ", " exs ++ ")"
                    gshow (Ternary ex1 ex2 ex3) = concat ["Ternary ", " (", ex1, ", ", ex2, ", ", ex3, ")" ]
                    gshow (ErrorCheck ex1 ex2) = concat ["ErrorCheck ", " (", ex1, ", ", ex2, ")" ]
                    gshow (FromSource sName ex1 ex2 ex3) = concat["FromSource", " (", sName, ", ", ex1, ", ", ex2, ", ", ex3, ")"]
@@ -76,7 +77,7 @@ data Node a = Position Int -- ^A position in the row
             | Constant Field -- ^A constant value
             | Unary UnaryOpInfo a -- ^Application of an unary operator
             | Binary BinaryOpInfo a a -- ^Application of a binary operator
-            | PrefixBinary PBinaryOpInfo a a -- ^Aplication of a prefix binary operator (max or min) 
+            | Prefix PrefixOpInfo [a] -- ^Aplication of a prefix operator (max or min) 
             | Ternary a a a -- ^Application of the ternary operator
             | ErrorCheck a a -- ^Check an error. If the left operator evaluates to an error return the evaluation of the right operator.
             | Cast FieldType a -- ^Application of cast
@@ -104,8 +105,8 @@ mkUnary = (In .) . Unary
 mkBinary :: BinaryOpInfo -> Expression -> Expression -> Expression
 mkBinary i e e' = In $ Binary i e e'
 
-mkPBinary :: PBinaryOpInfo -> Expression -> Expression -> Expression
-mkPBinary i e e' = In $ PrefixBinary i e e'
+mkPrefix :: PrefixOpInfo -> [Expression] -> Expression
+mkPrefix i es = In $ Prefix i es
 
 mkTernary :: Expression -> Expression -> Expression -> Expression
 mkTernary e e' e'' = In $ Ternary e e' e''
@@ -150,16 +151,18 @@ instance Show BinaryOpInfo where
 instance Eq BinaryOpInfo where
     a == b = formulaB a == formulaB b
 
--- |The information stored about a prefix binary operation.
-data PBinaryOpInfo = PBinaryOpInfo { opPB :: BinaryOp
-                                   , formulaPB :: Formula
-                                   }
+type PrefixOp = [Field] -> Field
 
-instance Show PBinaryOpInfo where
-    show = T.unpack . formulaPB
+-- |The information stored about a prefix operation.
+data PrefixOpInfo = PrefixOpInfo { opP :: PrefixOp
+                                 , formulaP :: Formula
+                                 }
 
-instance Eq PBinaryOpInfo where
-    a == b = formulaPB a == formulaPB b
+instance Show PrefixOpInfo where
+    show = T.unpack . formulaP
+
+instance Eq PrefixOpInfo where
+    a == b = formulaP a == formulaP b
 
 
 toFormula :: Expression -> Formula
@@ -178,8 +181,8 @@ toFormula = para tf
                                       TrueAssoc -> (prioB info, prioB info)
                                       NoAssoc -> (prioB info + 1, prioB info + 1)
                      in T.concat [parent pe1 (prio e1) f1, formulaB info, parent pe2 (prio e2) f2]
-          tf (PrefixBinary info (_, f1) (_, f2)) =
-                    T.concat [formulaPB info, "(", f1, ", ", f2, ")"]
+          tf (Prefix info fs) =
+                    T.concat $ [formulaP info, "(", T.intercalate ", " $ map snd fs, ")"]
           tf (Cast ft (_, f)) = T.concat [typeOperator ft, "(", f, ")"]
           tf (ErrorCheck (_, f1) (_, f2)) = T.concat ["(", f1, ") ?! (", f2, ")"]
           tf (Ternary (e1, f1) (e2, f2) (e3, f3)) = let
@@ -221,7 +224,7 @@ getPositions = cata gp
         gp (Constant _) = []
         gp (Unary _ ps) = ps
         gp (Binary _ ps1 ps2) = merge ps1 ps2
-        gp (PrefixBinary _ ps1 ps2) = merge ps1 ps2
+        gp (Prefix _ pss) = foldr merge [] pss
         gp (Cast _ ps) = ps
         gp (Ternary ps1 ps2 ps3) = ps1 `merge` ps2 `merge` ps3
         gp (ErrorCheck ps1 ps2) = merge ps1 ps2

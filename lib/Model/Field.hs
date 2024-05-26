@@ -222,16 +222,23 @@ notField (AnInt n _) | n > 0 = toField (0::Int)
                      | otherwise = toField (1::Int)
 notField f = typeError "no lógico" f
 
-maxField :: Field -> Field -> Field
-maxField f1 f2 = case compareField (>=) f1 f2 of
-                    err@(AnError _ _) -> err
-                    AnInt 1 _ -> f1
-                    _ -> f2
+maxField :: [Field] -> Field
+maxField [] = AnError TypeInt "max de lista vacía"
+maxField fs = extreme (>=) fs
 
-minField :: Field -> Field -> Field
-minField f1 f2 = case compareField (<=) f1 f2 of
-                    AnInt 1 _ -> f1
-                    _ -> f2
+minField :: [Field] -> Field
+minField [] = AnError TypeInt "min de lista vacía"
+minField fs = extreme (<=) fs
+
+extreme :: (Field -> Field -> Bool) -> [Field] -> Field
+extreme _ [] = AnError TypeInt "extremo de lista vacía"
+extreme _ [f] = f
+extreme cmp fs = go fs
+   where go [f] = f
+         go (f1:f2:fs) = case compareField cmp f1 f2 of
+                            err@(AnError _ _) -> err
+                            AnInt 1 _ -> go $ f1:fs
+                            _ -> go $ f2:fs
 
 compareField :: (Field -> Field -> Bool) -> Field -> Field -> Field
 compareField _ e@(AnError _ _) _ = e
