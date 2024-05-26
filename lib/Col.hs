@@ -210,14 +210,13 @@ checkPosition e = parsingError $ T.concat [ "Expression "
 -- |Produce a `RowStore` from a list of `Col` and an existing
 -- `RowStore`.
 applyCols :: [Col] -> RowStore -> RowStore
-applyCols cs0 rst = mkRowStore (getName rst) conf
-                    . map (processRow dss cs)
-                    $ rows rst
+applyCols cs0 rst = mkRowStore (getName rst) conf values
     where cs = cs0 & traversed . expressionT %~ addPositions rst
           dss = getDataSources rst
+          values = map (processRow dss cs) $ rows rst
           conf = case names rst of
-                    Just _ -> fromNamesTypes (colNames rst cs) (colTypes rst cs)
-                    Nothing -> fromTypes (colTypes rst cs)
+                    Just _ -> fromNamesTypes (colNames rst cs) (colTypes values)
+                    Nothing -> fromTypes (colTypes values)
 
 colNames :: RowStore -> [Col] -> [Text]
 colNames rst = concatMap toName
@@ -228,11 +227,32 @@ colNames rst = concatMap toName
           toName (Range e1 e2) = slice (pos e1) (pos e2) $ fnames rst
           toName AllCols = fnames rst
 
-colTypes :: RowStore -> [Col] -> [FieldType]
-colTypes rst = concatMap toType
-    where toType (Single e _) = [typeOf $ evaluate (row 0 rst) (getDataSources rst) e]
-          toType (Range e1 e2) = slice (pos e1) (pos e2) $ types rst
-          toType AllCols = types rst
+colTypes :: [Row] -> [FieldType]
+colTypes = foldr (zipWith consolidateType) (repeat TypeEmpty) . map (map typeOf)
+    where consolidateType t1 t2 | t1 == t2 = t1
+                                | t1 == TypeEmpty = t2
+                                | t2 == TypeEmpty = t1
+                                | otherwise = case t1 of
+                                   TypeInt -> case t2 of
+                                                TypeInt0 -> TypeInt0
+                                                TypeDouble -> TypeDouble
+                                                TypeDouble0 -> TypeDouble0
+                                                _ -> TypeInt0
+                                   TypeInt0 -> case t2 of
+                                                TypeDouble -> TypeDouble0
+                                                TypeDouble0 -> TypeDouble0
+                                                _ -> TypeInt0
+                                   TypeDouble -> case t2 of
+                                                  TypeInt -> TypeDouble
+                                                  _ -> TypeDouble0
+                                   TypeDouble0 -> TypeDouble0
+                                   TypeString -> case t2 of
+                                                  TypeInt -> TypeInt0
+                                                  TypeInt0 -> TypeInt0
+                                                  TypeDouble -> TypeDouble0
+                                                  TypeDouble0 -> TypeDouble0
+                                                  _ -> TypeString
+
 
 processRow :: [DataSource] -> [Col] -> Row -> Row
 processRow dss cs r = concatMap f cs
