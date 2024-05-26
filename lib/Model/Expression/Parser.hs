@@ -217,8 +217,9 @@ name s = do
                 fThere <- expression
                 return $ mkFromSource source fHere fThere pos 
         else return pos
-parenthesized :: Parser Expression
-parenthesized = open >> expression <* close
+
+parenthesized :: Parser [Expression]
+parenthesized = open >> separated expression CommaT <* close
 
 open :: Parser ()
 open = expect OpenT "un paréntesis abierto"
@@ -230,4 +231,4 @@ colon :: Parser ()
 colon = expect ColonT "dos puntos"
 
 maxMin :: PrefixOpInfo -> Parser Expression
-maxMin op = mkPrefix op <$> (open *> separated expression CommaT <* close)
+maxMin op = mkPrefix op <$> parenthesized

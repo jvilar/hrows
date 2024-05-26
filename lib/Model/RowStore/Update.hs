@@ -270,7 +270,7 @@ replace = go 0
   where go _ [] _ = []
         go _ l [] = l
         go n (f:fs) ((pos, val):rest) | n /= pos = f : go (n+1) fs ((pos, val):rest)
-                                      | otherwise = convert (typeOf f) val : go (n+1) fs rest
+                                      | otherwise = convert (typeOf f) [val] : go (n+1) fs rest
 
 
 
@@ -317,7 +317,7 @@ moveField from to rst = let
 -- |Changes the type of the field.
 changeFieldType :: FieldType -> FieldPos -> RowStore -> RowStore
 changeFieldType t n rst | t /= types rst !! n' =
-                            addPlan rst { _rows = IM.map (change $ convert t) (_rows rst)
+                            addPlan rst { _rows = IM.map (change $ convert t . (:[])) (_rows rst)
                                         , _fieldInfo = newInfo
                                         }
                         | otherwise = rst

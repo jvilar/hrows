@@ -38,6 +38,7 @@ import Data.Text(Text)
 import qualified Data.Text as T
 import Data.Text.Read(decimal, signed, double)
 import GHC.Int(Int32)
+import Numeric (showFFloat)
 import TextShow(TextShow(showt))
 
 import GHC.Generics
@@ -145,13 +146,19 @@ baseType = typeOf . defaultValue
 
 -- |Convert a field to a given type, return `AnError` with
 -- a message if there is an error in the conversion
-convert :: FieldType -> Field -> Field
-convert t f | typeOf f == baseType t = f
-            | otherwise = doConvert f t
+convert :: FieldType -> [Field] -> Field
+convert t [f] | typeOf f == baseType t = f
+              | otherwise = doConvert f t
+convert TypeString [f, d] | typeOf f == TypeDouble && typeOf d == TypeInt = convertWithDecimals f d
+convert t fs = AnError t $ T.concat ["Error en conversión a ", T.pack $ show t, ": parámetros: ", T.intercalate ", " $ map toString fs]
+
+-- |Convert to a double to a string with the given number of decimals
+convertWithDecimals :: Field -> Field -> Field
+convertWithDecimals (ADouble d _) (AnInt n _) = AString . T.pack $ showFFloat (Just n) d ""
 
 -- |Convert a field to the given type but keeping the text
 convertKeepText :: FieldType -> Field -> Field
-convertKeepText t f = case convert t f of
+convertKeepText t f = case convert t [f] of
                         AnError _ _ -> AnError t (toString f)
                         f' -> f'
 

@@ -194,7 +194,7 @@ fieldValues f = unique . sort . IM.foldr (\r l -> toString (r !!! f) : l) [] . _
 -- |The position of the next appearance of a value
 nextPos :: FieldPos -> Text -> RowPos -> RowStore -> RowPos
 nextPos fpos s pos store = let
-    v = convert (fieldType fpos store) $ toField s
+    v = convert (fieldType fpos store) [toField s]
     step i n (p, q) | n !!! fpos /= v = (p, q)
                     | i < pos = (Just $ maybe i (min i) p, q)
                     | i > pos = (p, Just $ maybe i (min i) q)

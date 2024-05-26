@@ -430,4 +430,10 @@ main = do
                        then sortRows ind Ascending rst'
                        else sortRowsOn (T.reverse . toString . (!!! ind)) rst'
           writeListing opts inds sorted
+          print $ types rst
+          print $ head (rows rst)
+          print $ types rst'
+          print $ head (rows rst')
+          print $ types sorted
+          print $ head (rows sorted)
 

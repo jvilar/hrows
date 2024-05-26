@@ -68,7 +68,7 @@ instance Show Expression where
                    gshow (Ternary ex1 ex2 ex3) = concat ["Ternary ", " (", ex1, ", ", ex2, ", ", ex3, ")" ]
                    gshow (ErrorCheck ex1 ex2) = concat ["ErrorCheck ", " (", ex1, ", ", ex2, ")" ]
                    gshow (FromSource sName ex1 ex2 ex3) = concat["FromSource", " (", sName, ", ", ex1, ", ", ex2, ", ", ex3, ")"]
-                   gshow (Cast t ex) = concat ["Cast ", show t, " (", ex, ")" ]
+                   gshow (Cast t exs) = concat ["Cast ", show t, " ("] ++ intercalate ", " exs ++ ")"
                    gshow (Error e) = T.unpack e
 
 -- |A node in the AST for expressions
@@ -80,7 +80,7 @@ data Node a = Position Int -- ^A position in the row
             | Prefix PrefixOpInfo [a] -- ^Aplication of a prefix operator (max or min) 
             | Ternary a a a -- ^Application of the ternary operator
             | ErrorCheck a a -- ^Check an error. If the left operator evaluates to an error return the evaluation of the right operator.
-            | Cast FieldType a -- ^Application of cast
+            | Cast FieldType [a] -- ^Application of cast
             | FromSource a a a a -- ^Recover from a source. Parameters: source, position in the row to compare with,
                                  -- position in the source, position in the source to get the value from 
             | Error Text -- ^An error
@@ -114,7 +114,7 @@ mkTernary e e' e'' = In $ Ternary e e' e''
 mkErrorCheck :: Expression -> Expression -> Expression
 mkErrorCheck e e' = In $ ErrorCheck e e'
 
-mkCast :: FieldType -> Expression -> Expression
+mkCast :: FieldType -> [Expression] -> Expression
 mkCast = (In .) . Cast
 
 mkFromSource :: Expression -> Expression -> Expression -> Expression -> Expression
@@ -183,7 +183,7 @@ toFormula = para tf
                      in T.concat [parent pe1 (prio e1) f1, formulaB info, parent pe2 (prio e2) f2]
           tf (Prefix info fs) =
                     T.concat $ [formulaP info, "(", T.intercalate ", " $ map snd fs, ")"]
-          tf (Cast ft (_, f)) = T.concat [typeOperator ft, "(", f, ")"]
+          tf (Cast ft fs) = T.concat [typeOperator ft, "(", T.intercalate ", " $ map snd fs, ")"]
           tf (ErrorCheck (_, f1) (_, f2)) = T.concat ["(", f1, ") ?! (", f2, ")"]
           tf (Ternary (e1, f1) (e2, f2) (e3, f3)) = let
                 f1' = parent 1 (prio e1) f1
@@ -209,9 +209,9 @@ prio _ = 10
 
 
 addCast :: FieldType -> Expression -> Expression
-addCast ft ex@(In (Cast ft' e)) | ft == ft' = ex
-                                 | otherwise = In (Cast ft e)
-addCast ft ex = In (Cast ft ex)
+addCast ft ex@(In (Cast ft' exs)) | ft == ft' = ex
+                                  | otherwise = In (Cast ft exs)
+addCast ft ex = In (Cast ft [ex])
 
 -- |The positions referenced in the expression. They are sorted, without repetions and
 --  only include those positions that refer to the current row, not to other data sources.
@@ -225,7 +225,7 @@ getPositions = cata gp
         gp (Unary _ ps) = ps
         gp (Binary _ ps1 ps2) = merge ps1 ps2
         gp (Prefix _ pss) = foldr merge [] pss
-        gp (Cast _ ps) = ps
+        gp (Cast _ pss) = foldr merge [] pss
         gp (Ternary ps1 ps2 ps3) = ps1 `merge` ps2 `merge` ps3
         gp (ErrorCheck ps1 ps2) = merge ps1 ps2
         gp (FromSource _ ps _ _) = ps
