@@ -1,4 +1,4 @@
-resolver: lts-20.26
+resolver: lts-22.26
 
 nix:
   enable: true
@@ -7,6 +7,16 @@ nix:
     - haskellPackages.freetype2
     - haskellPackages.gi-gobject
     - gtk3
+    - pcre2
+    - xorg.libXdmcp
+    - util-linux
+    - libselinux
+    - libsepol
+    - libthai
+    - libdatrie
+    - libxkbcommon
+    - libepoxy
+    - xorg.libXtst
 
 packages:
 - .

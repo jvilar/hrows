@@ -85,7 +85,7 @@ testSimpleExpressions = describe "Test simple expressions" $ do
 
 
 mkTypeError :: FieldType -> Text -> Field
-mkTypeError t = convert t . mkError
+mkTypeError t = convert t . (:[]) . mkError
 
 testSimpleErrors :: Spec
 testSimpleErrors = describe "Test simple errors" $ do

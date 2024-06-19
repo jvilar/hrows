@@ -29,9 +29,9 @@ import Graphics.Vty (imageWidth, imageHeight, translate)
 maxWidth :: Int
 maxWidth = 40
 
-data Name = FieldNames | ValueList | SearchList | ValueColumn Int deriving (Eq, Ord, Show)
+data Name = FieldNames | ValueList | SearchList | ValueColumn Int | DButton DialogButton deriving (Eq, Ord, Show)
 
-data DialogButton = OkButton | CancelButton
+data DialogButton = OkButton | CancelButton deriving (Eq, Ord, Show)
 
 data State = State { _sRowStore :: RowStore
                    , _sIndex :: Int
@@ -46,7 +46,7 @@ data State = State { _sRowStore :: RowStore
 type Zoom = (Text, Text)
 
 data SearchDialog n = SearchDialog { _sdValues :: List n Text
-                                   , _sdDialog :: Dialog DialogButton
+                                   , _sdDialog :: Dialog () n
                                    }
 
 data RowViewer = RowViewer { _rvFieldNames :: List Name Text
@@ -70,11 +70,11 @@ makeLenses ''SearchDialog
 makeLenses ''State
 makeLenses ''TableViewer
 
-searchDialog :: n -> Int -> Text -> [Text] -> SearchDialog n
+searchDialog :: Name -> Int -> Text -> [Text] -> SearchDialog Name
 searchDialog n w ttle values = SearchDialog (list n (V.fromList values) 1)
-                                            (dialog (Just $ T.unpack ttle)
-                                                    (Just (0, [ ("OK", OkButton)
-                                                              , ("Cancel", CancelButton)]))
+                                            (dialog (Just $ txt ttle)
+                                                    (Just (DButton OkButton, [ ("OK", DButton OkButton, ())
+                                                              , ("Cancel", DButton CancelButton, ())]))
                                                     w
                                             )
 
@@ -391,7 +391,7 @@ moveSearchList e = B.zoom (sSearch . _Just . sdValues) $ handleListEvent e
 moveToSelected :: EventM Name State ()
 moveToSelected = use sSearch >>= maybe (return ()) (\ss -> do
                      case dialogSelection (ss ^. sdDialog) of
-                         Just OkButton -> do
+                         Just (DButton OkButton, ()) -> do
                                             deactivateSearch
                                             case listSelectedElement (ss ^. sdValues) of
                                                Nothing -> return ()
@@ -399,8 +399,8 @@ moveToSelected = use sSearch >>= maybe (return ()) (\ss -> do
                                                    s <- get
                                                    let pos = nextPos (fromIntegral $ s ^. sCurrentField) t (s ^. sIndex) (s ^. sRowStore)
                                                    modify $ moveTo pos
-                         Just CancelButton -> deactivateSearch
-                         Nothing -> return ()
+                         Just (DButton CancelButton, ()) -> deactivateSearch
+                         _ -> return ()
                  )
 
 

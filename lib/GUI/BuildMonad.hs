@@ -20,7 +20,8 @@ module GUI.BuildMonad (
   , GUIControl
 ) where
 
-import Control.Monad.Reader(void, liftIO, asks, ReaderT, runReaderT)
+import Control.Monad(void)
+import Control.Monad.Reader(liftIO, asks, ReaderT, runReaderT)
 import Data.Maybe(fromJust)
 import Data.Text(Text)
 import GI.Gtk(on, MenuItem, Button, builderGetObject, Builder)
