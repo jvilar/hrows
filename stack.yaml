@@ -1,21 +1,23 @@
-resolver: lts-22.26
+resolver: lts-22.43
 
 nix:
   enable: true
   packages:
-    - pkg-config
+    - gtk3
     - haskellPackages.freetype2
     - haskellPackages.gi-gobject
-    - gtk3
-    - pcre2
-    - xorg.libXdmcp
-    - util-linux
+    - lerc
+    - libdatrie
+    - libepoxy
     - libselinux
     - libsepol
+    - libsysprof-capture
     - libthai
-    - libdatrie
     - libxkbcommon
-    - libepoxy
+    - pcre2
+    - pkg-config
+    - util-linux
+    - xorg.libXdmcp
     - xorg.libXtst
 
 packages:
