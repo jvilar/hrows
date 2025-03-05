@@ -38,6 +38,7 @@ library:
   - mtl
   - text
   - text-show
+  - text-zipper
   - transformers
   - vector
   - vty

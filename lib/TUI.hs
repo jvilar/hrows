@@ -18,21 +18,19 @@ import Brick.Widgets.Edit qualified as Ed
 import Brick.Widgets.List hiding (splitAt, reverse)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Data.List(transpose, intersperse, find)
-import Data.Maybe(isJust, fromMaybe, isNothing)
+import Data.Maybe(fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
+import Data.Text.Zipper qualified as Tz
 import Data.Vector qualified as V
 import Graphics.Vty.Attributes(defAttr, bold, reverseVideo, withStyle)
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl))
 
+import Model.Field
 import Model.Expression.RecursionSchemas
 import Model.RowStore
 import Graphics.Vty (imageWidth, imageHeight, translate)
-import Brick.Widgets.Edit (getEditContents)
-import Data.Aeson (Value(Bool))
-import Numeric.Lens (base)
-import Data.BitVector (sdiv)
-import Col (pos)
+import Control.Monad (when)
 
 maxWidth :: Int
 maxWidth = 40
@@ -96,11 +94,18 @@ rvValues f (RowViewer fl fw vl) = RowViewer fl fw <$> f vl
 tvLists :: Traversal' TableViewer (List Name Text)
 tvLists f (TableViewer fl cw cs cf) = TableViewer fl cw <$> traverse f cs <*> pure cf
 
+
 makeLenses ''RowViewer
 makeLenses ''SearchDialog
 makeLenses ''State
 makeLenses ''TableViewer
 makeLenses ''ZoomViewer
+
+updateRvValues :: [Text] -> RowViewer -> RowViewer
+updateRvValues ts rv = over rvValueList (listReplace v i) rv
+  where i = listSelected $ rv ^. rvValueList
+        l = listElements (rv ^. rvValueList)
+        v = V.fromList $ zipWith updateEditor ts (V.toList l)
 
 levelSearch :: Lens' Interface (Maybe SearchDialog)
 levelSearch = lens getter setter
@@ -225,18 +230,7 @@ currentFieldName :: State -> Text
 currentFieldName s = fnames (s ^. sRowStore) !! (s ^. sCurrentField)
 
 currentFieldValue :: State -> Text
-currentFieldValue = cata cfv . view sInterface
-    where cfv (Searching _ v) = v
-          cfv (Zoomed _ v) = v
-          cfv (AsTable tv) = case listSelectedElement ((tv ^. tvColumns) !! (tv ^. tvCurrentField)) of
-                                Nothing -> "ERROR, NO SELECTED ELEMENT"
-                                Just (_, t) -> t
-          cfv (AsRows rv) = case listSelectedElement (rv ^. rvValueList) of
-                              Nothing -> "ERROR, NO SELECTED ELEMENT"
-                              Just (_, t) -> T.concat $ getEditContents t
-
-storedFieldValue :: State -> Text
-storedFieldValue s = toString $ row (s ^. sIndex) (s ^. sRowStore) !! (s ^. sCurrentField)
+currentFieldValue s = toString $ row (s ^. sIndex) (s ^. sRowStore) !! (s ^. sCurrentField)
 
 mkRowViewer :: RowStore -> Int -> RowViewer
 mkRowViewer rst pos = RowViewer { _rvFieldNames = listMoveTo pos fl
@@ -454,6 +448,12 @@ handleCommonKeys (VtyEvent (EvKey (KChar c) [MCtrl])) = case c of
     't' -> toggleTable >> return True
     'z' -> toggleZoom >> return True
     _ -> return False
+handleCommonKeys (VtyEvent (EvKey k [MCtrl])) = case k of
+    KUp -> backward >> return True
+    KDown -> forward >> return True
+    KLeft -> fieldBackward >> return True
+    KRight -> fieldForward >> return True
+    _ -> return False
 handleCommonKeys _ = return False
 
 handleEventZoom :: BrickEvent Name EventType -> EventM Name State ()
@@ -463,7 +463,7 @@ handleEventZoom e = handleCommonKeys e >>->> case e of
     VtyEvent (EvKey KUp []) -> fieldBackward
     VtyEvent (EvKey KDown []) -> fieldForward
     VtyEvent (EvKey KEnter []) -> fieldForward
-    _ -> B.zoom (sInterface . activeEditor . _Just) $ Ed.handleEditorEvent e
+    _ -> handleEdition e
 
 handleEventTable :: BrickEvent Name EventType -> EventM Name State ()
 handleEventTable e = handleCommonKeys e >>->> case e of
@@ -481,8 +481,39 @@ handleEventRows e = handleCommonKeys e >>->> case e of
     VtyEvent (EvKey KUp []) -> fieldBackward
     VtyEvent (EvKey KDown []) -> fieldForward
     VtyEvent (EvKey KEnter []) -> fieldForward
-    _ -> B.zoom (sInterface . activeEditor . _Just) $ Ed.handleEditorEvent e
+    _ -> handleEdition e
 
+handleEdition :: BrickEvent Name EventType -> EventM Name State ()
+handleEdition e = do
+    med <- use (sInterface . activeEditor)
+    case med of
+        Nothing -> return ()
+        Just ed -> do
+                     B.zoom (sInterface . activeEditor . _Just) $ Ed.handleEditorEvent e
+                     value <- use (sInterface . activeEditor . _Just . to Ed.getEditContents)
+                     updateCurrentField $ T.concat value
+
+updateCurrentField :: Text -> EventM Name State ()
+updateCurrentField t = do
+    s <- get
+    let (rst, ch) = changeField (s ^. sIndex) (fromIntegral $ s ^. sCurrentField) (toField t) (s ^. sRowStore)
+    when (notNull ch) $ do
+        sRowStore .= rst
+        let r = map toString $ row (s ^. sIndex) rst
+        sInterface %= cata (uRow r (r !! (s ^. sCurrentField)))
+  where
+    uRow _ _ s@(Searching _ _) = In s
+    uRow _ ft (Zoomed zv i) = In (Zoomed (over zvEditor (updateEditor ft) zv) i)
+    uRow r ft (AsTable tv) = In $ AsTable tv
+    uRow r _ (AsRows rv) = In . AsRows $ updateRvValues r rv
+
+notNull :: [a] -> Bool
+notNull [] = False
+notNull _ = True
+
+updateEditor :: Text -> ValueEditor Name -> ValueEditor Name
+updateEditor t ed | t == T.concat (Ed.getEditContents ed) = ed
+                  | otherwise = Ed.applyEdit (const $ Tz.textZipper [t] $ Just 1) ed
 
 backward :: EventM Name State ()
 backward = uses sIndex (subtract 1) >>= modify . moveTo
@@ -522,9 +553,15 @@ toggleTable :: EventM Name State ()
 toggleTable = do
     rst <- use sRowStore
     idx <- use sIndex
+    fld <- use sCurrentField
     use (sInterface . levelTable) >>= \case
-                Just _ -> sInterface . levelRows .= Just (mkRowViewer rst idx)
-                Nothing -> sInterface . levelTable .= Just (buildTable rst idx)
+                Just _ -> do
+                            sInterface . levelRows .= Just (mkRowViewer rst idx)
+                            modify $ moveFieldTo fld
+                Nothing -> do
+                             sInterface . levelTable .= Just (buildTable rst idx)
+                             modify $ moveTo idx
+                             modify $ moveFieldTo fld
 {-
 
 sInterface %= cata tTable
@@ -603,7 +640,7 @@ moveTo pos s
         indexUpdated = set sIndex pos s
         moveInterface = cata mi
         mi (Searching sd i) = In $ Searching sd i
-        mi (Zoomed zv i) = In $ Zoomed (set zvEditor (mkEditor ZoomEditor (storedFieldValue indexUpdated)) zv) i
+        mi (Zoomed zv i) = In $ Zoomed (set zvEditor (mkEditor ZoomEditor (currentFieldValue indexUpdated)) zv) i
         mi (AsTable tv) = In $ AsTable (over tvLists (listMoveTo pos) tv)
         mi (AsRows rv) = let
                            vList = case listSelected (rv ^. rvFieldNames) of
