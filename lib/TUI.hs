@@ -13,6 +13,7 @@ import Brick hiding (getName, zoom)
 import Brick qualified as B
 import Brick.Widgets.Border
 import Brick.Widgets.Center
+import Brick.Widgets.Core qualified as BC
 import Brick.Widgets.Dialog
 import Brick.Widgets.Edit qualified as Ed
 import Brick.Widgets.List hiding (splitAt, reverse)
@@ -62,6 +63,7 @@ data State = State { _sRowStore :: RowStore
                    , _sIndex :: Int
                    , _sCurrentField :: Int
                    , _sInterface :: Interface
+                   , _sLog :: [Text]
                    }
 
 type ValueEditor = Ed.Editor Text
@@ -191,6 +193,9 @@ activeEditor = lens getter setter
           addE ve (AsRows rv) = In $ AsRows (set (rvValueList . element (fromMaybe 0 $ listSelected $ rv ^. rvValueList)) ve rv)
 
 
+logMessage :: Text -> EventM Name State ()
+logMessage t = sLog %= take 10 . (t:)
+
 mkSearchDialog :: Name -> Int -> Text -> [Text] -> SearchDialog
 mkSearchDialog n w ttle values = SearchDialog (list n (V.fromList values) 1)
                                             (dialog (Just $ txt ttle)
@@ -206,7 +211,7 @@ renderSearchDialog sd = renderDialog (sd ^. sdDialog) $
                                   (renderList renderValue False $ sd ^. sdValues)
 
 renderZoomViewer :: ZoomViewer -> Widget Name
-renderZoomViewer zv = myCenter $ joinBorders $
+renderZoomViewer zv = centerLayer $ joinBorders $
                        hLimitPercent 95 $
                        borderWithLabel (withAttr titleAttr $ txt $ zv ^. zvTitle) $
                          Ed.renderEditor (txt . T.unlines) True (zv ^. zvEditor)
@@ -224,6 +229,7 @@ initialState rst = State { _sRowStore = rst
                          , _sIndex = 0
                          , _sCurrentField = 0
                          , _sInterface = mkAsRows $ mkRowViewer rst 0
+                         , _sLog = []
                          }
 
 currentFieldName :: State -> Text
@@ -267,7 +273,7 @@ type EventType = ()
 
 
 draw :: State -> [Widget Name]
-draw s = cata doDraw $ _sInterface s
+draw s = bottomRight (txt $ T.unlines $ s ^. sLog) : cata doDraw (s ^. sInterface)
     where
         doDraw (Searching sd ws) = renderSearchDialog sd : ws
         doDraw (Zoomed zv ws) = renderZoomViewer zv : ws
@@ -381,17 +387,16 @@ myTxt t = Widget Fixed Fixed $ do
              | otherwise = T.take (w-3) t <> "..."
       render $ txt t'
 
-
-myCenter :: Widget Name -> Widget Name
-myCenter w = Widget Fixed Fixed $ do
+bottomRight :: Widget Name -> Widget Name
+bottomRight w = Widget Fixed Fixed $ do
     wd <- availWidth <$> getContext
     hg <- availHeight <$> getContext
     r <- render w
     let im = image r
         rw = imageWidth im
         rh = imageHeight im
-        hoffset = (wd - rw) `div` 2
-        voffset = (hg - rh) `div` 2
+        hoffset = wd - rw
+        voffset = hg - rh
     return r { image = translate hoffset voffset im }
 
 app :: App State EventType Name
@@ -403,13 +408,9 @@ app = App { appDraw = draw
           }
 
 showSelectedCursor :: State -> [CursorLocation Name] -> Maybe (CursorLocation Name)
-showSelectedCursor s cs = cata findCursor $ s ^. sInterface
-    where findCursor (Searching _ mc) = mc
-          findCursor (Zoomed _ _) = find ((== Just ZoomEditor) . cursorLocationName) cs
-          findCursor (AsTable _) = Nothing
-          findCursor (AsRows rv) = case listSelected (rv ^. rvValueList) of
-                                      Nothing -> Nothing
-                                      Just n -> find ((== Just (ValueEditor n)) . cursorLocationName) cs
+showSelectedCursor s cs = do
+    ed <- s ^. sInterface . activeEditor
+    find ((== Just (BC.getName ed)) . cursorLocationName) cs
 
 listKeys :: [Key]
 listKeys = [KDown, KUp, KPageUp, KPageDown, KHome, KEnd, KLeft, KRight]
@@ -489,6 +490,8 @@ handleEdition e = do
     case med of
         Nothing -> return ()
         Just ed -> do
+                     logMessage $ T.concat ["Edition: ", tshow e ]
+                     logMessage $ T.concat ["Cursor: ", tshow $ Ed.getCursorPosition ed]
                      B.zoom (sInterface . activeEditor . _Just) $ Ed.handleEditorEvent e
                      value <- use (sInterface . activeEditor . _Just . to Ed.getEditContents)
                      updateCurrentField $ T.concat value

@@ -210,6 +210,7 @@ checkPosition e = parsingError $ T.concat [ "Expression "
 -- |Produce a `RowStore` from a list of `Col` and an existing
 -- `RowStore`.
 applyCols :: [Col] -> RowStore -> RowStore
+applyCols [AllCols] rst = rst
 applyCols cs0 rst = mkRowStore (getName rst) conf values
     where cs = cs0 & traversed . expressionT %~ addPositions rst
           dss = getDataSources rst
