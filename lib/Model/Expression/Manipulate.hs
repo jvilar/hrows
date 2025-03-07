@@ -46,18 +46,18 @@ type Changed = Bool
 -- Returns True if any position changed.
 translatePositions :: [Int] -> Expression -> (Expression, Changed)
 translatePositions newPos = second getAny . runWriter . bottomUpM tPos
-    where tPos :: Expression -> Writer Any Expression
-          tPos (In (Position n)) = do
+    where tPos :: Node Expression -> Writer Any (Node Expression)
+          tPos (Position n) = do
               let n' = newPos !! n
               when (n' /= n) $ tell (Any True)
-              return . In $ Position n'
+              return $ Position n'
           tPos e = return e
 
 translateNames :: [(Text, Text)] -> Expression -> (Expression, Changed)
 translateNames newNames = second getAny . runWriter . bottomUpM tNames
-    where tNames (In (NamedPosition name _)) = do
+    where tNames (NamedPosition name _) = do
               let name' = fromMaybe name (lookup name newNames)
               when (name' /= name) $ tell (Any True)
-              return $ mkNamedPosition name'
+              return $ NamedPosition name' Nothing
           tNames e = return e
 

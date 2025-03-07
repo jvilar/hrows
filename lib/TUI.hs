@@ -24,7 +24,7 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Zipper qualified as Tz
 import Data.Vector qualified as V
-import Graphics.Vty.Attributes(defAttr, bold, reverseVideo, withStyle, withBackColor, cyan, withForeColor, black, brightCyan)
+import Graphics.Vty.Attributes (defAttr, bold, reverseVideo, withStyle, withBackColor, withForeColor, black, rgbColor)
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl))
 
 import Model.Field
@@ -32,9 +32,7 @@ import Model.Expression.RecursionSchemas
 import Model.RowStore
 import Graphics.Vty (imageWidth, imageHeight, translate)
 import Control.Monad (when)
-import Graphics.Vty.Attributes (rgbColor)
-import Data.Vector.Generic.Lens (vector)
-import Data.Aeson (Value(Bool))
+import Model.Row (Row)
 
 maxWidth :: Int
 maxWidth = 40
@@ -43,7 +41,7 @@ data Name = DButton DialogButton
           | FieldNames
           | SearchList
           | ValueColumn Int
-          | ValueEditor Int
+          | ValueViewer Int
           | ValueList
           | ZoomEditor
           deriving (Eq, Ord, Show)
@@ -54,6 +52,8 @@ data Level i = Searching SearchDialog i | Zoomed ZoomViewer i | AsTable TableVie
 
 type Interface = Fix Level
 
+updateLevels :: (Level Interface -> Level Interface) -> Interface -> Interface
+updateLevels = bottomUp
 
 data State = State { _sRowStore :: RowStore
                    , _sIndex :: Int
@@ -66,9 +66,11 @@ data SearchDialog = SearchDialog { _sdValues :: List Name Text
                                  , _sdDialog :: Dialog () Name
                                  }
 
-type ValueEditor = Ed.Editor Text
+data ValueEditor = ValueEditor { _veEditor :: Ed.Editor Text Name
+                               , _veIsError :: Bool
+                               }
 
-type ValueViewer = Either (ValueEditor Name) Text
+type ValueViewer = Either ValueEditor Field
 
 data RowViewer = RowViewer { _rvFieldNames :: List Name Text
                            , _rvFieldWidth :: Int
@@ -92,9 +94,10 @@ makeLenses ''RowViewer
 makeLenses ''SearchDialog
 makeLenses ''State
 makeLenses ''TableViewer
+makeLenses ''ValueEditor
 makeLenses ''ZoomViewer
 
-updateRvValues :: [Text] -> RowViewer -> RowViewer
+updateRvValues :: [Field] -> RowViewer -> RowViewer
 updateRvValues ts rv = over rvValueList (listReplace v i) rv
   where i = listSelected $ rv ^. rvValueList
         l = listElements (rv ^. rvValueList)
@@ -107,16 +110,15 @@ levelSearch = lens getter setter
           gd (Zoomed _ msd) = msd
           gd _ = Nothing
 
-          setter i Nothing = cata remD i
-          setter i (Just sd) = cata (addD sd) i
-          remD (Searching _ i) = i
-          remD (Zoomed z i) = In $ Zoomed z i
-          remD b = In b
-          addD :: SearchDialog -> Level Interface -> Interface
-          addD _ (Searching _ i) = i
-          addD sd (Zoomed z (In (Searching _ i))) = In $ Searching sd (In $ Zoomed z i)
-          addD _ z@(Zoomed _ _) = In z
-          addD sd b = In $ Searching sd (In b)
+          setter i Nothing = updateLevels remD i
+          setter i (Just sd) = updateLevels (addD sd) i
+          remD (Searching _ i) = out i
+          remD b = b
+          addD :: SearchDialog -> Level Interface -> Level Interface
+          addD _ (Searching _ i) = out i
+          addD sd (Zoomed z (In (Searching _ i))) = Searching sd (In $ Zoomed z i)
+          addD _ z@(Zoomed _ _) = z
+          addD sd b = Searching sd (In b)
 
 levelZoom :: Lens' Interface (Maybe ZoomViewer)
 levelZoom = lens getter setter
@@ -125,15 +127,15 @@ levelZoom = lens getter setter
           gz (Zoomed z _) = Just z
           gz _ = Nothing
 
-          setter i Nothing = cata remZ i
-          setter i (Just z) = cata (addZ z) i
-          remZ (Searching sd i) = In $ Searching sd i
-          remZ (Zoomed _ i) = i
-          remZ b = In b
-          addZ :: ZoomViewer -> Level Interface -> Interface
-          addZ _ (Searching sd i) = In $ Searching sd i
-          addZ _ (Zoomed _ i) = i
-          addZ z b = In $ Zoomed z (In b)
+          setter i Nothing = updateLevels remZ i
+          setter i (Just z) = updateLevels (addZ z) i
+          remZ s@(Searching sd i) = s
+          remZ (Zoomed _ i) = out i
+          remZ b = b
+          addZ :: ZoomViewer -> Level Interface -> Level Interface
+          addZ _ s@(Searching sd i) = s
+          addZ _ (Zoomed _ i) = out i
+          addZ z b = Zoomed z (In b)
 
 levelTable :: Lens' Interface (Maybe TableViewer)
 levelTable = lens getter setter
@@ -144,11 +146,11 @@ levelTable = lens getter setter
           gt _ = Nothing
 
           setter _ Nothing = error "Cannot remove table: add a row viewer"
-          setter i (Just tv) = cata (addT tv) i
-          addT :: TableViewer -> Level Interface -> Interface
-          addT _ s@(Searching _ _) = In s
-          addT _ z@(Zoomed _ _) = In z
-          addT tv _ = In $ AsTable tv
+          setter i (Just tv) = updateLevels (addT tv) i
+          addT :: TableViewer -> Level Interface -> Level Interface
+          addT _ s@(Searching _ _) = s
+          addT _ z@(Zoomed _ _) = z
+          addT tv _ = AsTable tv
 
 levelRows :: Lens' Interface (Maybe RowViewer)
 levelRows = lens getter setter
@@ -159,13 +161,13 @@ levelRows = lens getter setter
           gr (AsRows rv) = Just rv
 
           setter _ Nothing = error "Cannot remove row viewer: add a table"
-          setter i (Just rv) = cata (addR rv) i
-          addR :: RowViewer -> Level Interface -> Interface
-          addR _ s@(Searching _ _) = In s
-          addR _ z@(Zoomed _ _) = In z
-          addR rv _ = In $ AsRows rv
+          setter i (Just rv) = updateLevels (addR rv) i
+          addR :: RowViewer -> Level Interface -> Level Interface
+          addR _ s@(Searching _ _) = s
+          addR _ z@(Zoomed _ _) = z
+          addR rv _ = AsRows rv
 
-activeEditor :: Lens' Interface (Maybe (ValueEditor Name))
+activeEditor :: Lens' Interface (Maybe ValueEditor)
 activeEditor = lens getter setter
     where getter = cata ae
           ae (Searching _ _) = Nothing
@@ -179,7 +181,7 @@ activeEditor = lens getter setter
 
           setter _ Nothing = error "Cannot remove editor"
           setter i (Just ve) = para (addE ve) i
-          addE :: ValueEditor Name -> Level (Interface, Interface) -> Interface
+          addE :: ValueEditor -> Level (Interface, Interface) -> Interface
           addE _ (Searching sd (_, i)) = In $ Searching sd i
           addE ve (Zoomed zv (i, _)) = In $ Zoomed (set zvValue (Left ve) zv) i
           addE _ (AsTable _) = error "Cannot add editor to table"
@@ -187,7 +189,7 @@ activeEditor = lens getter setter
 
 
 logMessage :: Text -> EventM Name State ()
-logMessage t = sLog %= take 10 . (t:)
+logMessage t = sLog %= reverse . take 10 . (t:) . reverse
 
 mkSearchDialog :: Name -> Int -> Text -> [Text] -> SearchDialog
 mkSearchDialog n w ttle values = SearchDialog (list n (V.fromList values) 1)
@@ -214,11 +216,10 @@ renderZoomViewer zv = centerLayer $ joinBorders $
                          hCenter (txt "C-z: close zoom")
 
 renderValueViewer :: ValueViewer -> Widget Name
-renderValueViewer = either (renderValueEditor False) (withAttr formulaAttr . myTxt)
-
--- handleSearchDialogEvent :: Event -> SearchDialog n -> EventM n (SearchDialog n)
--- handleSearchDialogEvent = traverseOf sdDialog . handleDialogEvent
-
+renderValueViewer = either renderValueEditor renderField
+  where renderField f = let
+              attr = if isError f then errorAttr else formulaAttr
+           in withAttr attr . myTxt $ toString f
 
 initialState :: RowStore -> State
 initialState rst = State { _sRowStore = rst
@@ -231,8 +232,11 @@ initialState rst = State { _sRowStore = rst
 currentFieldName :: State -> Text
 currentFieldName s = fnames (s ^. sRowStore) !! (s ^. sCurrentField)
 
-currentFieldValue :: State -> Text
-currentFieldValue s = toString $ row (s ^. sIndex) (s ^. sRowStore) !! (s ^. sCurrentField)
+currentFieldText :: State -> Text
+currentFieldText = toString . currentField
+
+currentField :: State -> Field
+currentField s = row (s ^. sIndex) (s ^. sRowStore) !! (s ^. sCurrentField)
 
 isFormulaCurrentField :: State -> Bool
 isFormulaCurrentField s = isFormula (fromIntegral $ s ^. sCurrentField) (s ^. sRowStore)
@@ -245,24 +249,24 @@ mkRowViewer rst pos = RowViewer { _rvFieldNames = listMoveTo pos fl
                             where fl = fieldList rst
 
 mkZoomViewer :: State -> ZoomViewer
-mkZoomViewer s = ZoomViewer (currentFieldName s) $ (if isFormulaCurrentField s
-                                                    then Right
-                                                    else Left . mkEditor ZoomEditor) $ currentFieldValue s
+mkZoomViewer s = ZoomViewer (currentFieldName s) $ if isFormulaCurrentField s
+                                                   then Right (currentField s)
+                                                   else Left (mkEditor ZoomEditor $ currentField s)
 
-updateZoomViewer :: Text -> ZoomViewer -> ZoomViewer
-updateZoomViewer t = over zvValue (either (Left . updateEditor t) (Right . const t))
+updateZoomViewer :: Field -> ZoomViewer -> ZoomViewer
+updateZoomViewer f = over zvValue (either (Left . updateEditor f) (Right . const f))
 
-mkEditor :: Name -> Text -> ValueEditor Name
-mkEditor n = Ed.editor n (Just 1)
+mkEditor :: Name -> Field -> ValueEditor
+mkEditor n f = ValueEditor (Ed.editor n (Just 1) $ toString f) (isError f)
 
 fieldList :: RowStore -> List Name Text
 fieldList rst = list FieldNames (V.fromList $ fnames rst) 1
 
 valueList :: Int -> RowStore -> List Name ValueViewer
 valueList pos rst = list ValueList (V.fromList $ zipWith valueWidget [0..] (row pos rst)) 1
-    where valueWidget n t
-              | isFormula n rst = Right $ toString t
-              | otherwise = Left $ mkEditor (ValueEditor $ fromIntegral n) (toString t)
+    where valueWidget n f
+              | isFormula n rst = Right f
+              | otherwise = Left $ mkEditor (ValueViewer $ fromIntegral n) f
 
 buildTable :: RowStore -> Int -> TableViewer
 buildTable rst = TableViewer ns ws cls
@@ -376,9 +380,10 @@ renderName = (withAttr titleAttr .) . renderElement
 renderValue :: Bool -> Text -> Widget Name
 renderValue = renderElement
 
-renderValueEditor :: Bool -> ValueEditor Name -> Widget Name
-renderValueEditor False = Ed.renderEditor (txt . T.unlines) True
-renderValueEditor True = Ed.renderEditor (txt . T.unlines) True
+renderValueEditor :: ValueEditor -> Widget Name
+renderValueEditor ve = Ed.renderEditor ((if ve ^. veIsError
+                        then withAttr errorAttr
+                        else id) . (txt . T.unlines)) True $ ve ^. veEditor
 
 renderElement :: Bool -> Text -> Widget Name
 renderElement False = myTxt
@@ -416,7 +421,7 @@ app = App { appDraw = draw
 showSelectedCursor :: State -> [CursorLocation Name] -> Maybe (CursorLocation Name)
 showSelectedCursor s cs = do
     ed <- s ^. sInterface . activeEditor
-    find ((== Just (BC.getName ed)) . cursorLocationName) cs
+    find ((== Just (BC.getName $ ed ^. veEditor)) . cursorLocationName) cs
 
 listKeys :: [Key]
 listKeys = [KDown, KUp, KPageUp, KPageDown, KHome, KEnd, KLeft, KRight]
@@ -454,12 +459,17 @@ handleCommonKeys (VtyEvent (EvKey (KChar c) [MCtrl])) = case c of
     'f' -> activateSearch >> return True
     't' -> toggleTable >> return True
     'z' -> toggleZoom >> return True
+    '\t' -> forward >> return True
     _ -> return False
 handleCommonKeys (VtyEvent (EvKey k [MCtrl])) = case k of
     KUp -> backward >> return True
     KDown -> forward >> return True
     KLeft -> fieldBackward >> return True
     KRight -> fieldForward >> return True
+    _ -> return False
+handleCommonKeys (VtyEvent (EvKey k [])) = case k of
+    KChar '\t' -> fieldForward >> return True
+    KBackTab -> fieldBackward >> return True
     _ -> return False
 handleCommonKeys _ = return False
 
@@ -495,11 +505,9 @@ handleEdition e = do
     med <- use (sInterface . activeEditor)
     case med of
         Nothing -> return ()
-        Just ed -> do
-                     logMessage $ T.concat ["Edition: ", tshow e ]
-                     logMessage $ T.concat ["Cursor: ", tshow $ Ed.getCursorPosition ed]
-                     B.zoom (sInterface . activeEditor . _Just) $ Ed.handleEditorEvent e
-                     value <- use (sInterface . activeEditor . _Just . to Ed.getEditContents)
+        Just _ -> do
+                     B.zoom (sInterface . activeEditor . _Just . veEditor) $ Ed.handleEditorEvent e
+                     value <- use (sInterface . activeEditor . _Just . veEditor . to Ed.getEditContents)
                      updateCurrentField $ T.concat value
 
 updateCurrentField :: Text -> EventM Name State ()
@@ -508,24 +516,27 @@ updateCurrentField t = do
     let (rst, ch) = changeField (s ^. sIndex) (fromIntegral $ s ^. sCurrentField) (toField t) (s ^. sRowStore)
     when (notNull ch) $ do
         sRowStore .= rst
-        let r = map toString $ row (s ^. sIndex) rst
-        sInterface %= cata (uRow r (r !! (s ^. sCurrentField)))
+        let r = row (s ^. sIndex) rst
+        sInterface %= updateLevels (uRow r (r !! (s ^. sCurrentField)))
   where
-    uRow _ _ s@(Searching _ _) = In s
-    uRow _ ft (Zoomed zv i) = In (Zoomed (over zvValue (updateValueViewer ft) zv) i)
-    uRow _ _ (AsTable tv) = In $ AsTable tv
-    uRow r _ (AsRows rv) = In . AsRows $ updateRvValues r rv
+    uRow :: Row -> Field -> Level Interface -> Level Interface
+    uRow _ _ s@(Searching _ _) = s
+    uRow _ ft (Zoomed zv i) = Zoomed (over zvValue (updateValueViewer ft) zv) i
+    uRow _ _ a@(AsTable _) = a
+    uRow r _ (AsRows rv) = AsRows $ updateRvValues r rv
 
 notNull :: [a] -> Bool
 notNull [] = False
 notNull _ = True
 
-updateValueViewer :: Text -> ValueViewer -> ValueViewer
-updateValueViewer t = either (Left . updateEditor t) (const $ Right t)
+updateValueViewer :: Field -> ValueViewer -> ValueViewer
+updateValueViewer f = either (Left . updateEditor f) (const $ Right f)
 
-updateEditor :: Text -> ValueEditor Name -> ValueEditor Name
-updateEditor t ed | t == T.concat (Ed.getEditContents ed) = ed
-                  | otherwise = Ed.applyEdit (const $ Tz.textZipper [t] $ Just 1) ed
+updateEditor :: Field -> ValueEditor -> ValueEditor
+updateEditor f ve | t == T.concat (Ed.getEditContents $ ve ^. veEditor) = set veIsError (isError f) ve
+                  | otherwise = over veEditor (Ed.applyEdit (const $ Tz.textZipper [t] $ Just 1))
+                                $ set veIsError (isError f) ve
+                  where t = toString f
 
 backward :: EventM Name State ()
 backward = uses sIndex (subtract 1) >>= modify . moveTo
@@ -606,15 +617,16 @@ moveTo pos s
   | otherwise = s
   where valid = 0 <= pos && pos < size (s ^. sRowStore)
         indexUpdated = set sIndex pos s
-        moveInterface = cata mi
-        mi (Searching sd i) = In $ Searching sd i
-        mi (Zoomed zv i) = In $ Zoomed (updateZoomViewer (currentFieldValue indexUpdated) zv) i
-        mi (AsTable tv) = In $ AsTable (over tvLists (listMoveTo pos) tv)
+        moveInterface = updateLevels mi
+        mi se@(Searching _ _) = se
+        mi (Zoomed zv i) = Zoomed (updateZoomViewer (currentField indexUpdated) zv) i
+        mi (AsTable tv) = AsTable (over tvLists (listMoveTo pos) tv)
         mi (AsRows rv) = let
                            vList = case listSelected (rv ^. rvFieldNames) of
                                      Nothing -> valueList pos (s ^. sRowStore)
                                      Just n -> listMoveTo n (valueList pos (s ^. sRowStore))
-                         in In $ AsRows (set rvValueList vList rv)
+                         in AsRows (set rvValueList vList rv)
+
 
 moveFieldTo :: Int -> State -> State
 moveFieldTo pos s
@@ -622,11 +634,11 @@ moveFieldTo pos s
   | otherwise = s
     where valid = 0 <= pos && pos < length (fnames $ s ^. sRowStore)
           posUpdated = set sCurrentField pos s
-          moveInterface = cata mi
-          mi (Searching sd i) = In $ Searching sd i
-          mi (Zoomed _ i) = In $ Zoomed (mkZoomViewer posUpdated) i
-          mi (AsTable tv) = In $ AsTable (set tvCurrentField pos tv)
-          mi (AsRows rv) = In $ AsRows (over rvFieldNames (listMoveTo pos) $
+          moveInterface = updateLevels mi
+          mi (Searching sd i) = Searching sd i
+          mi (Zoomed _ i) = Zoomed (mkZoomViewer posUpdated) i
+          mi (AsTable tv) = AsTable (set tvCurrentField pos tv)
+          mi (AsRows rv) = AsRows (over rvFieldNames (listMoveTo pos) $
                                         over rvValueList (listMoveTo pos) rv)
 
 selectedElementAttr :: AttrName

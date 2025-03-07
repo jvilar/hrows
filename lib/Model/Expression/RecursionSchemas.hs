@@ -6,15 +6,14 @@ newtype Fix t = In { out :: t (Fix t) }
 
 type Algebra f a = f a -> a
 
-bottomUp :: Functor a => (Fix a -> Fix a) -> Fix a -> Fix a
-bottomUp f = out >>> fmap (bottomUp f) >>> In >>> f
+bottomUp :: Functor a => (a (Fix a) -> a (Fix a)) -> Fix a -> Fix a
+bottomUp f = out >>> fmap (bottomUp f) >>> f >>> In
 
-bottomUpM :: (Monad m, Traversable a) => (Fix a -> m (Fix a)) -> Fix a -> m (Fix a)
--- bottomUpM f = out >>> fmap (bottomUp f) >>> In >>> f
-bottomUpM f v = mapM (bottomUpM f) (out v) >>= f . In
+bottomUpM :: (Monad m, Traversable a) => (a (Fix a) -> m (a (Fix a))) -> Fix a -> m (Fix a)
+bottomUpM f v = mapM (bottomUpM f) (out v) >>= fmap In . f
 
-topDown  :: Functor a => (Fix a -> Fix a) -> Fix a -> Fix a
-topDown f = In <<< fmap (topDown f) <<< out <<< f
+topDown  :: Functor a => (a (Fix a) -> a (Fix a)) -> Fix a -> Fix a
+topDown f = In <<< fmap (topDown f) <<< f <<< out
 
 cata :: Functor f => Algebra f a -> Fix f -> a
 cata f = out >>> fmap (cata f) >>> f
