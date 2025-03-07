@@ -46,7 +46,6 @@ import Model.Row
 import Model.RowStore.Base
 import Model.RowStore.RowStoreConf
 import Model.RowStore.UpdatePlan
-import Model.RowStore.ListatabFile (ListatabHeader)
 
 updateAll :: UpdatePlan -> [DataSource] -> Row -> Row
 updateAll up dss r = foldr (changeRow $ mkError "Fórmula con dependencias circulares")
