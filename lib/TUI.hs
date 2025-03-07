@@ -433,11 +433,13 @@ listKeys = [KDown, KUp, KPageUp, KPageDown, KHome, KEnd, KLeft, KRight]
 
 handleEvent :: BrickEvent Name EventType -> EventM Name State ()
 handleEvent e = handleGlobalEvent e
-   >>->> (use sInterface >>= (\case
-                Searching _ _ -> handleEventSearch e
-                Zoomed _ _ -> handleEventZoom e
-                AsTable _ -> handleEventTable e
-                AsRows _ -> handleEventRows e) . out)
+   >>->> (use sInterface >>= handleInLevel e . out)
+
+handleInLevel :: BrickEvent Name EventType -> Level Interface -> EventM Name State ()
+handleInLevel e (Searching _ _) = handleEventSearch e
+handleInLevel e (Zoomed _ i) = handleInLevel e $ out i
+handleInLevel e (AsTable _) = handleEventTable e
+handleInLevel e (AsRows _) = handleEventRows e
 
 handleGlobalEvent :: BrickEvent Name EventType -> EventM Name State Bool
 handleGlobalEvent (VtyEvent (EvKey (KChar 'q') [MCtrl])) = halt >> return True
@@ -472,15 +474,6 @@ handleCommonKeys (VtyEvent (EvKey k [])) = case k of
     KBackTab -> fieldBackward >> return True
     _ -> return False
 handleCommonKeys _ = return False
-
-handleEventZoom :: BrickEvent Name EventType -> EventM Name State ()
-handleEventZoom e = handleCommonKeys e >>->> case e of
-    VtyEvent (EvKey KPageUp []) -> backward
-    VtyEvent (EvKey KPageDown []) -> forward
-    VtyEvent (EvKey KUp []) -> fieldBackward
-    VtyEvent (EvKey KDown []) -> fieldForward
-    VtyEvent (EvKey KEnter []) -> fieldForward
-    _ -> handleEdition e
 
 handleEventTable :: BrickEvent Name EventType -> EventM Name State ()
 handleEventTable e = handleCommonKeys e >>->> case e of
