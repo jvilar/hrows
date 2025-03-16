@@ -289,7 +289,7 @@ draw s = bottomRight (txt $ T.unlines $ s ^. sLog) : cata doDraw (s ^. sInterfac
         doDraw (AsTable tv) = [renderBack (windowTitle s) (renderTableViewer tv) tableHelp]
         doDraw (AsRows rv) = [renderBack (windowTitle s) (renderRowViewer rv) rowHelp]
         tableHelp = "C-z: toggle zoom, C-t: return to field view, C-f: find, C-q: exit"
-        rowHelp = "C-z: toggle zoom, C-t: table view, C-f: find, C-q: exit"
+        rowHelp = "C-z: toggle zoom, C-t: table view, C-f: find, C-n: newRow, C-q: exit"
 
 
 renderBack :: Text -> Widget Name -> Text -> Widget Name
@@ -491,6 +491,7 @@ handleEventRows e = handleCommonKeys e >>->> case e of
     VtyEvent (EvKey KUp []) -> fieldBackward
     VtyEvent (EvKey KDown []) -> fieldForward
     VtyEvent (EvKey KEnter []) -> fieldForward
+    VtyEvent (EvKey (KChar 'n') [MCtrl]) -> newRow
     _ -> handleEdition e
 
 handleEdition :: BrickEvent Name EventType -> EventM Name State ()
@@ -517,6 +518,12 @@ updateCurrentField t = do
     uRow _ ft (Zoomed zv i) = Zoomed (over zvValue (updateValueViewer ft) zv) i
     uRow _ _ a@(AsTable _) = a
     uRow r _ (AsRows rv) = AsRows $ updateRvValues r rv
+
+newRow :: EventM Name State ()
+newRow = do
+    B.zoom sRowStore $ modify addEmptyRow
+    s <- uses sRowStore size
+    modify $ moveTo (s - 1)
 
 notNull :: [a] -> Bool
 notNull [] = False
