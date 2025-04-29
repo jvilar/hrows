@@ -10,6 +10,7 @@ module TUI (
 ) where
 
 import Brick hiding (getName, zoom)
+import Brick.BChan qualified as B
 import Brick qualified as B
 import Brick.Widgets.Border
 import Brick.Widgets.Center
@@ -25,6 +26,8 @@ import Data.Text qualified as T
 import Data.Text.Zipper qualified as Tz
 import Data.Vector qualified as V
 import Graphics.Vty.Attributes (defAttr, bold, reverseVideo, withStyle, withBackColor, withForeColor, black, rgbColor)
+import Graphics.Vty.Config qualified as Vty
+import Graphics.Vty.CrossPlatform qualified as Vty
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl))
 
 import Model.Field
@@ -33,9 +36,12 @@ import Model.RowStore
 import Graphics.Vty (imageWidth, imageHeight, translate)
 import Control.Monad (when)
 import Model.Row (Row)
+import Control.Concurrent (threadDelay, forkIO)
 
 maxWidth :: Int
 maxWidth = 40
+
+data BackupEvent = BackupEvent
 
 data Name = DButton DialogButton
           | FieldNames
@@ -379,7 +385,7 @@ buildTable rst = TableViewer ns ws cls
                            $ map (maximum . map T.length) cs
 
 
-type EventType = ()
+type EventType = BackupEvent
 
 
 draw :: State -> [Widget Name]
@@ -534,6 +540,7 @@ listKeys = [KDown, KUp, KPageUp, KPageDown, KHome, KEnd, KLeft, KRight]
                     False -> e2
 
 handleEvent :: BrickEvent Name EventType -> EventM Name State ()
+handleEvent (AppEvent BackupEvent) = doBackup
 handleEvent e = handleGlobalEvent e
    >>->> (use sInterface >>= handleInLevel e . out)
 
@@ -776,9 +783,21 @@ myAttrMap = attrMap defAttr [ (selectedElementAttr, withStyle defAttr reverseVid
                             , (errorAttr, withBackColor (withForeColor defAttr black) $ rgbColor 255 (160 :: Int) 255)
                             ]
 
+backupLoop :: B.BChan EventType -> IO ()
+backupLoop chan = do
+  threadDelay $ 60 * 1000000
+  B.writeBChan chan BackupEvent
+  backupLoop chan
 
+doBackup :: EventM Name State ()
+doBackup = do
+    logMessage "Backup"
 
 startTUI :: RowStore -> IO ()
 startTUI rst = do
-  _ <- defaultMain app (initialState rst)
+  eventChan <- B.newBChan 10
+  _ <- forkIO $ backupLoop eventChan
+  let buildVty = Vty.mkVty Vty.defaultConfig
+  initialVty <- buildVty
+  finalState <- customMain initialVty buildVty (Just eventChan) app (initialState rst)
   return ()

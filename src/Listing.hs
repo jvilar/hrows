@@ -71,12 +71,12 @@ data Options = Options { _anonymize :: Bool
                        , _sortByGlobal :: Bool
 
                        , _key :: Col
-                       , _marks :: [Col]
+                       , _marks :: ColSpec
                        , _decimals :: Int
                        , _global :: Maybe Col
                        , _globalDecimals :: Int
                        , _message :: Maybe Col
-                       , _extraCols :: [Col]
+                       , _extraCols :: ColSpec
 
                        , _optionsFile :: Maybe FilePath
                        , _cOptions :: ColOptions
@@ -95,12 +95,12 @@ instance Default Options where
                   , _sortByGlobal = False
 
                   , _key = Single (mkPosition 0) Nothing
-                  , _marks = []
+                  , _marks = SelectedCols []
                   , _decimals = 2
                   , _global = Nothing
                   , _globalDecimals = 1
                   , _message = Nothing
-                  , _extraCols = []
+                  , _extraCols = SelectedCols []
 
                   , _optionsFile = Nothing
                   , _cOptions = def
@@ -109,7 +109,7 @@ instance Default Options where
 setSingleCol :: Traversal' Options Col -> String -> String -> Options -> Options
 setSingleCol l n s = case parseCols (T.pack s) of
                        Left e -> myError $ "Bad column especification in " ++ n ++ ": " ++ T.unpack e
-                       Right [c@(Single _ _)]-> set l c
+                       Right (SelectedCols [c@(Single _ _)]) -> set l c
                        Right _ -> myError $ "For " ++ n ++ " you have to specify exactly one column"
 
 setMaybeCol :: Lens' Options (Maybe Col) -> String -> String -> Options -> Options
@@ -179,9 +179,9 @@ translate :: Options -> Maybe AnonDic -> RowStore -> (RowStore, ColIndices)
 translate opts mdic rst = let
     trKey = getKeyCol opts mdic rst
     trMarks = applyCols (opts ^. marks) rst
-    trGlobal = applyCols (catMaybes [opts ^. global]) rst
+    trGlobal = applyCols (SelectedCols $ catMaybes [opts ^. global]) rst
     trExtras = applyCols (opts ^. extraCols) rst
-    trMessage = applyCols (catMaybes [opts ^. message]) rst
+    trMessage = applyCols (SelectedCols $ catMaybes [opts ^. message]) rst
     allTr = [trKey, trMarks, trGlobal, trExtras, trMessage]
     allRows = map concat . getZipList . sequenceA $
                 ZipList . rows <$> allTr
@@ -198,7 +198,7 @@ getKeyCol :: Options -> Maybe AnonDic -> RowStore -> RowStore
 getKeyCol opts mdic rst
     | isNothing mdic = col
     | otherwise = mapCol 0 mkAnon col
-    where col = applyCols [opts ^. key] rst
+    where col = applyCols (SelectedCols [opts ^. key]) rst
           Just dic = mdic
           mkAnon = toField . (dic M.!) . toString
 

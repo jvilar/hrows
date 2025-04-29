@@ -13,21 +13,21 @@ import System.Console.JMVOptions
 import Col
 import TUI
 
-data Options = Options { _cols :: [Col]
+data Options = Options { _colSpec :: ColSpec
                        , _cOptions :: ColOptions
                        }
 
 makeLenses ''Options
 
 instance Default Options where
-    def = Options  { _cols = [AllCols]
+    def = Options  { _colSpec = AllCols
                    , _cOptions = def
                    }
 
 options :: [OptDescr (Options -> Options)]
 options = colOptions OnlyInputOptions cOptions ++
           processOptions (
-              'c' ~: "cols" ==> ReqArg (appendCols cols "cols") "COLS" ~: "Column specification. A list of expressions separated by commas in the format of the formulas of hrows. Also, a range can be specified by two column names or positions separated by a colon and surrounded by square brackes like [$1:$4] or [Name:Surname]."
+              'c' ~: "cols" ==> ReqArg (setCols colSpec "vrows") "COLS" ~: "Column specification. A list of expressions separated by commas in the format of the formulas of hrows. Also, a range can be specified by two column names or positions separated by a colon and surrounded by square brackes like [$1:$4] or [Name:Surname]."
               )
 
 getOptions :: IO Options
@@ -53,7 +53,5 @@ main :: IO ()
 main = do
   opts <- getOptions
   rst0 <- readRowStoreFromOptions $ opts ^. cOptions
-  let rst = applyCols (opts ^. cols) rst0
+  let rst = applyCols (opts ^. colSpec) rst0
   startTUI rst
-
-

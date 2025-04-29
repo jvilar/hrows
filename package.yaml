@@ -42,6 +42,7 @@ library:
   - transformers
   - vector
   - vty
+  - vty-crossplatform
 
 executables:
   hrows:

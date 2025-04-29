@@ -19,7 +19,7 @@ import Model.RowStore (writeRowStore, writeRowStoreStdout, RowStore)
 import Model.SourceInfo (mkSourceInfo, PathAndConf(PathAndConf))
 
 
-data Options = Options { _cols :: [Col]
+data Options = Options { _colSpec :: ColSpec
                        , _cOptions :: ColOptions
                        , _oFile :: Maybe FilePath
                        , _genConf :: Bool
@@ -28,7 +28,7 @@ data Options = Options { _cols :: [Col]
 makeLenses ''Options
 
 instance Default Options where
-    def = Options { _cols = [AllCols]
+    def = Options { _colSpec = AllCols
                   , _cOptions = def
                   , _oFile = def
                   , _genConf = True
@@ -37,7 +37,7 @@ instance Default Options where
 options :: [OptDescr (Options -> Options)]
 options = colOptions FullIOOptions cOptions ++
           processOptions ( do
-               'c' ~: "cols" ==> ReqArg (appendCols cols "cols") "COLS" ~: "Column specification. A list of expressions separated by commas in the format of the formulas of hrows. Also, a range can be specified by two column names or positions separated by a colon and surrounded by square brackes like [$1:$4] or [Name:Surname]."
+               'c' ~: "cols" ==> ReqArg (setCols colSpec "cols") "COLS" ~: "Column specification. A list of expressions separated by commas in the format of the formulas of hrows. Also, a range can be specified by two column names or positions separated by a colon and surrounded by square brackes like [$1:$4] or [Name:Surname]."
                'o' ~: "output" ==> ReqArg (set oFile . Just) "PATH" ~: "Output file (default stdout)"
                'C' ~: "noConf" ==> NoArg (set genConf False) ~: "Do not generate conf file when using -o"
           )
@@ -78,5 +78,5 @@ main :: IO ()
 main = do
           opts <- getOptions
           rst0 <- readRowStoreFromOptions $ opts ^. cOptions
-          let rst = applyCols (opts ^. cols) rst0
+          let rst = applyCols (opts ^. colSpec) rst0
           doWrite opts rst

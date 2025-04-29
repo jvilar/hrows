@@ -3,12 +3,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 
 module Col (
     -- *Types
-    Col(..)
+    ColSpec(..)
+    , Col(..)
     -- *Functions
     , readRowStoreFromOptions
+    , readRowStoreAndSourceInfo
     , parseCols
     , applyCols
     , slice
@@ -21,6 +24,7 @@ module Col (
     , ColOptions
     , IOOptions(..)
     , colOptions
+    , setCols
     , appendCols
     , help
     , iOptions
@@ -57,11 +61,12 @@ import Model.RowStore.RowStoreConf (fromNamesTypes, fromTypes)
 
 -- |A Col especifies a column of the input in the command line. Single
 -- expressions especify a column, a couple of expressions that correspond
--- each to a column, especify a range. And `AllCols` espcifies all the cols
--- in the input.
+-- each to a column, especify a range. 
 data Col = Single Expression (Maybe Text)
-         | Range Expression Expression
-         | AllCols deriving Show
+         | Range Expression Expression deriving Show
+
+-- | A ColSpec is either all columns or a list of `Col`.
+data ColSpec = AllCols | SelectedCols [Col] deriving Show
 
 -- |Options for cols like programs
 
@@ -94,12 +99,11 @@ instance Default ColOptions where
 expressionT :: Traversal' Col Expression
 expressionT f (Single e mn) = Single <$> f e <*> pure mn
 expressionT f (Range e1 e2) = Range <$> f e1 <*> f e2
-expressionT _ AllCols = pure AllCols
 
 -- |A fold of the Fields specified by a `Col`
 colF :: Col -> Fold RowStore Row
 colF col = folding getRows
-    where getRows rst = map (processRow dss [col']) $ rows rst
+    where getRows rst = map (processRow dss $ SelectedCols [col']) $ rows rst
              where col' = col & expressionT %~ addPositions rst
                    dss = getDataSources rst
 
@@ -118,13 +122,18 @@ setSeparator l s = over l (\oc -> oc { ltSeparator = s })
 setHeader :: Lens' ColOptions ListatabInfo -> HeaderType -> ColOptions -> ColOptions
 setHeader l c = over l (\oc -> oc { ltHeaderType = c })
 
--- |Parse a String to extract a list of cols and add it to a list
-appendCols :: Lens' o [Col] -> String -> String -> o -> o
+-- |Parse a String to extract a list of cols and set it
+setCols :: Lens' o ColSpec -> String -> String -> o -> o
+setCols l n s = case parseCols (T.pack s) of
+                      Left e -> myError $ "Bad column especification in " ++ n ++ ": " ++ T.unpack e
+                      Right cs -> set l cs
+
+-- |Parse a String to extract a list of cols and append them
+appendCols :: Lens' o ColSpec -> String -> String -> o -> o
 appendCols l n s = case parseCols (T.pack s) of
                       Left e -> myError $ "Bad column especification in " ++ n ++ ": " ++ T.unpack e
-                      Right cs -> over l $ appCols cs
-                  where appCols xs [AllCols] = xs
-                        appCols xs ys = ys ++ xs
+                      Right (SelectedCols cs) -> over l (\(SelectedCols cs0) -> SelectedCols (cs0 ++ cs))
+                      Right AllCols -> myError $ "Cannot append all columns in " ++ n
 
 setFilter :: String -> ColOptions -> ColOptions
 setFilter s = case parse expression $ T.pack s of
@@ -162,9 +171,9 @@ myError m = unsafePerformIO $ do
               exitFailure
 
 -- |Parse a list of expressions separated by commas, return
--- the corresponding list of `Col` or an error message
-parseCols :: Text -> Either Text [Col]
-parseCols = parse colParser
+-- the corresponding `ColSpec` or an error message
+parseCols :: Text -> Either Text ColSpec
+parseCols = fmap SelectedCols <$> parse colParser
 
 colParser :: Parser [Col]
 colParser = do
@@ -207,26 +216,26 @@ checkPosition e = parsingError $ T.concat [ "Expression "
                                           , " does not represent a position"
                                           ]
 
--- |Produce a `RowStore` from a list of `Col` and an existing
+-- |Produce a `RowStore` from a `ColSpec` and an existing
 -- `RowStore`.
-applyCols :: [Col] -> RowStore -> RowStore
-applyCols [AllCols] rst = rst
-applyCols cs0 rst = mkRowStore (getName rst) conf values
+applyCols :: ColSpec -> RowStore -> RowStore
+applyCols AllCols rst = rst
+applyCols (SelectedCols cs0) rst = mkRowStore (getName rst) conf values
     where cs = cs0 & traversed . expressionT %~ addPositions rst
           dss = getDataSources rst
-          values = map (processRow dss cs) $ rows rst
+          values = map (processRow dss $ SelectedCols cs) $ rows rst
           conf = case names rst of
-                    Just _ -> fromNamesTypes (colNames rst cs) (colTypes values)
+                    Just _ -> fromNamesTypes (colNames rst $ SelectedCols cs) (colTypes values)
                     Nothing -> fromTypes (colTypes values)
 
-colNames :: RowStore -> [Col] -> [Text]
-colNames rst = concatMap toName
+colNames :: RowStore -> ColSpec -> [Text]
+colNames rst AllCols = fnames rst
+colNames rst (SelectedCols cs) = concatMap toName cs
     where toName (Single (In (NamedPosition n _)) Nothing) = [n]
           toName (Single (In (Position p)) Nothing) = [fnames rst !! p]
           toName (Single e Nothing) = [toFormula e]
           toName (Single _ (Just n)) = [n]
           toName (Range e1 e2) = slice (pos e1) (pos e2) $ fnames rst
-          toName AllCols = fnames rst
 
 colTypes :: [Row] -> [FieldType]
 colTypes = foldr (zipWith consolidateType) (repeat TypeEmpty) . map (map typeOf)
@@ -255,11 +264,11 @@ colTypes = foldr (zipWith consolidateType) (repeat TypeEmpty) . map (map typeOf)
                                                   _ -> TypeString
 
 
-processRow :: [DataSource] -> [Col] -> Row -> Row
-processRow dss cs r = concatMap f cs
+processRow :: [DataSource] -> ColSpec -> Row -> Row
+processRow dss AllCols r = r
+processRow dss (SelectedCols cs) r = concatMap f cs
     where f (Single e _) = [evaluate r dss e]
           f (Range e1 e2) = slice (pos e1) (pos e2) r
-          f AllCols = r
 
 -- The elements of the list from p1 to p2, both included
 slice :: Int -> Int -> [a] -> [a]
@@ -276,7 +285,7 @@ pos e = error $ "Expression "
                 ++ T.unpack (toFormula e)
                 ++ " does not represent a position"
 
-load :: ColOptions -> IO RowStore
+load :: ColOptions -> IO (RowStore, SourceInfo)
 load opts = do
     let Just fn = opts ^. inputFileName
     pc <- mkPathAndConf fn $ opts ^. confFileName
@@ -284,16 +293,21 @@ load opts = do
 
     r <- E.try $ readRowStore sinfo
     case r of
-        Right (rst, _) -> return rst
+        Right (rst, _) -> return (rst, sinfo)
         Left (HRowsException mess) -> myError $ T.unpack mess
 
 -- |Uses the options to read a `RowStore`
 readRowStoreFromOptions :: ColOptions -> IO RowStore
-readRowStoreFromOptions opts = do
-  rst <- case opts ^. inputFileName of
-            Nothing -> readRowStoreStdin $ opts ^. iOptions
-            Just _ -> load opts
-  return $ flip execState rst $ do
+readRowStoreFromOptions opts = fst <$> readRowStoreAndSourceInfo opts 
+
+
+-- |Uses the options to build the `SourceInfo` and read a `RowStore`
+readRowStoreAndSourceInfo :: ColOptions -> IO (RowStore, Maybe SourceInfo)
+readRowStoreAndSourceInfo opts = do
+  (rst, sinfo) <- case opts ^. inputFileName of
+            Nothing -> (, Nothing) <$> readRowStoreStdin (opts ^. iOptions)
+            Just _ -> fmap Just <$> load opts
+  return . (, sinfo) . flip execState rst $ do
         case opts ^. rFilter of
              Nothing -> return ()
              Just e -> do
