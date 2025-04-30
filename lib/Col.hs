@@ -57,7 +57,7 @@ import Control.Monad (when)
 import qualified Control.Exception as E
 import HRowsException (HRowsException(HRowsException))
 import Control.Monad.State (execState, gets, modify)
-import Model.RowStore.RowStoreConf (fromNamesTypes, fromTypes)
+import Model.RowStore.RowStoreConf (fromNamesTypes, fromTypes, RowStoreConf (sourceInfos))
 
 -- |A Col especifies a column of the input in the command line. Single
 -- expressions especify a column, a couple of expressions that correspond
@@ -238,7 +238,7 @@ colNames rst (SelectedCols cs) = concatMap toName cs
           toName (Range e1 e2) = slice (pos e1) (pos e2) $ fnames rst
 
 colTypes :: [Row] -> [FieldType]
-colTypes = foldr (zipWith consolidateType) (repeat TypeEmpty) . map (map typeOf)
+colTypes = foldr (zipWith consolidateType . map typeOf) (repeat TypeEmpty)
     where consolidateType t1 t2 | t1 == t2 = t1
                                 | t1 == TypeEmpty = t2
                                 | t2 == TypeEmpty = t1
@@ -265,7 +265,7 @@ colTypes = foldr (zipWith consolidateType) (repeat TypeEmpty) . map (map typeOf)
 
 
 processRow :: [DataSource] -> ColSpec -> Row -> Row
-processRow dss AllCols r = r
+processRow _ AllCols r = r
 processRow dss (SelectedCols cs) r = concatMap f cs
     where f (Single e _) = [evaluate r dss e]
           f (Range e1 e2) = slice (pos e1) (pos e2) r
@@ -285,29 +285,30 @@ pos e = error $ "Expression "
                 ++ T.unpack (toFormula e)
                 ++ " does not represent a position"
 
-load :: ColOptions -> IO (RowStore, SourceInfo)
-load opts = do
-    let Just fn = opts ^. inputFileName
-    pc <- mkPathAndConf fn $ opts ^. confFileName
-    let sinfo =  mkSourceInfo Nothing pc $ opts ^. iOptions
+load :: ColOptions -> IO (RowStore, Maybe (SourceInfo, [SourceInfo]))
+load opts = case opts ^. inputFileName of
+    Nothing -> (, Nothing) <$> readRowStoreStdin (opts ^. iOptions)
+    Just fn -> do
+         pc <- mkPathAndConf fn $ opts ^. confFileName
+         let sinfo =  mkSourceInfo Nothing pc $ opts ^. iOptions
 
-    r <- E.try $ readRowStore sinfo
-    case r of
-        Right (rst, _) -> return (rst, sinfo)
-        Left (HRowsException mess) -> myError $ T.unpack mess
+         r <- E.try $ readRowStore sinfo
+         case r of
+             Right (rst, mconf) -> case mconf of
+                 Nothing -> return (rst, Just (sinfo, []))
+                 Just cnf -> return (rst, Just (sinfo, sourceInfos cnf))
+             Left (HRowsException mess) -> myError $ T.unpack mess
 
 -- |Uses the options to read a `RowStore`
 readRowStoreFromOptions :: ColOptions -> IO RowStore
-readRowStoreFromOptions opts = fst <$> readRowStoreAndSourceInfo opts 
+readRowStoreFromOptions opts = fst <$> readRowStoreAndSourceInfo opts
 
 
 -- |Uses the options to build the `SourceInfo` and read a `RowStore`
-readRowStoreAndSourceInfo :: ColOptions -> IO (RowStore, Maybe SourceInfo)
+readRowStoreAndSourceInfo :: ColOptions -> IO (RowStore, Maybe (SourceInfo, [SourceInfo]))
 readRowStoreAndSourceInfo opts = do
-  (rst, sinfo) <- case opts ^. inputFileName of
-            Nothing -> (, Nothing) <$> readRowStoreStdin (opts ^. iOptions)
-            Just _ -> fmap Just <$> load opts
-  return . (, sinfo) . flip execState rst $ do
+  (rst, msinfo) <- load opts
+  return . (, msinfo) . flip execState rst $ do
         case opts ^. rFilter of
              Nothing -> return ()
              Just e -> do

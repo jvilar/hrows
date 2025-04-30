@@ -37,12 +37,12 @@ getOptions = do
                let opt = foldl (flip id) def o
                when (opt ^. cOptions . help) $ putStrLn helpMessage >> exitSuccess
                unless (null e) $ myError $ concat e ++ helpMessage
-               case a of
+               return $ (case a of
                    [] -> myError "No filename given"
-                   [f] -> return $ set (cOptions . inputFileName) (Just f) opt
-                   [f, c] -> return $ set (cOptions . inputFileName) (Just f)
-                                    $ set (cOptions . confFileName) (Just c) opt
-                   _ -> myError "Too many filenames"
+                   [f] -> set (cOptions . inputFileName) (Just f)
+                   [f, c] -> set (cOptions . inputFileName) (Just f)
+                               . set (cOptions . confFileName) (Just c)
+                   _ -> myError "Too many filenames") opt
 
 helpMessage :: String
 helpMessage = usageInfo header options
@@ -52,6 +52,9 @@ helpMessage = usageInfo header options
 main :: IO ()
 main = do
   opts <- getOptions
-  rst0 <- readRowStoreFromOptions $ opts ^. cOptions
+  (rst0, sinf0) <- readRowStoreAndSourceInfo $ opts ^. cOptions
   let rst = applyCols (opts ^. colSpec) rst0
-  startTUI rst
+      msi = case opts ^. colSpec of
+              AllCols -> sinf0
+              _ -> Nothing
+  startTUI rst msi

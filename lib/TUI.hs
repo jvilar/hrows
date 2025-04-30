@@ -4,6 +4,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module TUI (
   startTUI
@@ -33,10 +34,16 @@ import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl))
 import Model.Field
 import Model.Expression.RecursionSchemas
 import Model.RowStore
+import Model.SourceInfo
 import Graphics.Vty (imageWidth, imageHeight, translate)
-import Control.Monad (when)
+import Control.Monad (when, void)
 import Model.Row (Row)
 import Control.Concurrent (threadDelay, forkIO)
+import Control.Monad.IO.Class (liftIO)
+import HRowsException (HRowsException(..))
+import Model.DefaultFileNames (defaultBackupFileName)
+import Control.Exception (try, SomeException)
+import System.Directory (removeFile)
 
 maxWidth :: Int
 maxWidth = 40
@@ -87,6 +94,7 @@ updateLevels :: (Level Interface -> Level Interface) -> Interface -> Interface
 updateLevels = bottomUp
 
 data State = State { _sRowStore :: RowStore
+                   , _sSourceInfo :: Maybe (SourceInfo, [SourceInfo])
                    , _sIndex :: Int
                    , _sCurrentField :: Int
                    , _sInterface :: Interface
@@ -313,13 +321,14 @@ renderValueViewer = either renderValueEditor renderField
               attr = if isError f then errorAttr else formulaAttr
            in withAttr attr . myTxt $ toString f
 
-initialState :: RowStore -> State
-initialState rst = State { _sRowStore = rst
-                         , _sIndex = 0
-                         , _sCurrentField = 0
-                         , _sInterface = In . AsRows $ mkRowViewer rst 0
-                         , _sLog = []
-                         }
+initialState :: RowStore -> Maybe (SourceInfo, [SourceInfo]) -> State
+initialState rst msi = State { _sRowStore = rst
+                             , _sSourceInfo = msi
+                             , _sIndex = 0
+                             , _sCurrentField = 0
+                             , _sInterface = In . AsRows $ mkRowViewer rst 0
+                             , _sLog = []
+                             }
 
 currentFieldName :: State -> Text
 currentFieldName s = fnames (s ^. sRowStore) !! (s ^. sCurrentField)
@@ -349,7 +358,7 @@ mkZoomViewer s = ZoomViewer (currentFieldName s) $ if isFormulaCurrentField s
                                                    else Left (mkEditor ZoomEditor $ currentField s)
 
 mkRichZoomViewer :: State -> RichZoomViewer
-mkRichZoomViewer s = RichZoomViewer (currentFieldName s) 
+mkRichZoomViewer s = RichZoomViewer (currentFieldName s)
                             (if isFormulaCurrentField s
                              then Right (currentField s)
                              else Left (mkEditor RichZoomEditor $ currentField s)
@@ -396,8 +405,8 @@ draw s = bottomRight (txt $ T.unlines $ s ^. sLog) : cata doDraw (s ^. sInterfac
         doDraw (RichZoomed iv ws) = renderRichZoomViewer iv : ws
         doDraw (AsTable tv) = [renderBack (windowTitle s) (renderTableViewer tv) tableHelp]
         doDraw (AsRows rv) = [renderBack (windowTitle s) (renderRowViewer rv) rowHelp]
-        tableHelp = "C-z: toggle zoom, C-r: rich zoom, C-t: return to field view, C-f: find, C-q: exit"
-        rowHelp = "C-z: toggle zoom, C-r: rich zoom, C-t: table view, C-f: find, C-n: new row, C-q: exit"
+        tableHelp = "C-z: zoom, C-r: rich zoom, C-t: return to field view, C-f: find, C-w: write, C-q: exit"
+        rowHelp = "C-z: zoom, C-r: rich zoom, C-t: table view, C-f: find, C-n: new row, C-w: write, C-q: exit"
 
 
 renderBack :: Text -> Widget Name -> Text -> Widget Name
@@ -416,6 +425,7 @@ tshow = T.pack . show
 
 windowTitle :: State -> Text
 windowTitle s = T.concat [ getName $ s ^. sRowStore
+                         , if changed (s ^. sRowStore) then "*" else ""
                          , " (", tshow $ s ^. sIndex + 1, "/"
                          , tshow $ size $ s ^. sRowStore, ")"
                          ]
@@ -552,7 +562,8 @@ handleInLevel e (AsTable _) = handleEventTable e
 handleInLevel e (AsRows _) = handleEventRows e
 
 handleGlobalEvent :: BrickEvent Name EventType -> EventM Name State Bool
-handleGlobalEvent (VtyEvent (EvKey (KChar 'q') [MCtrl])) = halt >> return True
+handleGlobalEvent (VtyEvent (EvKey (KChar 'q') [MCtrl])) = doFinalBackup >> return True
+handleGlobalEvent (VtyEvent (EvKey (KChar 'w') [MCtrl])) = doSave >> return True
 handleGlobalEvent _ = return False
 
 handleEventSearch :: BrickEvent Name EventType -> EventM Name State ()
@@ -783,6 +794,16 @@ myAttrMap = attrMap defAttr [ (selectedElementAttr, withStyle defAttr reverseVid
                             , (errorAttr, withBackColor (withForeColor defAttr black) $ rgbColor 255 (160 :: Int) 255)
                             ]
 
+doSave :: EventM Name State ()
+doSave = do
+    msi <- use sSourceInfo
+    case msi of
+        Nothing -> return ()
+        Just (si, sis) -> do
+            rst <- use sRowStore
+            liftIO $ writeRowStore si sis rst
+            sRowStore %= setUnchanged
+
 backupLoop :: B.BChan EventType -> IO ()
 backupLoop chan = do
   threadDelay $ 60 * 1000000
@@ -790,14 +811,42 @@ backupLoop chan = do
   backupLoop chan
 
 doBackup :: EventM Name State ()
-doBackup = do
-    logMessage "Backup"
+doBackup = use sRowStore >>= (\case
+    False -> return ()
+    True -> do
+        msi <- use sSourceInfo
+        case msi of
+            Nothing -> return ()
+            Just (si, sis) -> do
+                let conf = defaultBackupFileName <$> confPath (siPathAndConf si)
+                    fp = defaultBackupFileName $ path (siPathAndConf si)
+                    si' = changePathAndConf (PathAndConf fp conf) si
+                rst <- use sRowStore
+                (liftIO . try $ writeRowStore si' sis rst) >>= \case
+                    Right _ -> return ()
+                    Left (HRowsException e) -> logMessage ("Backup error: " <> e))
+        . changed
 
-startTUI :: RowStore -> IO ()
-startTUI rst = do
+doFinalBackup :: EventM Name State ()
+doFinalBackup = use sRowStore >>= (\case
+    True -> doBackup
+    False -> do
+        msi <- use sSourceInfo
+        case msi of
+            Nothing -> return ()
+            Just (si, _) -> do
+                let conf = defaultBackupFileName <$> confPath (siPathAndConf si)
+                    fp = defaultBackupFileName $ path (siPathAndConf si)
+                void . liftIO $ ((try $ do
+                                    removeFile fp
+                                    maybe (return ()) removeFile conf) :: IO (Either SomeException ())))
+        . changed
+
+startTUI :: RowStore -> Maybe (SourceInfo, [SourceInfo]) -> IO ()
+startTUI rst msi = do
   eventChan <- B.newBChan 10
   _ <- forkIO $ backupLoop eventChan
   let buildVty = Vty.mkVty Vty.defaultConfig
   initialVty <- buildVty
-  finalState <- customMain initialVty buildVty (Just eventChan) app (initialState rst)
+  finalState <- customMain initialVty buildVty (Just eventChan) app (initialState rst msi)
   return ()
