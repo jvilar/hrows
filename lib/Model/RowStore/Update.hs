@@ -135,7 +135,9 @@ mkRSFromExpressions :: [(Expression, FieldName)] -> RowStore -> RowStore
 mkRSFromExpressions expNames rst = let
     exps = map (addPositions rst . fst) expNames
     values = [ map (evaluate r $ _dataSources rst) exps | r <- rows rst ]
-    types = foldr (zipWith consolidateType . map typeOf) (repeat TypeString) values
+    types = case values of
+              [] -> replicate (length exps) TypeString
+              (v:vs) -> foldr (zipWith consolidateType . map typeOf) (map typeOf v) vs
     formulas = translateExpressions rst exps
     names = map snd expNames
     fconfs = zipWith3 FieldConf (map Just names) types formulas
