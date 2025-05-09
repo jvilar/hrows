@@ -1,6 +1,5 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -562,7 +561,7 @@ handleInLevel e (AsTable _) = handleEventTable e
 handleInLevel e (AsRows _) = handleEventRows e
 
 handleGlobalEvent :: BrickEvent Name EventType -> EventM Name State Bool
-handleGlobalEvent (VtyEvent (EvKey (KChar 'q') [MCtrl])) = doFinalBackup >> return True
+handleGlobalEvent (VtyEvent (EvKey (KChar 'q') [MCtrl])) = doFinalBackup >> halt >> return True
 handleGlobalEvent (VtyEvent (EvKey (KChar 'w') [MCtrl])) = doSave >> return True
 handleGlobalEvent _ = return False
 
@@ -798,7 +797,7 @@ doSave :: EventM Name State ()
 doSave = do
     msi <- use sSourceInfo
     case msi of
-        Nothing -> return ()
+        Nothing -> logMessage "No source info available"
         Just (si, sis) -> do
             rst <- use sRowStore
             liftIO $ writeRowStore si sis rst

@@ -1,6 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
-
-
+{-# LANGUAGE TupleSections #-}
 module Model.RowStore.UpdatePlan ( mkUpdatePlan ) where
 
 import Data.IntMap(IntMap)
@@ -41,7 +39,7 @@ closureUpdates isParameterOf = let
     graph = mkGraph edges
     order = fst . toposort $ graph
     orderMap = IM.fromList (zip order [(1::Int) ..])
-    initial = IM.fromList (zip ks $ repeat [])
+    initial = IM.fromList (map (, []) ks)
     updateClosure n cl = let
           deps = tail $ dfs graph n
         in IM.insert n (sortOn (orderMap IM.!) deps) cl

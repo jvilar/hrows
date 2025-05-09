@@ -5,6 +5,7 @@ module Model.Expression.Manipulate ( addPositions
                                      , translatePositions
                                      , translateNames
                                      , getPositions
+                                     , asPosition
 ) where
 
 import Control.Arrow(second)
@@ -60,4 +61,11 @@ translateNames newNames = second getAny . runWriter . bottomUpM tNames
               when (name' /= name) $ tell (Any True)
               return $ NamedPosition name' Nothing
           tNames e = return e
+
+-- |If the expression references a single position (i.e. it is a `Position` or a `NamedPosition`),
+-- it returns the position. Otherwise it returns Nothing.
+asPosition :: Expression -> Maybe Int
+asPosition (In (Position n)) = Just n
+asPosition (In (NamedPosition _ (Just n))) = Just n
+asPosition _ = Nothing
 

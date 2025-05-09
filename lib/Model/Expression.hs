@@ -182,7 +182,7 @@ toFormula = para tf
                                       NoAssoc -> (prioB info + 1, prioB info + 1)
                      in T.concat [parent pe1 (prio e1) f1, formulaB info, parent pe2 (prio e2) f2]
           tf (Prefix info fs) =
-                    T.concat $ [formulaP info, "(", T.intercalate ", " $ map snd fs, ")"]
+                    T.concat [formulaP info, "(", T.intercalate ", " $ map snd fs, ")"]
           tf (Cast ft fs) = T.concat [typeOperator ft, "(", T.intercalate ", " $ map snd fs, ")"]
           tf (ErrorCheck (_, f1) (_, f2)) = T.concat ["(", f1, ") ?! (", f2, ")"]
           tf (Ternary (e1, f1) (e2, f2) (e3, f3)) = let

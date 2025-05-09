@@ -35,7 +35,7 @@ module Col (
     , myError
 ) where
 
-import Control.Lens (Traversal', (%~), traversed, (&), Fold, folding, makeLenses, Lens', over, set, (^.))
+import Control.Lens (Traversal', (%~), (&), Fold, folding, makeLenses, Lens', over, set, (^.))
 import Data.Default ( def, Default(def) )
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -57,7 +57,7 @@ import Control.Monad (when)
 import qualified Control.Exception as E
 import HRowsException (HRowsException(HRowsException))
 import Control.Monad.State (execState, gets, modify)
-import Model.RowStore.RowStoreConf (fromNamesTypes, fromTypes, RowStoreConf (sourceInfos))
+import Model.RowStore.RowStoreConf (RowStoreConf (sourceInfos))
 
 -- |A Col especifies a column of the input in the command line. Single
 -- expressions especify a column, a couple of expressions that correspond
@@ -220,49 +220,14 @@ checkPosition e = parsingError $ T.concat [ "Expression "
 -- `RowStore`.
 applyCols :: ColSpec -> RowStore -> RowStore
 applyCols AllCols rst = rst
-applyCols (SelectedCols cs0) rst = mkRowStore (getName rst) conf values
-    where cs = cs0 & traversed . expressionT %~ addPositions rst
-          dss = getDataSources rst
-          values = map (processRow dss $ SelectedCols cs) $ rows rst
-          conf = case names rst of
-                    Just _ -> fromNamesTypes (colNames rst $ SelectedCols cs) (colTypes values)
-                    Nothing -> fromTypes (colTypes values)
-
-colNames :: RowStore -> ColSpec -> [Text]
-colNames rst AllCols = fnames rst
-colNames rst (SelectedCols cs) = concatMap toName cs
-    where toName (Single (In (NamedPosition n _)) Nothing) = [n]
-          toName (Single (In (Position p)) Nothing) = [fnames rst !! p]
-          toName (Single e Nothing) = [toFormula e]
-          toName (Single _ (Just n)) = [n]
-          toName (Range e1 e2) = slice (pos e1) (pos e2) $ fnames rst
-
-colTypes :: [Row] -> [FieldType]
-colTypes = foldr (zipWith consolidateType . map typeOf) (repeat TypeEmpty)
-    where consolidateType t1 t2 | t1 == t2 = t1
-                                | t1 == TypeEmpty = t2
-                                | t2 == TypeEmpty = t1
-                                | otherwise = case t1 of
-                                   TypeInt -> case t2 of
-                                                TypeInt0 -> TypeInt0
-                                                TypeDouble -> TypeDouble
-                                                TypeDouble0 -> TypeDouble0
-                                                _ -> TypeInt0
-                                   TypeInt0 -> case t2 of
-                                                TypeDouble -> TypeDouble0
-                                                TypeDouble0 -> TypeDouble0
-                                                _ -> TypeInt0
-                                   TypeDouble -> case t2 of
-                                                  TypeInt -> TypeDouble
-                                                  _ -> TypeDouble0
-                                   TypeDouble0 -> TypeDouble0
-                                   TypeString -> case t2 of
-                                                  TypeInt -> TypeInt0
-                                                  TypeInt0 -> TypeInt0
-                                                  TypeDouble -> TypeDouble0
-                                                  TypeDouble0 -> TypeDouble0
-                                                  _ -> TypeString
-
+applyCols (SelectedCols cs0) rst = mkRSFromExpressions expNames rst
+    where expNames = concatMap toExpName cs0
+          toExpName (Single e Nothing) = [(e, toFormula e)]
+          toExpName (Single e (Just n)) = [(e, n)]
+          toExpName (Range e1 e2) = slice (pos e1) (pos e2) defExpNames
+          defExpNames = do
+            n <- fnames rst
+            return (In $ NamedPosition n Nothing, n)
 
 processRow :: [DataSource] -> ColSpec -> Row -> Row
 processRow _ AllCols r = r

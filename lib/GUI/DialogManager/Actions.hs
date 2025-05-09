@@ -29,7 +29,7 @@ module GUI.DialogManager.Actions (
   , showAboutDialog
 ) where
 
-import Control.Monad(filterM, forM, forM_, unless, when)
+import Control.Monad(forM, forM_, unless, when)
 import Data.Either(lefts, rights)
 import Data.Functor((<&>))
 import Data.GI.Base.Attributes(clear)

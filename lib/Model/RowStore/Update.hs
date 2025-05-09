@@ -10,6 +10,7 @@ module Model.RowStore.Update (
   , emptyConf
   , emptyName
   , mkRowStore
+  , mkRSFromExpressions
   , changeField
   , mapCol
   , filterRows
@@ -27,12 +28,13 @@ module Model.RowStore.Update (
   , deleteDataSources
 ) where
 
+import qualified Data.IntSet as IS
 import qualified Data.IntMap.Strict as IM
 
 import Data.List(sort, foldl')
 import Data.Map(Map)
 import qualified Data.Map as M
-import Data.Maybe(catMaybes, fromJust, isNothing)
+import Data.Maybe(catMaybes, fromJust, isNothing, mapMaybe)
 import qualified Data.Text as T
 import TextShow(TextShow(showt))
 
@@ -46,6 +48,7 @@ import Model.Row
 import Model.RowStore.Base
 import Model.RowStore.RowStoreConf
 import Model.RowStore.UpdatePlan
+import Model.SourceInfo (FormatInfo(NoFormatInfo))
 
 updateAll :: UpdatePlan -> [DataSource] -> Row -> Row
 updateAll up dss r = foldr (changeRow $ mkError "Fórmula con dependencias circulares")
@@ -126,6 +129,59 @@ emptyName name = RowStore { _nameRS = name
 -- |Creates a `RowStore` from a list of `Row`s and a `RowStoreConf`
 mkRowStore :: RowStoreName -> RowStoreConf -> [Row] -> RowStore
 mkRowStore n conf rs = (foldl' addRow  (emptyConf n conf) rs) { _changed = False }
+
+-- |Creates a `RowStore` from a list of `Expresion`s, a `RowStoreConf`, and a `RowStore`
+mkRSFromExpressions :: [(Expression, FieldName)] -> RowStore -> RowStore
+mkRSFromExpressions expNames rst = let
+    exps = map (addPositions rst . fst) expNames
+    values = [ map (evaluate r $ _dataSources rst) exps | r <- rows rst ]
+    types = foldr (zipWith consolidateType . map typeOf) (repeat TypeString) values
+    formulas = translateExpressions rst exps
+    names = map snd expNames
+    fconfs = zipWith3 FieldConf (map Just names) types formulas
+    conf = mkRowStoreConf fconfs NoFormatInfo [] -- TODO rethink the constructors of RowStores
+  in mkRowStore (getName rst) conf values        -- They don't need all the infromation from a RowStoreConf
+
+-- |Given a list of expressions, it returns the formulas corresponding
+-- to those expressions that could be evaluated if a new `RowStore` were created from
+-- another one using the expresions to calculate the new values.
+translateExpressions :: RowStore -> [Expression] -> [Maybe Formula]
+translateExpressions rst exps = let
+    posKept = IS.fromList $ mapMaybe asPosition exps
+    treatExpr e = case asPosition e of
+                    Just i -> let p = fromIntegral i
+                              in if isFormula p rst
+                                 then treatExpr . fromJust . _expression  . (!!! p) $ _fieldInfo rst
+                                 else Nothing
+                    Nothing -> if all (`IS.member` posKept) (getPositions e)
+                               then Just $ toFormula e
+                               else Nothing
+  in map treatExpr exps
+
+consolidateType :: FieldType -> FieldType -> FieldType
+consolidateType t1 t2 | t1 == t2 = t1
+                      | t1 == TypeEmpty = t2
+                      | t2 == TypeEmpty = t1
+                      | otherwise = case t1 of
+                         TypeInt -> case t2 of
+                                      TypeInt0 -> TypeInt0
+                                      TypeDouble -> TypeDouble
+                                      TypeDouble0 -> TypeDouble0
+                                      _ -> TypeInt0
+                         TypeInt0 -> case t2 of
+                                      TypeDouble -> TypeDouble0
+                                      TypeDouble0 -> TypeDouble0
+                                      _ -> TypeInt0
+                         TypeDouble -> case t2 of
+                                        TypeInt -> TypeDouble
+                                        _ -> TypeDouble0
+                         TypeDouble0 -> TypeDouble0
+                         TypeString -> case t2 of
+                                        TypeInt -> TypeInt0
+                                        TypeInt0 -> TypeInt0
+                                        TypeDouble -> TypeDouble0
+                                        TypeDouble0 -> TypeDouble0
+                                        _ -> TypeString
 
 -- |Changes one field. Returns the new store and the fields changed.
 changeField :: RowPos -> FieldPos -> Field -> RowStore -> (RowStore, [FieldPos])
