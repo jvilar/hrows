@@ -119,7 +119,7 @@ data FieldType = TypeInt
                | TypeDouble0
                | TypeString
                | TypeEmpty
-               deriving (Show, Eq, Generic, Read)
+               deriving (Show, Eq, Generic, Read, Enum, Bounded)
 
 instance ToJSON FieldType where
     toEncoding = genericToEncoding defaultOptions

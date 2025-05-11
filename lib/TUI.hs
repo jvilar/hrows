@@ -43,6 +43,7 @@ import HRowsException (HRowsException(..))
 import Model.DefaultFileNames (defaultBackupFileName)
 import Control.Exception (try, SomeException)
 import System.Directory (removeFile)
+import Data.BitVector (msb)
 
 maxWidth :: Int
 maxWidth = 40
@@ -129,6 +130,7 @@ data RichZoomViewer = RichZoomViewer { _ivTitle :: Text
                                      , _ivValue :: ValueViewer
                                      , _ivType :: Text
                                      , _ivFormula :: Maybe Text
+                                     , _ivFocus :: Int -- 0: title, 1: type, 2: formula
                                      }
 
 tvLists :: Traversal' TableViewer (List Name Text)
@@ -302,7 +304,9 @@ renderRichZoomViewer iv = centerLayer $ joinBorders $
                          <=>
                          hBorder
                          <=>
-                         txt (iv ^. ivType)
+                         (if iv ^. ivFocus == 1
+                          then withAttr selectedElementAttr
+                          else id) (txt $ iv ^. ivType)
                          <=>
                          case iv ^. ivFormula of
                            Nothing -> emptyWidget
@@ -364,12 +368,33 @@ mkRichZoomViewer s = RichZoomViewer (currentFieldName s)
                              )
                             (currentFieldType s)
                             (currentFieldFormula s)
+                            0
 
 updateZoomViewer :: Field -> ZoomViewer -> ZoomViewer
 updateZoomViewer f = over zvValue (either (Left . updateEditor f) (Right . const f))
 
 updateRichZoomViewer :: Field -> RichZoomViewer -> RichZoomViewer
 updateRichZoomViewer f = over ivValue (either (Left . updateEditor f) (Right . const f))
+
+richZoomMoveUp :: RichZoomViewer -> RichZoomViewer
+richZoomMoveUp = over ivFocus (\i -> max 0 (i - 1))
+
+richZoomMoveDown :: RichZoomViewer -> RichZoomViewer
+richZoomMoveDown = over ivFocus (\i -> min 2 (i + 1))
+
+richZoomNextType :: RichZoomViewer -> Maybe (RichZoomViewer, FieldType)
+richZoomNextType rz
+   | rz ^. ivFocus /= 1 || t == maxBound || t' == TypeEmpty = Nothing
+   | otherwise = Just (set ivType (T.pack $ show t') rz, t')
+   where t = read . T.unpack $ rz ^. ivType
+         t' = succ t
+
+richZoomPrevType :: RichZoomViewer -> Maybe (RichZoomViewer, FieldType)
+richZoomPrevType rz
+   | rz ^. ivFocus /= 1 || t == minBound = Nothing
+   | otherwise = Just (set ivType (T.pack $ show t') rz, t')
+   where t = read . T.unpack $ rz ^. ivType
+         t' = pred t
 
 mkEditor :: Name -> Field -> ValueEditor
 mkEditor n f = ValueEditor (Ed.editor n (Just 1) $ toString f) (isError f)
@@ -535,7 +560,7 @@ app = App { appDraw = draw
           , appAttrMap = const myAttrMap
           }
 
-showSelectedCursor :: State -> [CursorLocation Name] -> Maybe (CursorLocation Name)
+showSelectedCursor :: State ->[CursorLocation Name] -> Maybe (CursorLocation Name)
 showSelectedCursor s cs = do
     ed <- s ^. sInterface . activeEditor
     find ((== Just (BC.getName $ ed ^. veEditor)) . cursorLocationName) cs
@@ -556,7 +581,7 @@ handleEvent e = handleGlobalEvent e
 handleInLevel :: BrickEvent Name EventType -> Level Interface -> EventM Name State ()
 handleInLevel e (Searching _ _) = handleEventSearch e
 handleInLevel e (Zoomed _ i) = handleInLevel e $ out i
-handleInLevel e (RichZoomed _ i) = handleInLevel e $ out i
+handleInLevel e (RichZoomed _ i) = handleEventRichZoom e >>->> handleInLevel e (out i)
 handleInLevel e (AsTable _) = handleEventTable e
 handleInLevel e (AsRows _) = handleEventRows e
 
@@ -575,6 +600,39 @@ handleKeySearch KEnter [] = moveToSelected
 handleKeySearch KEsc [] = deactivateSearch
 handleKeySearch k ms = handleInSearchDialog (EvKey k ms)
 
+handleEventRichZoom :: BrickEvent Name EventType -> EventM Name State Bool
+handleEventRichZoom (VtyEvent (EvKey k ms)) = handleKeyRichZoom k ms
+handleEventRichZoom _ = return False
+
+handleKeyRichZoom :: Key -> [Modifier] -> EventM Name State Bool
+handleKeyRichZoom KUp [] = sInterface . levelRichZoom %= fmap richZoomMoveUp >> return True
+handleKeyRichZoom KDown [] = sInterface . levelRichZoom %= fmap richZoomMoveDown >> return True
+handleKeyRichZoom (KChar '\t') [] = sInterface . levelRichZoom %= fmap richZoomMoveDown >> return True
+handleKeyRichZoom KBackTab [] = sInterface . levelRichZoom %= fmap richZoomMoveUp >> return True
+handleKeyRichZoom KLeft [] = do
+    uses (sInterface . levelRichZoom) (maybe Nothing richZoomNextType) >>= \case
+        Just (rz, t) -> do
+            sInterface . levelRichZoom .= Just rz
+            changeType t
+            return True
+        Nothing -> return True
+handleKeyRichZoom KRight [] = do
+    uses (sInterface . levelRichZoom) (maybe Nothing richZoomPrevType) >>= \case
+        Just (rz, t) -> do
+            sInterface . levelRichZoom .= Just rz
+            changeType t
+            return True
+        Nothing -> return True
+handleKeyRichZoom _ _ = return False
+
+changeType :: FieldType -> EventM Name State ()
+changeType t = do
+                 f <- use sCurrentField
+                 sRowStore %= changeFieldType t (fromIntegral f)
+                 n <- use sIndex
+                 modify $ moveTo n
+
+showFocus = use (sInterface . levelRichZoom) >>= logMessage . T.pack . show . fmap (^. ivFocus)
 
 handleCommonKeys :: BrickEvent Name EventType -> EventM Name State Bool
 handleCommonKeys (VtyEvent (EvKey (KChar c) [MCtrl])) = case c of
