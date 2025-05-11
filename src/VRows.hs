@@ -52,9 +52,5 @@ helpMessage = usageInfo header options
 main :: IO ()
 main = do
   opts <- getOptions
-  (rst0, sinf0) <- readRowStoreAndSourceInfo $ opts ^. cOptions
-  let rst = applyCols (opts ^. colSpec) rst0
-      msi = case opts ^. colSpec of
-              AllCols -> sinf0
-              _ -> Nothing
-  startTUI rst msi
+  (rst, msi) <- readRowStoreAndSourceInfo $ opts ^. cOptions
+  startTUI (applyCols (opts ^. colSpec) rst) msi
