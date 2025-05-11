@@ -31,6 +31,7 @@ module Model.RowStore (
              , sortRows
              , sortRowsOn
              , setUnchanged
+             , setChanged
              -- * Types
              , FieldName
              , RowStore

@@ -37,6 +37,7 @@ module Model.RowStore.Base (
                 , sortRows
                 , sortRowsOn
                 , setUnchanged
+                , setChanged
                 , fieldIndex
                 , setName
                 , setNames
@@ -245,3 +246,6 @@ sortRowsOn f rst = rst { _changed = True
 setUnchanged :: RowStore -> RowStore
 setUnchanged store = store { _changed = False }
 
+-- |Marks the store as changed
+setChanged :: RowStore -> RowStore
+setChanged store = store { _changed = True }

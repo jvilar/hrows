@@ -220,7 +220,7 @@ checkPosition e = parsingError $ T.concat [ "Expression "
 -- `RowStore`.
 applyCols :: ColSpec -> RowStore -> RowStore
 applyCols AllCols rst = rst
-applyCols (SelectedCols cs0) rst = mkRSFromExpressions expNames rst
+applyCols (SelectedCols cs0) rst = setChanged $ mkRSFromExpressions expNames rst
     where expNames = concatMap toExpName cs0
           toExpName (Single e Nothing) = [(e, toFormula e)]
           toExpName (Single e (Just n)) = [(e, n)]
