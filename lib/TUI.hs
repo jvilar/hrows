@@ -40,7 +40,7 @@ import Model.Row (Row)
 import Control.Concurrent (threadDelay, forkIO)
 import Control.Monad.IO.Class (liftIO)
 import HRowsException (HRowsException(..))
-import Model.DefaultFileNames (defaultBackupFileName)
+import Model.DefaultFileNames (defaultBackupFileName, defaultConfFileName)
 import Control.Exception (try, SomeException)
 import System.Directory (removeFile)
 
@@ -894,7 +894,13 @@ doSave = do
         Nothing -> logMessage "No source info available"
         Just (si, sis) -> do
             rst <- use sRowStore
-            liftIO $ writeRowStore si sis rst
+            let pc = siPathAndConf si
+                si' = case confPath pc of
+                         Nothing -> let
+                                       cnf = defaultConfFileName $ path pc
+                                    in changePathAndConf (pc { confPath = Just cnf }) si
+                         Just _ -> si
+            liftIO $ writeRowStore si' sis rst
             sRowStore %= setUnchanged
 
 backupLoop :: B.BChan EventType -> IO ()
