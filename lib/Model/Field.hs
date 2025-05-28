@@ -27,6 +27,7 @@ module Model.Field ( Field
                    , compareField
                    , maxField
                    , minField
+                   , intsInParentheses
                    , ternary
                    -- *Other
                    , (!!!)
@@ -238,14 +239,25 @@ minField [] = AnError TypeInt "min de lista vacía"
 minField fs = extreme (<=) fs
 
 extreme :: (Field -> Field -> Bool) -> [Field] -> Field
-extreme _ [] = AnError TypeInt "extremo de lista vacía"
-extreme _ [f] = f
 extreme cmp fs = go fs
-   where go [f] = f
+   where go [] = AnError TypeInt "extremo de lista vacía"
+         go [f] = f
          go (f1:f2:fs) = case compareField cmp f1 f2 of
                             err@(AnError _ _) -> err
                             AnInt 1 _ -> go $ f1:fs
                             _ -> go $ f2:fs
+
+intsInParentheses :: [Field] -> Field
+intsInParentheses [AString s] = toField $ go s 0
+    where go txt n | T.null txt = n :: Int
+                   | otherwise = let
+                        rest = T.dropWhile (/= '(') txt
+                      in case T.uncons rest of
+                           Nothing -> n
+                           Just (_, rest') -> case signed decimal rest' of
+                                                Right (m, rest'') -> go rest'' (n + m)
+                                                _ -> go rest' n
+intsInParentheses f = AnError TypeInt $ "intsInParentheses, parámetros erróneos: " <> T.intercalate ", " (map toString f)
 
 compareField :: (Field -> Field -> Bool) -> Field -> Field -> Field
 compareField _ e@(AnError _ _) _ = e

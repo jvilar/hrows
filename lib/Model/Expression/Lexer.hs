@@ -24,6 +24,7 @@ data Token = IntT Int
            | NameT String
            | MaxT
            | MinT
+           | IntsInParenthesesT
            | AddT
            | SubT
            | MultT
@@ -265,7 +266,7 @@ at = ifChar (== '{')
         (emit AtT)
 
 reservedWords :: [(String, Token)]
-reservedWords = [("max", MaxT), ("min", MinT)] ++
+reservedWords = [("max", MaxT), ("min", MinT), ("intsInParentheses", IntsInParenthesesT)] ++
        [(T.unpack $ typeOperator t, CastT t) | t <- [TypeString, TypeInt, TypeInt0, TypeDouble, TypeDouble0]]
 
 shortNamed :: Tokenizer ()

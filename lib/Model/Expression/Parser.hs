@@ -184,8 +184,9 @@ multiplicative = binaryLevel base
 
 -- base -> IntT | DoubleT | StringT | PositionT | NameT name | NotT base
 --         | CastT parenthesized | OpenT expression CloseT
---         | MaxT OpenT expression CommaT expression CloseT
---         | MinT OpenT expression CommaT expression CloseT
+--         | MaxT parenthesized
+--         | MinT parenthesized
+--         | IntsInParenthesesT parenthesized
 base :: Parser Expression
 base = do
     t <- current
@@ -200,6 +201,7 @@ base = do
         OpenT -> expression <* close
         MaxT -> maxMin $ PrefixOpInfo maxField "max"
         MinT -> maxMin $ PrefixOpInfo minField "min"
+        IntsInParenthesesT -> mkPrefix (PrefixOpInfo intsInParentheses "intsInParentheses") <$> parenthesized
         _ -> parsingError $ T.concat ["Error en ", showt t, ", esperaba un comienzo de expresión"]
 
 -- name --> (AtT NameT ArrowT NameT EqualT NameT)?
@@ -218,6 +220,7 @@ name s = do
                 return $ mkFromSource source fHere fThere pos 
         else return pos
 
+-- parenthesized -> OpenT expression (CommaT expression)* CloseT
 parenthesized :: Parser [Expression]
 parenthesized = open >> separated expression CommaT <* close
 
