@@ -130,7 +130,7 @@ emptyName name = RowStore { _nameRS = name
 mkRowStore :: RowStoreName -> RowStoreConf -> [Row] -> RowStore
 mkRowStore n conf rs = (foldl' addRow  (emptyConf n conf) rs) { _changed = False }
 
--- |Creates a `RowStore` from a list of `Expresion`s, a `RowStoreConf`, and a `RowStore`
+-- |Creates a `RowStore` from a list of `Expresion`s, and a `RowStore`
 mkRSFromExpressions :: [(Expression, FieldName)] -> RowStore -> RowStore
 mkRSFromExpressions expNames rst = let
     exps = map (addPositions rst . fst) expNames
@@ -139,10 +139,12 @@ mkRSFromExpressions expNames rst = let
               [] -> replicate (length exps) TypeString
               (v:vs) -> foldr (zipWith consolidateType . map typeOf) (map typeOf v) vs
     formulas = translateExpressions rst exps
-    names = map snd expNames
-    fconfs = zipWith3 FieldConf (map Just names) types formulas
-    conf = mkRowStoreConf fconfs NoFormatInfo [] -- TODO rethink the constructors of RowStores
-  in mkRowStore (getName rst) conf values        -- They don't need all the infromation from a RowStoreConf
+    names = map (Just . snd) expNames
+    rst' = flip (foldl' addRow) values
+         $ flip (foldr (uncurry changeFieldFormula)) (zip formulas [0..])
+         $ newFields (zip names types)
+         $ deleteFields [0 .. fromIntegral (_nFields rst - 1)] rst { _rows = IM.empty }
+  in rst'
 
 -- |Given a list of expressions, it returns the formulas corresponding
 -- to those expressions that could be evaluated if a new `RowStore` were created from
@@ -153,7 +155,7 @@ translateExpressions rst exps = let
     treatExpr e = case asPosition e of
                     Just i -> let p = fromIntegral i
                               in if isFormula p rst
-                                 then treatExpr . fromJust . _expression  . (!!! p) $ _fieldInfo rst
+                                 then treatExpr . addPositions rst . fromJust . _expression  . (!!! p) $ _fieldInfo rst
                                  else Nothing
                     Nothing -> if all (`IS.member` posKept) (getPositions e)
                                then Just $ toFormula e

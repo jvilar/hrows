@@ -216,7 +216,7 @@ checkPosition e = parsingError $ T.concat [ "Expression "
                                           , " does not represent a position"
                                           ]
 
--- |Produce a `RowStore` from a `ColSpec` and an existing
+-- |Produce a `RowStore` from a `ColSpec`, a list of `SourceInfo`, and an existing
 -- `RowStore`.
 applyCols :: ColSpec -> RowStore -> RowStore
 applyCols AllCols rst = rst
