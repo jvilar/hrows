@@ -156,14 +156,14 @@ testNames = describe "Test names" $ do
                           addPositions mainRst (parseExpression "first") `shouldBe` mkKnownNamedPosition "first" 0
                           addPositions mainRst (parseExpression "second") `shouldBe` mkKnownNamedPosition "second" 1
                           addPositions mainRst (parseExpression "other @ child <- second <-> value")
-                             `shouldBe` mkFromSource (mkConstant $ toField (0 :: Int))
+                             `shouldBe` mkFromSource (mkKnownSourceName "child" 0)
                                                      (mkKnownNamedPosition "second" 1)
                                                      (mkKnownNamedPosition "value" 2)
                                                      (mkKnownNamedPosition "other" 3)
                           addPositions mainRst (parseExpression "first + value @ child <- \"one\" <-> name")
                              `shouldBe` mkBinary (BinaryOpInfo (+) "+" 4 TrueAssoc)
                                                  (mkKnownNamedPosition "first" 0)
-                                                 (mkFromSource (mkConstant $ toField (0 :: Int))
+                                                 (mkFromSource (mkKnownSourceName "child" 0)
                                                                (mkConstant $ toField ("one" :: Text))
                                                                (mkKnownNamedPosition "name" 1)
                                                                (mkKnownNamedPosition "value" 2)
@@ -197,7 +197,7 @@ testParser :: Spec
 testParser = describe "Test the parser" $
                it "Checks a from source expression" $
                  parseExpression "value @ child <- name <-> name2"
-                       `shouldBe` mkFromSource (mkNamedPosition "child")
+                       `shouldBe` mkFromSource (mkSourceName "child")
                                                (mkNamedPosition "name")
                                                (mkNamedPosition "name2")
                                                (mkNamedPosition "value")
