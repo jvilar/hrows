@@ -143,7 +143,7 @@ mkRSFromExpressions expNames rst = let
     rst' = flip (foldl' addRow) values
          $ flip (foldr (uncurry changeFieldFormula)) (zip formulas [0..])
          $ newFields (zip names types)
-         $ deleteFields [0 .. fromIntegral (_nFields rst - 1)] rst { _rows = IM.empty }
+         $ deleteFields [0 .. fromIntegral (_nFields rst - 1)] rst { _rows = IM.empty, _size = 0 }
   in rst'
 
 -- |Given a list of expressions, it returns the formulas corresponding

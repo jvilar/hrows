@@ -15,6 +15,8 @@ module Model.Expression ( -- *Types
                         , mkPosition
                         , mkNamedPosition
                         , mkKnownNamedPosition
+                        , mkSourceName
+                        , mkKnownSourceName
                         , mkConstant
                         , mkUnary
                         , mkBinary
@@ -61,6 +63,8 @@ instance Show Expression where
              where gshow (Position i) = "Position " ++ show i
                    gshow (NamedPosition t n) = concat ["NamedPosition ", show t
                                                       , " ", show n ]
+                   gshow (SourceName t n) = concat ["SourceName ", show t
+                                                      , " ", show n ]
                    gshow (Constant f) = "Constant " ++ show f
                    gshow (Unary u ex) = concat ["Unary ", show u, " (", ex, ")" ]
                    gshow (Binary b ex1 ex2) = concat ["Binary ", show b, " (", ex1,", ", ex2, ")" ]
@@ -74,6 +78,7 @@ instance Show Expression where
 -- |A node in the AST for expressions
 data Node a = Position Int -- ^A position in the row
             | NamedPosition Text (Maybe Int) -- ^The name of a position in the row and its index
+            | SourceName Text (Maybe Int) -- ^The name of a source and the index of the corresponding `RowStore`
             | Constant Field -- ^A constant value
             | Unary UnaryOpInfo a -- ^Application of an unary operator
             | Binary BinaryOpInfo a a -- ^Application of a binary operator
@@ -95,6 +100,12 @@ mkNamedPosition t = In $ NamedPosition t Nothing
 
 mkKnownNamedPosition :: Text -> Int -> Expression
 mkKnownNamedPosition t n = In $ NamedPosition t (Just n)
+
+mkSourceName :: Text -> Expression
+mkSourceName t = In $ SourceName t Nothing
+
+mkKnownSourceName :: Text -> Int -> Expression
+mkKnownSourceName t n = In $ SourceName t (Just n)
 
 mkConstant :: Field -> Expression
 mkConstant = In . Constant
@@ -171,6 +182,8 @@ toFormula = para tf
           tf (Position p) = "$" `T.append` showt (p + 1)
           tf (NamedPosition n _ ) | T.all isAlphaNum n = n
                                   | otherwise = T.concat ["@{", n, "}"]
+          tf (SourceName n _ ) | T.all isAlphaNum n = n
+                               | otherwise = T.concat ["@{", n, "}"]
           tf (Constant f) | typeOf f == TypeString = T.concat[ "\"", toString f, "\""]
                           | otherwise = toString f
           tf (Unary info (e, f)) = formulaU info `T.append` parent 8 (prio e) f
@@ -221,6 +234,8 @@ getPositions = cata gp
         gp (Position n) = [n]
         gp (NamedPosition _ Nothing) = []
         gp (NamedPosition _ (Just n)) = [n]
+        gp (SourceName _ Nothing) = []
+        gp (SourceName _ (Just n)) = [n]
         gp (Constant _) = []
         gp (Unary _ ps) = ps
         gp (Binary _ ps1 ps2) = merge ps1 ps2

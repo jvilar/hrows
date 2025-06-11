@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Model.Expression.Parser (
@@ -32,6 +33,7 @@ import TextShow(TextShow(..))
 
 import Model.Expression.Lexer
 import Model.Expression
+import Model.Expression.RecursionSchemas(Fix(In))
 
 type Parser = ExceptT Text (State [Token])
 
@@ -212,7 +214,9 @@ name s = do
         if at
         then do
                 advance
-                source <- expectName "el nombre de la fuente"
+                source <- expectName "el nombre de la fuente" >>= \case
+                   In (NamedPosition name _) -> return $ mkSourceName name
+                   _ -> parsingError "Se esperaba un nombre de fuente"
                 expect ArrowT "una flecha"
                 fHere <- expression
                 expect DoubleArrowT "una flecha doble"

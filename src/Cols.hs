@@ -18,7 +18,6 @@ import Model.DefaultFileNames (defaultConfFileName)
 import Model.RowStore (writeRowStore, writeRowStoreStdout, RowStore)
 import Model.SourceInfo (mkSourceInfo, PathAndConf(PathAndConf))
 
-
 data Options = Options { _colSpec :: ColSpec
                        , _cOptions :: ColOptions
                        , _oFile :: Maybe FilePath

@@ -25,21 +25,19 @@ addPositions :: RowStore -> Expression -> Expression
 addPositions rst (In (NamedPosition name _)) = case fieldIndex rst name of
                                                  Nothing -> mkErrorExpr $ "Mal nombre de campo: " `T.append` name
                                                  Just n -> mkKnownNamedPosition name n
-addPositions rst (In (FromSource s inr ins gets)) = case identifySource rst s of
-    Nothing -> mkErrorExpr $ T.append "Mal nombre de fuente: " (toFormula s)
-    Just (rst', s') -> let
-                         inr' = addPositions rst inr
-                         ins' = addPositions rst' ins
-                         gets' = addPositions rst' gets
-                       in mkFromSource s' inr' ins' gets'
-addPositions rst n = In (fmap (addPositions rst) (out n))
-
-identifySource :: RowStore -> Expression -> Maybe (RowStore, Expression)
-identifySource rst (In (NamedPosition name _)) = do
-    n <- getRowStoreIndex rst name
-    return (getRowStore rst n, mkConstant $ toField n)
-identifySource _ _ = Nothing
-
+addPositions rst (In (SourceName name _)) = case getRowStoreIndex rst name of
+    Nothing -> mkErrorExpr $ "Mal nombre de fuente: " `T.append` name
+    Just rst -> mkKnownSourceName name rst
+addPositions rst (In (FromSource s inr ins gets)) = case s' of
+    In (SourceName _ (Just n)) -> let
+                                     rst' = getRowStore rst n
+                                     inr' = addPositions rst inr
+                                     ins' = addPositions rst' ins
+                                     gets' = addPositions rst' gets
+                                  in mkFromSource s' inr' ins' gets'
+    _ -> s'
+   where s' = addPositions rst s
+addPositions rst (In n) = In (fmap (addPositions rst) n)
 
 type Changed = Bool
 

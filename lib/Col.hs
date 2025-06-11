@@ -212,7 +212,7 @@ checkPosition :: Expression -> Parser ()
 checkPosition (In (Position _)) = return ()
 checkPosition (In (NamedPosition _ _)) = return ()
 checkPosition e = parsingError $ T.concat [ "Expression "
-                                          , toFormula e
+
                                           , " does not represent a position"
                                           ]
 
@@ -224,7 +224,7 @@ applyCols (SelectedCols cs0) rst = setChanged $ mkRSFromExpressions expNames rst
     where expNames = concatMap toExpName cs0
           toExpName (Single e Nothing) = [(e, toFormula e)]
           toExpName (Single e (Just n)) = [(e, n)]
-          toExpName (Range e1 e2) = slice (pos e1) (pos e2) defExpNames
+          toExpName (Range e1 e2) = slice (pos $ addPositions rst e1) (pos $ addPositions rst e2) defExpNames
           defExpNames = do
             n <- fnames rst
             return (In $ NamedPosition n Nothing, n)
