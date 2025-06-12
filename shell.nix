@@ -4,7 +4,7 @@ with pkgs;
 
 mkShell {
   buildInputs = [
-    (haskell-language-server.override { supportedGhcVersions = ["96"]; })
+    (haskell-language-server.override { supportedGhcVersions = ["966"]; })
   ];
 }
 
