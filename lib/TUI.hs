@@ -9,45 +9,46 @@ module TUI (
   startTUI
 ) where
 
+
 import Brick hiding (getName, zoom)
-import Brick.BChan qualified as B
 import Brick qualified as B
+import Brick.BChan qualified as B
 import Brick.Widgets.Border
 import Brick.Widgets.Center
 import Brick.Widgets.Core qualified as BC
 import Brick.Widgets.Dialog
 import Brick.Widgets.Edit qualified as Ed
 import Brick.Widgets.List hiding (splitAt, reverse)
+import Control.Concurrent (threadDelay, forkIO)
+import Control.Exception (try, SomeException)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
+import Control.Monad (when, void)
+import Control.Monad.IO.Class (liftIO)
 import Data.List(transpose, intersperse, find)
 import Data.Maybe(fromMaybe, isJust)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Zipper qualified as Tz
 import Data.Vector qualified as V
+import Graphics.Vty (imageWidth, imageHeight, translate, Vty (outputIface), supportsMode)
 import Graphics.Vty.Attributes (defAttr, bold, reverseVideo, withStyle, withBackColor, withForeColor, black, rgbColor)
 import Graphics.Vty.Config qualified as Vty
 import Graphics.Vty.CrossPlatform qualified as Vty
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl))
-
-import Model.Field
-import Model.Expression.RecursionSchemas
-import Model.RowStore
-import Model.SourceInfo
-import Graphics.Vty (imageWidth, imageHeight, translate)
-import Control.Monad (when, void)
-import Model.Row (Row)
-import Control.Concurrent (threadDelay, forkIO)
-import Control.Monad.IO.Class (liftIO)
+import Graphics.Vty.Output (Mode(Mouse), setMode)
 import HRowsException (HRowsException(..))
 import Model.DefaultFileNames (defaultBackupFileName, defaultConfFileName)
-import Control.Exception (try, SomeException)
+import Model.Expression.RecursionSchemas
+import Model.Field
+import Model.Row (Row)
+import Model.RowStore
+import Model.SourceInfo
 import System.Directory (removeFile)
 
 maxWidth :: Int
 maxWidth = 40
 
-data BackupEvent = BackupEvent
+data BackupEvent = BackupEvent deriving (Show)
 
 data Name = DButton DialogButton
           | FieldNames
@@ -63,10 +64,12 @@ data Name = DButton DialogButton
 data DialogButton = OkButton | CancelButton deriving (Eq, Ord, Show)
 
 data Level i = Searching SearchDialog i
-             | Zoomed ZoomViewer i
-             | RichZoomed RichZoomViewer i
+             | Zoomed ZoomLevel i
              | AsTable TableViewer
              | AsRows RowViewer deriving Functor
+
+data ZoomLevel = NormalZoom ZoomViewer
+               | RichZoom RichZoomViewer
 
 isSearching :: Level i -> Bool
 isSearching (Searching _ _) = True
@@ -75,10 +78,6 @@ isSearching _ = False
 isZoomed :: Level i -> Bool
 isZoomed (Zoomed _ _) = True
 isZoomed _ = False
-
-isRichZoomed :: Level i -> Bool
-isRichZoomed (RichZoomed _ _) = True
-isRichZoomed _ = False
 
 isAsTable :: Level i -> Bool
 isAsTable (AsTable _) = True
@@ -89,6 +88,9 @@ isAsRows (AsRows _) = True
 isAsRows _ = False
 
 type Interface = Fix Level
+
+class HasEditor i where
+    editorLens :: Lens' i (Maybe ValueEditor)
 
 updateLevels :: (Level Interface -> Level Interface) -> Interface -> Interface
 updateLevels = bottomUp
@@ -147,6 +149,37 @@ makeLenses ''ValueEditor
 makeLenses ''ZoomViewer
 makeLenses ''RichZoomViewer
 
+instance HasEditor ZoomViewer where
+    editorLens = lens getter setter
+        where getter zv = case zv ^. zvValue of
+                             Left ve -> Just ve
+                             _ -> Nothing
+              setter _ Nothing = error "Cannot remove editor from zoom viewer"
+              setter zv (Just ve) = set zvValue (Left ve) zv
+
+instance HasEditor RichZoomViewer where
+    editorLens = lens getter setter
+        where getter iv = case iv ^. ivFocus of
+                              RzValue -> case iv ^. ivValue of
+                                             Left ve -> Just ve
+                                             _ -> Nothing
+                              RzFormula -> if iv ^. ivIsFormula
+                                             then Just $ iv ^. ivFormula
+                                             else Nothing
+                              _ -> Nothing
+              setter _ Nothing = error "Cannot remove editor from rich zoom viewer"
+              setter iv (Just ve) = case iv ^. ivFocus of
+                                      RzValue -> set ivValue (Left ve) iv
+                                      RzFormula -> set ivFormula ve iv
+                                      _ -> error "Bad focus in rich zoom for setting editor"
+
+instance HasEditor ZoomLevel where
+    editorLens = lens getter setter
+        where getter (NormalZoom zv) = zv ^. editorLens
+              getter (RichZoom iv) = iv ^. editorLens
+              setter (NormalZoom zv) v = NormalZoom $ set editorLens v zv
+              setter (RichZoom zv) v = RichZoom $ set editorLens v zv
+
 updateRvValues :: [Field] -> RowViewer -> RowViewer
 updateRvValues ts rv = over rvValueList (listReplace v i) rv
   where i = listSelected $ rv ^. rvValueList
@@ -157,8 +190,7 @@ getLevel :: (forall i . Level i -> Bool) -> Interface -> Maybe Interface
 getLevel f = para search
     where search :: Level (Interface, Maybe Interface) -> Maybe Interface
           search l@(Searching sd (i, ms)) = if f l then Just (In $ Searching sd i) else ms
-          search l@(Zoomed zv (i, ms)) = if f l then Just (In $ Zoomed zv i) else Nothing
-          search l@(RichZoomed iv (i, ms)) = if f l then Just (In $ RichZoomed iv i) else ms
+          search l@(Zoomed zl (i, ms)) = if f l then Just (In $ Zoomed zl i) else Nothing
           search l@(AsTable tv) = if f l then Just (In $ AsTable tv) else Nothing
           search l@(AsRows rv) = if f l then Just (In $ AsRows rv) else Nothing
 
@@ -166,7 +198,6 @@ removeLevel :: (forall i . Level i -> Bool) -> Interface -> Interface
 removeLevel f = updateLevels remL
     where remL l@(Searching _ i) = if f l then out i else l
           remL l@(Zoomed _ i) = if f l then out i else l
-          remL l@(RichZoomed _ i) = if f l then out i else l
           remL l@(AsTable _) = if f l then error "Cannot remove table" else l
           remL l@(AsRows _) = if f l then error "Cannot remove row viewer" else l
 
@@ -180,42 +211,24 @@ levelSearch = lens getter setter
           setter i (Just sd) = updateLevels (addD sd) i
           addD :: SearchDialog -> Level Interface -> Level Interface
           addD _ (Searching _ i) = out i
-          addD sd (Zoomed zv (In (Searching _ i))) = Searching sd (In $ Zoomed zv i)
+          addD sd (Zoomed zl (In (Searching _ i))) = Searching sd (In $ Zoomed zl i)
           addD _ z@(Zoomed _ _) = z
-          addD sd (RichZoomed iv (In (Searching _ i))) = Searching sd (In $ RichZoomed iv i)
-          addD _ z@(RichZoomed _ _) = z
           addD sd t@(AsTable _) = Searching sd (In t)
           addD sd r@(AsRows _) = Searching sd (In r)
 
-levelZoom :: Lens' Interface (Maybe ZoomViewer)
+levelZoom :: Lens' Interface (Maybe ZoomLevel)
 levelZoom = lens getter setter
     where getter i = case getLevel isZoomed i of
-                         Just (In (Zoomed zv _)) -> Just zv
+                         Just (In (Zoomed zl _)) -> Just zl
                          _ -> Nothing
 
           setter i Nothing = removeLevel isZoomed i
           setter i (Just z) = updateLevels (addZ z) i
-          addZ :: ZoomViewer -> Level Interface -> Level Interface
+          addZ :: ZoomLevel -> Level Interface -> Level Interface
           addZ _ s@(Searching _ _) = s
           addZ _ (Zoomed _ i) = out i
-          addZ _ (RichZoomed _ i) = out i
           addZ z t@(AsTable _) = Zoomed z (In t)
           addZ z r@(AsRows _) = Zoomed z (In r)
-
-levelRichZoom :: Lens' Interface (Maybe RichZoomViewer)
-levelRichZoom = lens getter setter
-    where getter i = case getLevel isRichZoomed i of
-                         Just (In (RichZoomed iv _)) -> Just iv
-                         _ -> Nothing
-
-          setter i Nothing = removeLevel isRichZoomed i
-          setter i (Just iv) = updateLevels (addI iv) i
-          addI :: RichZoomViewer -> Level Interface -> Level Interface
-          addI _ s@(Searching _ _) = s
-          addI _ (Zoomed _ i) = out i
-          addI _ (RichZoomed _ i) = out i
-          addI iv t@(AsTable _) = RichZoomed iv (In t)
-          addI iv r@(AsRows _) = RichZoomed iv (In r)
 
 levelTable :: Lens' Interface (Maybe TableViewer)
 levelTable = lens getter setter
@@ -228,7 +241,6 @@ levelTable = lens getter setter
           addT :: TableViewer -> Level Interface -> Level Interface
           addT _ s@(Searching _ _) = s
           addT _ z@(Zoomed _ _) = z
-          addT _ i@(RichZoomed _ _) = i
           addT tv (AsRows _) = AsTable tv
           addT tv (AsTable _) = AsTable tv
 
@@ -243,25 +255,22 @@ levelRows = lens getter setter
           addR :: RowViewer -> Level Interface -> Level Interface
           addR _ s@(Searching _ _) = s
           addR _ z@(Zoomed _ _) = z
-          addR _ i@(RichZoomed _ _) = i
           addR rv (AsTable _) = AsRows rv
           addR rv (AsRows _) = AsRows rv
+
+richZoom :: Lens' Interface (Maybe RichZoomViewer)
+richZoom = lens getter setter
+    where getter i = do
+                        In (Zoomed (RichZoom iv) _) <- getLevel isZoomed i
+                        return iv
+
+          setter i v = set levelZoom (fmap RichZoom v) i
 
 activeEditor :: Lens' Interface (Maybe ValueEditor)
 activeEditor = lens getter setter
     where getter = cata ae
           ae (Searching _ _) = Nothing
-          ae (Zoomed z _) = case z ^. zvValue of
-                              Left ve -> Just ve
-                              _ -> Nothing
-          ae (RichZoomed iv _) = case iv ^. ivFocus of
-                                    RzValue -> case iv ^. ivValue of
-                                                   Left ve -> Just ve
-                                                   _ -> Nothing
-                                    RzFormula -> if iv ^. ivIsFormula
-                                                   then Just $ iv ^. ivFormula
-                                                   else Nothing
-                                    _ -> Nothing
+          ae (Zoomed zl _) = zl ^. editorLens
           ae (AsTable _) = Nothing
           ae (AsRows rv) = case listSelectedElement (rv ^. rvValueList) of
                              Just (_, Left ve) -> Just ve
@@ -271,11 +280,7 @@ activeEditor = lens getter setter
           setter i (Just ve) = para (addE ve) i
           addE :: ValueEditor -> Level (Interface, Interface) -> Interface
           addE _ (Searching sd (_, i)) = In $ Searching sd i
-          addE ve (Zoomed zv (i, _)) = In $ Zoomed (set zvValue (Left ve) zv) i
-          addE ve (RichZoomed iv (i, _)) = In $ case iv ^. ivFocus of
-              RzValue -> RichZoomed (set ivValue (Left ve) iv) i
-              RzFormula -> RichZoomed (set ivFormula ve iv) i
-              _ -> error "Bad focus in rich zoom for setting editor"
+          addE ve (Zoomed zl (i, _)) = In $ Zoomed (set editorLens (Just ve) zl) i
           addE _ (AsTable _) = error "Cannot add editor to table"
           addE ve (AsRows rv) = In $ AsRows (set (rvValueList . element (fromMaybe 0 $ listSelected $ rv ^. rvValueList)) (Left ve) rv)
 
@@ -397,7 +402,6 @@ richZoomMoveDown :: RichZoomViewer -> RichZoomViewer
 richZoomMoveDown rz = over ivFocus (\i -> if i < limit then succ i else limit) rz
   where
     limit = if rz ^. ivIsFormula then RzFormula else RzFMark
- 
 
 richZoomNextType :: RichZoomViewer -> Maybe (RichZoomViewer, FieldType)
 richZoomNextType rz
@@ -442,8 +446,8 @@ draw :: State -> [Widget Name]
 draw s = bottomRight (txt $ T.unlines $ s ^. sLog) : cata doDraw (s ^. sInterface)
     where
         doDraw (Searching sd ws) = renderSearchDialog sd : ws
-        doDraw (Zoomed zv ws) = renderZoomViewer zv : ws
-        doDraw (RichZoomed iv ws) = renderRichZoomViewer iv : ws
+        doDraw (Zoomed (NormalZoom zv) ws) = renderZoomViewer zv : ws
+        doDraw (Zoomed (RichZoom iv) ws) = renderRichZoomViewer iv : ws
         doDraw (AsTable tv) = [renderBack (windowTitle s) (renderTableViewer tv) tableHelp]
         doDraw (AsRows rv) = [renderBack (windowTitle s) (renderRowViewer rv) rowHelp]
         tableHelp = "C-z: zoom, C-r: rich zoom, C-t: return to field view, C-f: find, C-w: write, C-q: exit"
@@ -573,9 +577,16 @@ app :: App State EventType Name
 app = App { appDraw = draw
           , appChooseCursor = showSelectedCursor
           , appHandleEvent = handleEvent
-          , appStartEvent = return ()
+          , appStartEvent = acceptMouseInput
           , appAttrMap = const myAttrMap
           }
+
+acceptMouseInput :: EventM Name State ()
+acceptMouseInput = do
+    vty <- getVtyHandle
+    let output = outputIface vty
+    when (supportsMode output Mouse) $
+        liftIO $ setMode output Mouse True
 
 showSelectedCursor :: State ->[CursorLocation Name] -> Maybe (CursorLocation Name)
 showSelectedCursor s cs = do
@@ -592,13 +603,14 @@ listKeys = [KDown, KUp, KPageUp, KPageDown, KHome, KEnd, KLeft, KRight]
 
 handleEvent :: BrickEvent Name EventType -> EventM Name State ()
 handleEvent (AppEvent BackupEvent) = doBackup
+handleEvent e@(MouseDown _ _ _ _) = logMessage $ "Mouse " <> tshow e
 handleEvent e = handleGlobalEvent e
    >>->> (use sInterface >>= handleInLevel e . out)
 
 handleInLevel :: BrickEvent Name EventType -> Level Interface -> EventM Name State ()
 handleInLevel e (Searching _ _) = handleEventSearch e
-handleInLevel e (Zoomed _ i) = handleInLevel e $ out i
-handleInLevel e (RichZoomed _ i) = handleEventRichZoom e >>->> handleInLevel e (out i)
+handleInLevel e (Zoomed (NormalZoom _) i) = handleInLevel e $ out i
+handleInLevel e (Zoomed (RichZoom _) i) = handleEventRichZoom e >>->> handleInLevel e (out i)
 handleInLevel e (AsTable _) = handleEventTable e
 handleInLevel e (AsRows _) = handleEventRows e
 
@@ -622,28 +634,28 @@ handleEventRichZoom (VtyEvent (EvKey k ms)) = handleKeyRichZoom k ms
 handleEventRichZoom _ = return False
 
 handleKeyRichZoom :: Key -> [Modifier] -> EventM Name State Bool
-handleKeyRichZoom KUp [] = sInterface . levelRichZoom %= fmap richZoomMoveUp >> return True
-handleKeyRichZoom KDown [] = sInterface . levelRichZoom %= fmap richZoomMoveDown >> return True
-handleKeyRichZoom (KChar '\t') [] = sInterface . levelRichZoom %= fmap richZoomMoveDown >> return True
-handleKeyRichZoom KBackTab [] = sInterface . levelRichZoom %= fmap richZoomMoveUp >> return True
+handleKeyRichZoom KUp [] = sInterface . richZoom %= fmap richZoomMoveUp >> return True
+handleKeyRichZoom KDown [] = sInterface . richZoom %= fmap richZoomMoveDown >> return True
+handleKeyRichZoom (KChar '\t') [] = sInterface . richZoom %= fmap richZoomMoveDown >> return True
+handleKeyRichZoom KBackTab [] = sInterface . richZoom %= fmap richZoomMoveUp >> return True
 handleKeyRichZoom KLeft [] = handleChangeType richZoomNextType
 handleKeyRichZoom KRight [] = handleChangeType richZoomPrevType
 handleKeyRichZoom (KChar ' ') [] = handleSwitchFormula
 handleKeyRichZoom _ _ = return False
 
 handleChangeType :: (RichZoomViewer -> Maybe (RichZoomViewer, FieldType)) -> EventM Name State Bool
-handleChangeType f = uses (sInterface . levelRichZoom) (maybe Nothing f) >>= \case
+handleChangeType f = uses (sInterface . richZoom) (maybe Nothing f) >>= \case
         Just (rz, t) -> do
-            sInterface . levelRichZoom .= Just rz
+            sInterface . richZoom .= Just rz
             changeType t
             return True
         Nothing -> return False
 
 handleSwitchFormula :: EventM Name State Bool
-handleSwitchFormula = use (sInterface . levelRichZoom) >>= \case
+handleSwitchFormula = use (sInterface . richZoom) >>= \case
     Just rz -> if rz ^. ivFocus == RzFMark
                then do
-                      sInterface . levelRichZoom . _Just . ivIsFormula %= not
+                      sInterface . richZoom . _Just . ivIsFormula %= not
                       f <- if rz ^. ivIsFormula
                            then return Nothing
                            else Just . T.concat <$> use (sInterface . activeEditor . _Just . veEditor . to Ed.getEditContents)
@@ -705,8 +717,8 @@ handleEdition e = do
         Just _ -> do
                      B.zoom (sInterface . activeEditor . _Just . veEditor) $ Ed.handleEditorEvent e
                      value <- T.concat <$> use (sInterface . activeEditor . _Just . veEditor . to Ed.getEditContents)
-                     use (sInterface . to (getLevel isRichZoomed)) >>= \case
-                        Just (In (RichZoomed rz _)) -> if rz ^. ivFocus == RzValue
+                     use (sInterface . richZoom) >>= \case
+                        Just rz -> if rz ^. ivFocus == RzValue
                             then updateCurrentField value
                             else changeCurrentFieldFormula $ Just value
                         _ -> updateCurrentField value
@@ -730,8 +742,8 @@ updateCurrentField t = do
   where
     uRow :: Row -> Field -> Level Interface -> Level Interface
     uRow _ _ s@(Searching _ _) = s
-    uRow _ ft (Zoomed zv i) = Zoomed (over zvValue (updateValueViewer ft) zv) i
-    uRow _ ft (RichZoomed iv i) = RichZoomed (over ivValue (updateValueViewer ft) iv) i
+    uRow _ ft (Zoomed (NormalZoom zv) i) = Zoomed (NormalZoom (over zvValue (updateValueViewer ft) zv)) i
+    uRow _ ft (Zoomed (RichZoom iv) i) = Zoomed (RichZoom (over ivValue (updateValueViewer ft) iv)) i
     uRow _ _ a@(AsTable _) = a
     uRow r _ (AsRows rv) = AsRows $ updateRvValues r rv
 
@@ -772,15 +784,15 @@ toggleZoom = use (sInterface . levelZoom) >>= \case
                 Nothing -> modify zoom
 
 zoom :: State -> State
-zoom s = set (sInterface . levelZoom) (Just $ mkZoomViewer s) s
+zoom s = set (sInterface . levelZoom) (Just . NormalZoom $ mkZoomViewer s) s
 
 toggleInfo :: EventM Name State ()
-toggleInfo = use (sInterface . levelRichZoom) >>= \case
-                Just _ -> sInterface . levelRichZoom .= Nothing
+toggleInfo = use (sInterface . richZoom) >>= \case
+                Just _ -> sInterface . richZoom .= Nothing
                 Nothing -> modify info
 
 info :: State -> State
-info s = set (sInterface . levelRichZoom) (Just $ mkRichZoomViewer s) s
+info s = set (sInterface . richZoom) (Just $ mkRichZoomViewer s) s
 
 activateSearch :: EventM Name State ()
 activateSearch = do
@@ -843,8 +855,8 @@ moveTo pos s
         indexUpdated = set sIndex pos s
         moveInterface = updateLevels mi
         mi se@(Searching _ _) = se
-        mi (Zoomed zv i) = Zoomed (updateZoomViewer (currentField indexUpdated) zv) i
-        mi (RichZoomed iv i) = RichZoomed (updateRichZoomViewer (currentField indexUpdated) iv) i
+        mi (Zoomed (NormalZoom zv) i) = Zoomed (NormalZoom (updateZoomViewer (currentField indexUpdated) zv)) i
+        mi (Zoomed (RichZoom iv) i) = Zoomed (RichZoom (updateRichZoomViewer (currentField indexUpdated) iv)) i
         mi (AsTable tv) = AsTable (over tvLists (listMoveTo pos) tv)
         mi (AsRows rv) = let
                            vList = case listSelected (rv ^. rvFieldNames) of
@@ -861,8 +873,8 @@ moveFieldTo pos s
           posUpdated = set sCurrentField pos s
           moveInterface = updateLevels mi
           mi (Searching sd i) = Searching sd i
-          mi (Zoomed _ i) = Zoomed (mkZoomViewer posUpdated) i
-          mi (RichZoomed _ i) = RichZoomed (mkRichZoomViewer posUpdated) i
+          mi (Zoomed (NormalZoom _) i) = Zoomed (NormalZoom $ mkZoomViewer posUpdated) i
+          mi (Zoomed (NormalZoom _) i) = Zoomed (RichZoom $ mkRichZoomViewer posUpdated) i
           mi (AsTable tv) = AsTable (set tvCurrentField pos tv)
           mi (AsRows rv) = AsRows (over rvFieldNames (listMoveTo pos) $
                                         over rvValueList (listMoveTo pos) rv)
