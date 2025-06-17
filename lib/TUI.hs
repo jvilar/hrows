@@ -455,13 +455,18 @@ draw :: State -> [Widget Name]
 draw s = bottomRight (txt $ T.unlines $ s ^. sLog) : cata doDraw (s ^. sInterface)
     where
         doDraw (Searching sd ws) = renderSearchDialog sd : ws
-        doDraw (Zoomed (NormalZoom zv) ws) = renderZoomViewer zv : ws
-        doDraw (Zoomed (RichZoom iv) ws) = renderRichZoomViewer iv : ws
-        doDraw (Back (AsTable tv)) = [renderBack (windowTitle s) (renderTableViewer tv) tableHelp]
-        doDraw (Back (AsRows rv)) = [renderBack (windowTitle s) (renderRowViewer rv) rowHelp]
-        tableHelp = "C-z: zoom, C-r: rich zoom, C-t: return to field view, C-f: find, C-w: write, C-q: exit"
-        rowHelp = "C-z: zoom, C-r: rich zoom, C-t: table view, C-f: find, C-n: new row, C-w: write, C-q: exit"
+        doDraw (Zoomed zl ws) = renderZoomLevel zl : ws
+        doDraw (Back bl) = [renderBackLevel s bl]
 
+renderZoomLevel :: ZoomLevel -> Widget Name
+renderZoomLevel (NormalZoom zv) = renderZoomViewer zv
+renderZoomLevel (RichZoom iv) = renderRichZoomViewer iv
+
+renderBackLevel :: State -> BackLevel -> Widget Name
+renderBackLevel s (AsTable tv) = renderBack (windowTitle s) (renderTableViewer tv) tableHelp
+  where tableHelp = "C-z: zoom, C-r: rich zoom, C-t: return to field view, C-f: find, C-w: write, C-q: exit"
+renderBackLevel s (AsRows rv) = renderBack (windowTitle s) (renderRowViewer rv) rowHelp
+  where rowHelp = "C-z: zoom, C-r: rich zoom, C-t: table view, C-f: find, C-n: new row, C-w: write, C-q: exit"
 
 renderBack :: Text -> Widget Name -> Text -> Widget Name
 renderBack t content help = joinBorders $ center $
@@ -618,10 +623,8 @@ handleEvent e = handleGlobalEvent e
 
 handleInLevel :: BrickEvent Name EventType -> Level Interface -> EventM Name State ()
 handleInLevel e (Searching _ _) = handleEventSearch e
-handleInLevel e (Zoomed (NormalZoom _) i) = handleInLevel e $ out i
-handleInLevel e (Zoomed (RichZoom _) i) = handleEventRichZoom e >>->> handleInLevel e (out i)
-handleInLevel e (Back (AsTable _)) = handleEventTable e
-handleInLevel e (Back (AsRows _)) = handleEventRows e
+handleInLevel e (Zoomed zl i) = handleEventZoomLevel zl e >>->> handleInLevel e (out i)
+handleInLevel e (Back bl) = handleEventBackLevel bl e
 
 handleGlobalEvent :: BrickEvent Name EventType -> EventM Name State Bool
 handleGlobalEvent (VtyEvent (EvKey (KChar 'q') [MCtrl])) = doFinalBackup >> halt >> return True
@@ -637,6 +640,10 @@ handleKeySearch k [] | k `elem` listKeys = moveSearchList (EvKey k [])
 handleKeySearch KEnter [] = moveToSelected
 handleKeySearch KEsc [] = deactivateSearch
 handleKeySearch k ms = handleInSearchDialog (EvKey k ms)
+
+handleEventZoomLevel :: ZoomLevel -> BrickEvent Name EventType -> EventM Name State Bool
+handleEventZoomLevel (NormalZoom _) _ = return False
+handleEventZoomLevel (RichZoom _) e = handleEventRichZoom e
 
 handleEventRichZoom :: BrickEvent Name EventType -> EventM Name State Bool
 handleEventRichZoom (VtyEvent (EvKey k ms)) = handleKeyRichZoom k ms
@@ -698,6 +705,10 @@ handleCommonKeys (VtyEvent (EvKey k [])) = case k of
     KBackTab -> fieldBackward >> return True
     _ -> return False
 handleCommonKeys _ = return False
+
+handleEventBackLevel :: BackLevel -> BrickEvent Name EventType -> EventM Name State ()
+handleEventBackLevel (AsTable _) e = handleEventTable e
+handleEventBackLevel (AsRows _) e = handleEventRows e
 
 handleEventTable :: BrickEvent Name EventType -> EventM Name State ()
 handleEventTable e = handleCommonKeys e >>->> case e of
