@@ -63,9 +63,11 @@ data Name = DButton DialogButton
 
 data DialogButton = OkButton | CancelButton deriving (Eq, Ord, Show)
 
-data Level i = Searching SearchDialog i
+data Level i = WithDialog DialogLevel i
              | Zoomed ZoomLevel i
              | Back BackLevel deriving Functor
+
+newtype DialogLevel = Searching SearchDialog
 
 data ZoomLevel = NormalZoom ZoomViewer
                | RichZoom RichZoomViewer
@@ -73,9 +75,9 @@ data ZoomLevel = NormalZoom ZoomViewer
 data BackLevel = AsTable TableViewer
                | AsRows RowViewer
 
-isSearching :: Level i -> Bool
-isSearching (Searching _ _) = True
-isSearching _ = False
+isDialog :: Level i -> Bool
+isDialog (WithDialog _ _) = True
+isDialog _ = False
 
 isZoomed :: Level i -> Bool
 isZoomed (Zoomed _ _) = True
@@ -147,6 +149,11 @@ makeLenses ''ValueEditor
 makeLenses ''ZoomViewer
 makeLenses ''RichZoomViewer
 
+instance HasEditor DialogLevel where
+    editorLens = lens getter setter
+        where getter dl = Nothing
+              setter dl _ = dl
+
 instance HasEditor ZoomViewer where
     editorLens = lens getter setter
         where getter zv = case zv ^. zvValue of
@@ -208,29 +215,29 @@ updateRvValues ts rv = over rvValueList (listReplace v i) rv
 getLevel :: (forall i . Level i -> Bool) -> Interface -> Maybe Interface
 getLevel f = para search
     where search :: Level (Interface, Maybe Interface) -> Maybe Interface
-          search l@(Searching sd (i, ms)) = if f l then Just (In $ Searching sd i) else ms
+          search l@(WithDialog dl (i, ms)) = if f l then Just (In $ WithDialog dl i) else ms
           search l@(Zoomed zl (i, _)) = if f l then Just (In $ Zoomed zl i) else Nothing
           search l@(Back bl) = if f l then Just (In $ Back bl) else Nothing
 
 removeLevel :: (forall i . Level i -> Bool) -> Interface -> Interface
 removeLevel f = updateLevels remL
-    where remL l@(Searching _ i) = if f l then out i else l
+    where remL l@(WithDialog _ i) = if f l then out i else l
           remL l@(Zoomed _ i) = if f l then out i else l
           remL l@(Back _) = if f l then error "Cannot remove back" else l
 
-levelSearch :: Lens' Interface (Maybe SearchDialog)
-levelSearch = lens getter setter
-    where getter i = case getLevel isSearching i of
-                         Just (In (Searching sd _)) -> Just sd
+levelDialog :: Lens' Interface (Maybe DialogLevel)
+levelDialog = lens getter setter
+    where getter i = case getLevel isDialog i of
+                         Just (In (WithDialog dl _)) -> Just dl
                          _ -> Nothing
 
-          setter i Nothing = removeLevel isSearching i
-          setter i (Just sd) = updateLevels (addD sd) i
-          addD :: SearchDialog -> Level Interface -> Level Interface
-          addD _ (Searching _ i) = out i
-          addD sd (Zoomed zl (In (Searching _ i))) = Searching sd (In $ Zoomed zl i)
+          setter i Nothing = removeLevel isDialog i
+          setter i (Just dl) = updateLevels (addD dl) i
+          addD :: DialogLevel -> Level Interface -> Level Interface
+          addD _ (WithDialog _ i) = out i
+          addD dl (Zoomed zl (In (WithDialog _ i))) = WithDialog dl (In $ Zoomed zl i)
           addD _ z@(Zoomed _ _) = z
-          addD sd t@(Back _) = Searching sd (In t)
+          addD dl t@(Back _) = WithDialog dl (In t)
 
 levelZoom :: Lens' Interface (Maybe ZoomLevel)
 levelZoom = lens getter setter
@@ -241,7 +248,7 @@ levelZoom = lens getter setter
           setter i Nothing = removeLevel isZoomed i
           setter i (Just z) = updateLevels (addZ z) i
           addZ :: ZoomLevel -> Level Interface -> Level Interface
-          addZ _ s@(Searching _ _) = s
+          addZ _ s@(WithDialog _ _) = s
           addZ _ (Zoomed _ i) = out i
           addZ z t@(Back _) = Zoomed z (In t)
 
@@ -253,9 +260,16 @@ levelBack = lens getter setter
           setter i Nothing = removeLevel isBack i
           setter i (Just bl) = updateLevels (addB bl) i
           addB :: BackLevel -> Level Interface -> Level Interface
-          addB _ s@(Searching _ _) = s
+          addB _ s@(WithDialog _ _) = s
           addB _ z@(Zoomed _ _) = z
           addB bl (Back _) = Back bl
+
+searchDialog :: Lens' Interface (Maybe SearchDialog)
+searchDialog = lens getter setter
+    where getter i = do
+                        Searching sd <- i ^. levelDialog
+                        return sd
+          setter i v = set levelDialog (fmap Searching v) i
 
 richZoom :: Lens' Interface (Maybe RichZoomViewer)
 richZoom = lens getter setter
@@ -282,14 +296,14 @@ rowViewer = lens getter setter
 activeEditor :: Lens' Interface (Maybe ValueEditor)
 activeEditor = lens getter setter
     where getter = cata ae
-          ae (Searching _ _) = Nothing
+          ae (WithDialog dl _) = dl ^. editorLens
           ae (Zoomed zl _) = zl ^. editorLens
           ae (Back bl) = bl ^. editorLens
 
           setter _ Nothing = error "Cannot remove editor"
           setter i (Just ve) = para (addE ve) i
           addE :: ValueEditor -> Level (Interface, Interface) -> Interface
-          addE _ (Searching sd (_, i)) = In $ Searching sd i
+          addE _ (WithDialog dl (_, i)) = In $ WithDialog dl i
           addE ve (Zoomed zl (i, _)) = In $ Zoomed (set editorLens (Just ve) zl) i
           addE ve (Back bl) = In $ Back $ set editorLens (Just ve) bl
 
@@ -454,9 +468,12 @@ type EventType = BackupEvent
 draw :: State -> [Widget Name]
 draw s = bottomRight (txt $ T.unlines $ s ^. sLog) : cata doDraw (s ^. sInterface)
     where
-        doDraw (Searching sd ws) = renderSearchDialog sd : ws
+        doDraw (WithDialog dl ws) = renderDialogLevel dl : ws
         doDraw (Zoomed zl ws) = renderZoomLevel zl : ws
         doDraw (Back bl) = [renderBackLevel s bl]
+
+renderDialogLevel :: DialogLevel -> Widget Name
+renderDialogLevel (Searching sd) = renderSearchDialog sd
 
 renderZoomLevel :: ZoomLevel -> Widget Name
 renderZoomLevel (NormalZoom zv) = renderZoomViewer zv
@@ -622,7 +639,7 @@ handleEvent e = handleGlobalEvent e
    >>->> (use sInterface >>= handleInLevel e . out)
 
 handleInLevel :: BrickEvent Name EventType -> Level Interface -> EventM Name State ()
-handleInLevel e (Searching _ _) = handleEventSearch e
+handleInLevel e (WithDialog dl _) = handleEventDialogLevel dl e
 handleInLevel e (Zoomed zl i) = handleEventZoomLevel zl e >>->> handleInLevel e (out i)
 handleInLevel e (Back bl) = handleEventBackLevel bl e
 
@@ -630,6 +647,9 @@ handleGlobalEvent :: BrickEvent Name EventType -> EventM Name State Bool
 handleGlobalEvent (VtyEvent (EvKey (KChar 'q') [MCtrl])) = doFinalBackup >> halt >> return True
 handleGlobalEvent (VtyEvent (EvKey (KChar 'w') [MCtrl])) = doSave >> return True
 handleGlobalEvent _ = return False
+
+handleEventDialogLevel :: DialogLevel -> BrickEvent Name EventType -> EventM Name State ()
+handleEventDialogLevel (Searching _) = handleEventSearch
 
 handleEventSearch :: BrickEvent Name EventType -> EventM Name State ()
 handleEventSearch (VtyEvent (EvKey k ms)) = handleKeySearch k ms
@@ -761,7 +781,7 @@ updateCurrentField t = do
         sInterface %= updateLevels (uRow r (r !! (s ^. sCurrentField)))
   where
     uRow :: Row -> Field -> Level Interface -> Level Interface
-    uRow _ _ s@(Searching _ _) = s
+    uRow _ _ s@(WithDialog _ _) = s
     uRow _ ft (Zoomed (NormalZoom zv) i) = Zoomed (NormalZoom (over zvValue (updateValueViewer ft) zv)) i
     uRow _ ft (Zoomed (RichZoom iv) i) = Zoomed (RichZoom (over ivValue (updateValueViewer ft) iv)) i
     uRow _ _ a@(Back (AsTable _)) = a
@@ -819,11 +839,11 @@ activateSearch = do
    index <- use sCurrentField
    tle <- (!! index) <$> uses sRowStore fnames
    vs <- uses sRowStore (fieldValues (fromIntegral index))
-   sInterface . levelSearch .= Just (mkSearchDialog SearchList maxWidth tle vs)
+   sInterface . searchDialog .= Just (mkSearchDialog SearchList maxWidth tle vs)
 
 
 deactivateSearch :: EventM Name State ()
-deactivateSearch = sInterface . levelSearch .= Nothing
+deactivateSearch = sInterface . searchDialog .= Nothing
 
 
 toggleTable :: EventM Name State ()
@@ -841,11 +861,11 @@ toggleTable = do
                              modify $ moveFieldTo fld
 
 moveSearchList :: Event -> EventM Name State ()
-moveSearchList e = B.zoom (sInterface . levelSearch . _Just . sdValues) $ handleListEvent e
+moveSearchList e = B.zoom (sInterface . searchDialog . _Just . sdValues) $ handleListEvent e
 
 moveToSelected :: EventM Name State ()
 moveToSelected = do
-    msd <- use $ sInterface . levelSearch
+    msd <- use $ sInterface . searchDialog
     let ds = do
                sd <- msd
                dialogSelection (sd ^. sdDialog)
@@ -865,7 +885,7 @@ moveToSelected = do
         _ -> return ()
 
 handleInSearchDialog :: Event -> EventM Name State ()
-handleInSearchDialog ev = B.zoom (sInterface . levelSearch . _Just . sdDialog) $ handleDialogEvent ev
+handleInSearchDialog ev = B.zoom (sInterface . searchDialog . _Just . sdDialog) $ handleDialogEvent ev
 
 moveTo :: Int -> State -> State
 moveTo pos s
@@ -874,7 +894,7 @@ moveTo pos s
   where valid = 0 <= pos && pos < size (s ^. sRowStore)
         indexUpdated = set sIndex pos s
         moveInterface = updateLevels mi
-        mi se@(Searching _ _) = se
+        mi se@(WithDialog _ _) = se
         mi (Zoomed (NormalZoom zv) i) = Zoomed (NormalZoom (updateZoomViewer (currentField indexUpdated) zv)) i
         mi (Zoomed (RichZoom iv) i) = Zoomed (RichZoom (updateRichZoomViewer (currentField indexUpdated) iv)) i
         mi (Back (AsTable tv)) = Back $ AsTable (over tvLists (listMoveTo pos) tv)
@@ -892,7 +912,7 @@ moveFieldTo pos s
     where valid = 0 <= pos && pos < length (fnames $ s ^. sRowStore)
           posUpdated = set sCurrentField pos s
           moveInterface = updateLevels mi
-          mi (Searching sd i) = Searching sd i
+          mi (WithDialog dl i) = WithDialog dl i
           mi (Zoomed (NormalZoom _) i) = Zoomed (NormalZoom $ mkZoomViewer posUpdated) i
           mi (Zoomed (RichZoom _) i) = Zoomed (RichZoom $ mkRichZoomViewer posUpdated) i
           mi (Back (AsTable tv)) = Back $ AsTable (set tvCurrentField pos tv)
