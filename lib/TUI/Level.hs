@@ -87,9 +87,9 @@ instance HasEditor DialogLevel where
 instance HasEditor ZoomLevel where
     editorLens = lens getter setter
         where getter (NormalZoom zv) = zv ^. editorLens
-              getter (RichZoom iv) = iv ^. editorLens
+              getter (RichZoom rz) = rz ^. editorLens
               setter (NormalZoom zv) v = NormalZoom $ set editorLens v zv
-              setter (RichZoom zv) v = RichZoom $ set editorLens v zv
+              setter (RichZoom rz) v = RichZoom $ set editorLens v rz
 
 instance HasEditor BackLevel where
     editorLens = lens getter setter
@@ -160,8 +160,8 @@ searchDialog = lens getter setter
 richZoom :: Lens' Interface (Maybe RichZoomViewer)
 richZoom = lens getter setter
     where getter i = do
-                        RichZoom iv <- i ^. levelZoom
-                        return iv
+                        RichZoom rz <- i ^. levelZoom
+                        return rz
 
           setter i v = set levelZoom (fmap RichZoom v) i
 
@@ -199,7 +199,7 @@ renderDialogLevel (Searching sd) = renderSearchDialog sd
 
 renderZoomLevel :: ZoomLevel -> Widget Name
 renderZoomLevel (NormalZoom zv) = renderZoomViewer zv
-renderZoomLevel (RichZoom iv) = renderRichZoomViewer iv
+renderZoomLevel (RichZoom rz) = renderRichZoomViewer rz
 
 renderBackLevel :: Text -> BackLevel -> Widget Name
 renderBackLevel title (AsTable tv) = renderBack title (renderTableViewer tv) tableHelp

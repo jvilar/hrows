@@ -203,10 +203,10 @@ handleChangeType f = uses (sInterface . richZoom) (maybe Nothing f) >>= \case
 
 handleSwitchFormula :: EventM Name State Bool
 handleSwitchFormula = use (sInterface . richZoom) >>= \case
-    Just rz -> if rz ^. ivFocus == RzFMark
+    Just rz -> if rz ^. rzFocus == RzFMark
                then do
-                      sInterface . richZoom . _Just . ivIsFormula %= not
-                      f <- if rz ^. ivIsFormula
+                      sInterface . richZoom . _Just . rzIsFormula %= not
+                      f <- if rz ^. rzIsFormula
                            then return Nothing
                            else Just . T.concat <$> use (sInterface . activeEditor . _Just . veEditor . to Ed.getEditContents)
                       changeCurrentFieldFormula f
@@ -272,7 +272,7 @@ handleEdition e = do
                      B.zoom (sInterface . activeEditor . _Just . veEditor) $ Ed.handleEditorEvent e
                      value <- T.concat <$> use (sInterface . activeEditor . _Just . veEditor . to Ed.getEditContents)
                      use (sInterface . richZoom) >>= \case
-                        Just rz -> if rz ^. ivFocus == RzValue
+                        Just rz -> if rz ^. rzFocus == RzValue
                             then updateCurrentField value
                             else changeCurrentFieldFormula $ Just value
                         _ -> updateCurrentField value
@@ -297,7 +297,7 @@ updateCurrentField t = do
     uRow :: Row -> Field -> Level Interface -> Level Interface
     uRow _ _ s@(WithDialog _ _) = s
     uRow _ ft (Zoomed (NormalZoom zv) i) = Zoomed (NormalZoom (over zvValue (updateValueViewer ft) zv)) i
-    uRow _ ft (Zoomed (RichZoom iv) i) = Zoomed (RichZoom (over ivValue (updateValueViewer ft) iv)) i
+    uRow _ ft (Zoomed (RichZoom rz) i) = Zoomed (RichZoom (over rzValue (updateValueViewer ft) rz)) i
     uRow _ _ a@(Back (AsTable _)) = a
     uRow r _ (Back (AsRows rv)) = Back . AsRows $ updateRvValues r rv
 
@@ -417,7 +417,7 @@ moveTo pos s
         moveInterface = updateLevels mi
         mi se@(WithDialog _ _) = se
         mi (Zoomed (NormalZoom zv) i) = Zoomed (NormalZoom (updateZoomViewer (currentField indexUpdated) zv)) i
-        mi (Zoomed (RichZoom iv) i) = Zoomed (RichZoom (updateRichZoomViewer (currentField indexUpdated) iv)) i
+        mi (Zoomed (RichZoom rz) i) = Zoomed (RichZoom (updateRichZoomViewer (currentField indexUpdated) rz)) i
         mi (Back (AsTable tv)) = Back $ AsTable (over tvLists (listMoveTo pos) tv)
         mi (Back (AsRows rv)) = let
                            vList = case listSelected (rv ^. rvFieldNames) of
