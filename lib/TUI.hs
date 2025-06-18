@@ -317,14 +317,6 @@ notNull :: [a] -> Bool
 notNull [] = False
 notNull _ = True
 
-updateValueViewer :: Field -> ValueViewer -> ValueViewer
-updateValueViewer f = either (Left . updateEditor f) (const $ Right f)
-
-updateEditor :: Field -> ValueEditor -> ValueEditor
-updateEditor f ve | t == T.concat (Ed.getEditContents $ ve ^. veEditor) = set veIsError (isError f) ve
-                  | otherwise = over veEditor (Ed.applyEdit (const $ Tz.textZipper [t] $ Just 1))
-                                $ set veIsError (isError f) ve
-                  where t = toString f
 
 backward :: EventM Name State ()
 backward = uses sIndex (subtract 1) >>= modify . moveTo

@@ -1,3 +1,5 @@
+{-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module TUI.Base (
@@ -13,17 +15,23 @@ module TUI.Base (
     , ValueEditor(..)
     , veEditor
     , veIsError
+    , updateValueViewer
+    , updateEditor
+    , mkEditor
+    , renderValueViewer
 ) where
 
 
-import Brick ( AttrName, AttrMap, attrName, attrMap )
+import Brick ( AttrName, AttrMap, attrName, attrMap, Widget (..), Size (Fixed), Context (availWidth), getContext, txt, withAttr )
 import Brick.Widgets.Dialog (buttonSelectedAttr)
-import Brick.Widgets.Edit(Editor)
-import Control.Lens (Lens', makeLenses)
+import Brick.Widgets.Edit(Editor, getEditContents, applyEdit, editor, renderEditor)
+import Control.Lens (Lens', makeLenses, (^.), set, over)
 import Data.Text (Text)
+import Data.Text qualified as T
+import Data.Text.Zipper qualified as Tz
 import Graphics.Vty.Attributes (defAttr, bold, reverseVideo, withStyle, withBackColor, withForeColor, black, rgbColor)
 
-import Model.Field ( Field )
+import Model.Field ( Field, isError, toString )
 
 
 data Name = DButton DialogButton
@@ -70,3 +78,33 @@ makeLenses ''ValueEditor
 
 type ValueViewer = Either ValueEditor Field
 
+updateValueViewer :: Field -> ValueViewer -> ValueViewer
+updateValueViewer f = either (Left . updateEditor f) (const $ Right f)
+
+updateEditor :: Field -> ValueEditor -> ValueEditor
+updateEditor f ve | t == T.concat (getEditContents $ ve ^. veEditor) = set veIsError (isError f) ve
+                  | otherwise = over veEditor (applyEdit (const $ Tz.textZipper [t] $ Just 1))
+                                $ set veIsError (isError f) ve
+                  where t = toString f
+
+mkEditor :: Name -> Field -> ValueEditor
+mkEditor n f = ValueEditor (editor n (Just 1) $ toString f) (isError f)
+
+renderValueViewer :: ValueViewer -> Widget Name
+renderValueViewer = either renderValueEditor renderField
+  where renderField f = let
+              attr = if isError f then errorAttr else formulaAttr
+           in withAttr attr . myTxt $ toString f
+
+renderValueEditor :: ValueEditor -> Widget Name
+renderValueEditor ve = renderEditor ((if ve ^. veIsError
+                        then withAttr errorAttr
+                        else id) . (txt . T.unlines)) True $ ve ^. veEditor
+
+myTxt :: Text -> Widget n
+myTxt t = Widget Fixed Fixed $ do
+      w <- availWidth <$> getContext
+      let l = T.length t
+          t' | l <= w = T.justifyLeft w ' ' t
+             | otherwise = T.take (w-3) t <> "..."
+      render $ txt t'

@@ -10,8 +10,6 @@ module TUI.Level (
   , Level(..)
   , BackLevel(..)
   , ZoomLevel(..)
-  , ZoomViewer(..)
-  , zvValue
   , RichZoomViewer(..)
   , RichZoomFocus(..)
   , ivFocus
@@ -32,12 +30,9 @@ module TUI.Level (
   , tvCurrentField
   , mkSearchDialog
   , renderSearchDialog
-  , renderZoomViewer
   , renderRichZoomViewer
   , mkRowViewer
-  , mkZoomViewer
   , mkRichZoomViewer
-  , updateZoomViewer
   , updateRichZoomViewer
   , richZoomMoveUp
   , richZoomMoveDown
@@ -59,6 +54,8 @@ module TUI.Level (
   , tableViewer
   , rowViewer
   , activeEditor
+
+  , module TUI.ZoomViewer
   ) where
 
 
@@ -77,7 +74,9 @@ import Data.Text.Zipper qualified as Tz
 import Data.Vector qualified as V
 import Model.Expression.RecursionSchemas ( Fix(..), bottomUp, cata, para )
 import Model.RowStore
+
 import TUI.Base
+import TUI.ZoomViewer
 
 
 data Level i = WithDialog DialogLevel i
@@ -124,10 +123,6 @@ data TableViewer = TableViewer { _tvFieldNames :: [Text]
                                , _tvCurrentField :: Int
                                }
 
-data ZoomViewer = ZoomViewer { _zvTitle :: Text
-                             , _zvValue :: ValueViewer
-                             }
-
 data RichZoomFocus = RzValue | RzType | RzFMark | RzFormula deriving (Eq, Ord, Enum)
 
 data RichZoomViewer = RichZoomViewer { _ivTitle :: Text
@@ -151,14 +146,6 @@ instance HasEditor DialogLevel where
     editorLens = lens getter setter
         where getter _ = Nothing
               setter dl _ = dl
-
-instance HasEditor ZoomViewer where
-    editorLens = lens getter setter
-        where getter zv = case zv ^. zvValue of
-                             Left ve -> Just ve
-                             _ -> Nothing
-              setter _ Nothing = error "Cannot remove editor from zoom viewer"
-              setter zv (Just ve) = set zvValue (Left ve) zv
 
 instance HasEditor RichZoomViewer where
     editorLens = lens getter setter
@@ -209,15 +196,6 @@ updateRvValues ts rv = over rvValueList (listReplace v i) rv
   where i = listSelected $ rv ^. rvValueList
         l = listElements (rv ^. rvValueList)
         v = V.fromList $ zipWith updateValueViewer ts (V.toList l)
-
-updateValueViewer :: Field -> ValueViewer -> ValueViewer
-updateValueViewer f = either (Left . updateEditor f) (const $ Right f)
-
-updateEditor :: Field -> ValueEditor -> ValueEditor
-updateEditor f ve | t == T.concat (Ed.getEditContents $ ve ^. veEditor) = set veIsError (isError f) ve
-                  | otherwise = over veEditor (Ed.applyEdit (const $ Tz.textZipper [t] $ Just 1))
-                                $ set veIsError (isError f) ve
-                  where t = toString f
 
 getLevel :: (forall i . Level i -> Bool) -> Interface -> Maybe Interface
 getLevel f = para search
@@ -329,16 +307,6 @@ renderSearchDialog sd = renderDialog (sd ^. sdDialog) $
                            vLimit (V.length $ listElements $ sd ^. sdValues)
                                   (renderList renderValue False $ sd ^. sdValues)
 
-renderZoomViewer :: ZoomViewer -> Widget Name
-renderZoomViewer zv = centerLayer $ joinBorders $
-                       hLimitPercent 95 $
-                       borderWithLabel (withAttr titleAttr $ txt $ zv ^. zvTitle) $
-                         renderValueViewer (zv ^. zvValue)
-                         <=>
-                         hBorder
-                         <=>
-                         hCenter (txt "C-r: rich zoom, C-z: close zoom")
-
 renderRichZoomViewer :: RichZoomViewer -> Widget Name
 renderRichZoomViewer iv = centerLayer $ joinBorders $
                        hLimitPercent 95 $
@@ -363,13 +331,6 @@ renderRichZoomViewer iv = centerLayer $ joinBorders $
                       else id
 
 
-renderValueViewer :: ValueViewer -> Widget Name
-renderValueViewer = either renderValueEditor renderField
-  where renderField f = let
-              attr = if isError f then errorAttr else formulaAttr
-           in withAttr attr . myTxt $ toString f
-
-
 maxWidth :: Int
 maxWidth = 40
 
@@ -379,11 +340,6 @@ mkRowViewer rst pos = RowViewer { _rvFieldNames = listMoveTo pos fl
                                 , _rvValueList = valueList pos rst
                                 }
                             where fl = fieldList rst
-
-mkZoomViewer :: Text -> Bool -> Field -> ZoomViewer
-mkZoomViewer fname isFormula field = ZoomViewer fname $ if isFormula
-                                                        then Right field
-                                                        else Left (mkEditor ZoomEditor field)
 
 mkRichZoomViewer :: Text -> Bool -> Field -> Text -> Maybe Formula -> RichZoomViewer
 mkRichZoomViewer fname isFormula field fType mFormula = RichZoomViewer fname
@@ -395,9 +351,6 @@ mkRichZoomViewer fname isFormula field fType mFormula = RichZoomViewer fname
                             (isJust mFormula)
                             (mkEditor RichZoomFormulaEditor $ toField $ fromMaybe "" mFormula)
                             RzValue
-
-updateZoomViewer :: Field -> ZoomViewer -> ZoomViewer
-updateZoomViewer f = over zvValue (either (Left . updateEditor f) (Right . const f))
 
 updateRichZoomViewer :: Field -> RichZoomViewer -> RichZoomViewer
 updateRichZoomViewer f = over ivValue (either (Left . updateEditor f) (Right . const f))
@@ -423,9 +376,6 @@ richZoomPrevType rz
    | otherwise = Just (set ivType (T.pack $ show t') rz, t')
    where t = read . T.unpack $ rz ^. ivType
          t' = pred t
-
-mkEditor :: Name -> Field -> ValueEditor
-mkEditor n f = ValueEditor (Ed.editor n (Just 1) $ toString f) (isError f)
 
 fieldList :: RowStore -> List Name Text
 fieldList rst = list FieldNames (V.fromList $ fnames rst) 1
