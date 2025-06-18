@@ -13,8 +13,6 @@ module TUI (
 import Brick hiding (getName, zoom)
 import Brick qualified as B
 import Brick.BChan qualified as B
-import Brick.Widgets.Border
-import Brick.Widgets.Center
 import Brick.Widgets.Core qualified as BC
 import Brick.Widgets.Dialog
 import Brick.Widgets.Edit qualified as Ed
@@ -24,14 +22,10 @@ import Control.Exception (try, SomeException)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Control.Monad (when, void)
 import Control.Monad.IO.Class (liftIO)
-import Data.List(transpose, intersperse, find)
-import Data.Maybe(fromMaybe, isJust)
+import Data.List(find)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Data.Text.Zipper qualified as Tz
-import Data.Vector qualified as V
 import Graphics.Vty (imageWidth, imageHeight, translate, Vty (outputIface), supportsMode)
-import Graphics.Vty.Attributes (defAttr, bold, reverseVideo, withStyle, withBackColor, withForeColor, black, rgbColor)
 import Graphics.Vty.Config qualified as Vty
 import Graphics.Vty.CrossPlatform qualified as Vty
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl))

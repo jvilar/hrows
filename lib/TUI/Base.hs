@@ -19,6 +19,7 @@ module TUI.Base (
     , updateEditor
     , mkEditor
     , renderValueViewer
+    , renderValueEditor
 ) where
 
 
