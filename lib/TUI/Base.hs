@@ -23,6 +23,7 @@ module TUI.Base (
     , renderValueViewer
     , renderValueEditor
     , myTxt
+    , valueList
 ) where
 
 
@@ -33,9 +34,13 @@ import Control.Lens (Lens', makeLenses, (^.), set, over)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Zipper qualified as Tz
+import Data.Vector qualified as V
 import Graphics.Vty.Attributes (defAttr, bold, reverseVideo, withStyle, withBackColor, withForeColor, black, rgbColor)
 
 import Model.Field ( Field, isError, toString )
+import Model.RowStore (RowStore, isFormula)
+import Brick.Widgets.List (List, list)
+import Model (row)
 
 
 data Name = DButton DialogButton
@@ -122,3 +127,9 @@ myTxt t = Widget Fixed Fixed $ do
           t' | l <= w = T.justifyLeft w ' ' t
              | otherwise = T.take (w-3) t <> "..."
       render $ txt t'
+
+valueList :: Int -> RowStore -> List Name ValueViewer
+valueList pos rst = list ValueList (V.fromList $ zipWith valueWidget [0..] (row pos rst)) 1
+    where valueWidget n f
+              | isFormula n rst = Right f
+              | otherwise = Left $ mkEditor (ValueViewer $ fromIntegral n) f

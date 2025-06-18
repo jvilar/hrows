@@ -13,20 +13,14 @@ module TUI.Level (
   , isDialog
   , isZoomed
   , isBack
-  , RowViewer(..)
-  , rvFieldNames
-  , rvValueList
-  , valueList
   , TableViewer(..)
   , tvLists
   , tvCurrentField
-  , mkRowViewer
   , buildTable
   , renderDialogLevel
   , renderZoomLevel
   , renderBackLevel
   , updateLevels
-  , updateRvValues
   , getLevel
   , removeLevel
   , levelDialog
@@ -39,6 +33,7 @@ module TUI.Level (
   , activeEditor
 
   , module TUI.RichZoomViewer
+  , module TUI.RowViewer
   , module TUI.SearchDialog
   , module TUI.ZoomViewer
   ) where
@@ -50,7 +45,6 @@ import Brick.Widgets.Center
 import Brick.Widgets.List hiding (splitAt, reverse)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Data.List(transpose, intersperse)
-import Data.Maybe(fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Vector qualified as V
@@ -58,6 +52,7 @@ import Model.Expression.RecursionSchemas ( Fix(..), bottomUp, cata, para )
 import Model.RowStore
 
 import TUI.Base
+import TUI.RowViewer
 import TUI.SearchDialog
 import TUI.RichZoomViewer
 import TUI.ZoomViewer
@@ -92,12 +87,6 @@ type Interface = Fix Level
 updateLevels :: (Level Interface -> Level Interface) -> Interface -> Interface
 updateLevels = bottomUp
 
-
-data RowViewer = RowViewer { _rvFieldNames :: List Name Text
-                           , _rvFieldWidth :: Int
-                           , _rvValueList :: List Name ValueViewer
-                           }
-
 data TableViewer = TableViewer { _tvFieldNames :: [Text]
                                , _tvColWidths :: [Int]
                                , _tvColumns :: [List Name Text]
@@ -107,7 +96,6 @@ data TableViewer = TableViewer { _tvFieldNames :: [Text]
 tvLists :: Traversal' TableViewer (List Name Text)
 tvLists f (TableViewer fl cw cs cf) = TableViewer fl cw <$> traverse f cs <*> pure cf
 
-makeLenses ''RowViewer
 makeLenses ''TableViewer
 
 instance HasEditor DialogLevel where
@@ -124,14 +112,6 @@ instance HasEditor ZoomLevel where
               setter (RichZoom zv) v = RichZoom $ set editorLens v zv
 
 
-instance HasEditor RowViewer where
-    editorLens = lens getter setter
-        where getter rv = do
-                             (_, Left ve) <- listSelectedElement $ rv ^. rvValueList
-                             return ve
-              setter _ Nothing = error "Cannot remove editor from row viewer"
-              setter rv (Just ve) = set (rvValueList . element (fromMaybe 0 $ listSelected $ rv ^. rvValueList)) (Left ve) rv
-
 instance HasEditor TableViewer where
     editorLens = lens (const Nothing) setter
         where setter _ Nothing = error "Cannot remove editor from table viewer"
@@ -143,12 +123,6 @@ instance HasEditor BackLevel where
               getter (AsRows rv) = rv ^. editorLens
               setter (AsTable tv) v = AsTable $ set editorLens v tv
               setter (AsRows rv) v = AsRows $ set editorLens v rv
-
-updateRvValues :: [Field] -> RowViewer -> RowViewer
-updateRvValues ts rv = over rvValueList (listReplace v i) rv
-  where i = listSelected $ rv ^. rvValueList
-        l = listElements (rv ^. rvValueList)
-        v = V.fromList $ zipWith updateValueViewer ts (V.toList l)
 
 getLevel :: (forall i . Level i -> Bool) -> Interface -> Maybe Interface
 getLevel f = para search
@@ -246,25 +220,6 @@ activeEditor = lens getter setter
           addE ve (Back bl) = In $ Back $ set editorLens (Just ve) bl
 
 
-maxWidth :: Int
-maxWidth = 40
-
-mkRowViewer :: RowStore -> Int -> RowViewer
-mkRowViewer rst pos = RowViewer { _rvFieldNames = listMoveTo pos fl
-                                , _rvFieldWidth = min maxWidth (V.maximum . V.map T.length $ listElements fl)
-                                , _rvValueList = valueList pos rst
-                                }
-                            where fl = fieldList rst
-
-fieldList :: RowStore -> List Name Text
-fieldList rst = list FieldNames (V.fromList $ fnames rst) 1
-
-valueList :: Int -> RowStore -> List Name ValueViewer
-valueList pos rst = list ValueList (V.fromList $ zipWith valueWidget [0..] (row pos rst)) 1
-    where valueWidget n f
-              | isFormula n rst = Right f
-              | otherwise = Left $ mkEditor (ValueViewer $ fromIntegral n) f
-
 buildTable :: RowStore -> Int -> TableViewer
 buildTable rst = TableViewer ns ws cls
     where cs = transpose $ map (map toString) $ rows rst
@@ -296,17 +251,6 @@ renderBack t content help = joinBorders $ center $
        <=>
        hCenter (txt help)
 
-
-renderRowViewer :: RowViewer -> Widget Name
-renderRowViewer rv = Widget Greedy Fixed $ do
-    h <- availHeight <$> getContext
-    let v = min (V.length $ listElements $ rv ^. rvFieldNames) (h-2)
-    render $ vLimit v $ hBox [
-                hLimit (rv ^. rvFieldWidth) (renderList renderName False $ rv ^. rvFieldNames)
-                , vBorder
-                , renderList (const renderValueViewer) False
-                      $ rv ^. rvValueList
-              ]
 
 renderTableViewer :: TableViewer -> Widget Name
 renderTableViewer tv = Widget Greedy Fixed $ do
@@ -357,5 +301,3 @@ withWidths f ws l = intersperse vBorder
 
 withWidth :: (a -> Widget Name) -> Int -> a -> Widget Name
 withWidth f w = hLimit w . padRight Max . f
-
-
