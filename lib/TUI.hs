@@ -44,24 +44,12 @@ import Model.Row (Row)
 import Model.RowStore
 import Model.SourceInfo
 import System.Directory (removeFile)
+import TUI.Base
 
 maxWidth :: Int
 maxWidth = 40
 
 data BackupEvent = BackupEvent deriving (Show)
-
-data Name = DButton DialogButton
-          | FieldNames
-          | SearchList
-          | RichZoomValueEditor
-          | RichZoomFormulaEditor
-          | ValueColumn Int
-          | ValueViewer Int
-          | ValueList
-          | ZoomEditor
-          deriving (Eq, Ord, Show)
-
-data DialogButton = OkButton | CancelButton deriving (Eq, Ord, Show)
 
 data Level i = WithDialog DialogLevel i
              | Zoomed ZoomLevel i
@@ -89,9 +77,6 @@ isBack _ = False
 
 type Interface = Fix Level
 
-class HasEditor i where
-    editorLens :: Lens' i (Maybe ValueEditor)
-
 updateLevels :: (Level Interface -> Level Interface) -> Interface -> Interface
 updateLevels = bottomUp
 
@@ -106,12 +91,6 @@ data State = State { _sRowStore :: RowStore
 data SearchDialog = SearchDialog { _sdValues :: List Name Text
                                  , _sdDialog :: Dialog () Name
                                  }
-
-data ValueEditor = ValueEditor { _veEditor :: Ed.Editor Text Name
-                               , _veIsError :: Bool
-                               }
-
-type ValueViewer = Either ValueEditor Field
 
 data RowViewer = RowViewer { _rvFieldNames :: List Name Text
                            , _rvFieldWidth :: Int
@@ -145,7 +124,6 @@ makeLenses ''RowViewer
 makeLenses ''SearchDialog
 makeLenses ''State
 makeLenses ''TableViewer
-makeLenses ''ValueEditor
 makeLenses ''ZoomViewer
 makeLenses ''RichZoomViewer
 
@@ -918,26 +896,6 @@ moveFieldTo pos s
           mi (Back (AsTable tv)) = Back $ AsTable (set tvCurrentField pos tv)
           mi (Back (AsRows rv)) = Back $ AsRows (over rvFieldNames (listMoveTo pos) $
                                         over rvValueList (listMoveTo pos) rv)
-
-selectedElementAttr :: AttrName
-selectedElementAttr = attrName "selectedElement"
-
-titleAttr :: AttrName
-titleAttr = attrName "title"
-
-formulaAttr :: AttrName
-formulaAttr = attrName "formula"
-
-errorAttr :: AttrName
-errorAttr = attrName "error"
-
-myAttrMap :: AttrMap
-myAttrMap = attrMap defAttr [ (selectedElementAttr, withStyle defAttr reverseVideo)
-                            , (buttonSelectedAttr, withStyle defAttr reverseVideo)
-                            , (titleAttr, withStyle defAttr bold)
-                            , (formulaAttr, withBackColor (withForeColor defAttr black) $ rgbColor (160 :: Int) 255 255)
-                            , (errorAttr, withBackColor (withForeColor defAttr black) $ rgbColor 255 (160 :: Int) 255)
-                            ]
 
 doSave :: EventM Name State ()
 doSave = do
