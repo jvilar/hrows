@@ -10,9 +10,6 @@ module TUI.Level (
   , Level(..)
   , BackLevel(..)
   , ZoomLevel(..)
-  , SearchDialog(..)
-  , sdValues
-  , sdDialog
   , isDialog
   , isZoomed
   , isBack
@@ -23,8 +20,6 @@ module TUI.Level (
   , TableViewer(..)
   , tvLists
   , tvCurrentField
-  , mkSearchDialog
-  , renderSearchDialog
   , mkRowViewer
   , buildTable
   , renderDialogLevel
@@ -44,6 +39,7 @@ module TUI.Level (
   , activeEditor
 
   , module TUI.RichZoomViewer
+  , module TUI.SearchDialog
   , module TUI.ZoomViewer
   ) where
 
@@ -51,8 +47,6 @@ module TUI.Level (
 import Brick hiding (getName, zoom)
 import Brick.Widgets.Border
 import Brick.Widgets.Center
-import Brick.Widgets.Dialog
-import Brick.Widgets.Edit qualified as Ed
 import Brick.Widgets.List hiding (splitAt, reverse)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Data.List(transpose, intersperse)
@@ -64,6 +58,7 @@ import Model.Expression.RecursionSchemas ( Fix(..), bottomUp, cata, para )
 import Model.RowStore
 
 import TUI.Base
+import TUI.SearchDialog
 import TUI.RichZoomViewer
 import TUI.ZoomViewer
 
@@ -97,9 +92,6 @@ type Interface = Fix Level
 updateLevels :: (Level Interface -> Level Interface) -> Interface -> Interface
 updateLevels = bottomUp
 
-data SearchDialog = SearchDialog { _sdValues :: List Name Text
-                                 , _sdDialog :: Dialog () Name
-                                 }
 
 data RowViewer = RowViewer { _rvFieldNames :: List Name Text
                            , _rvFieldWidth :: Int
@@ -116,9 +108,7 @@ tvLists :: Traversal' TableViewer (List Name Text)
 tvLists f (TableViewer fl cw cs cf) = TableViewer fl cw <$> traverse f cs <*> pure cf
 
 makeLenses ''RowViewer
-makeLenses ''SearchDialog
 makeLenses ''TableViewer
-makeLenses ''ZoomViewer
 
 instance HasEditor DialogLevel where
     editorLens = lens getter setter
@@ -256,21 +246,6 @@ activeEditor = lens getter setter
           addE ve (Back bl) = In $ Back $ set editorLens (Just ve) bl
 
 
-mkSearchDialog :: Name -> Int -> Text -> [Text] -> SearchDialog
-mkSearchDialog n w ttle values = SearchDialog (list n (V.fromList values) 1)
-                                            (dialog (Just $ txt ttle)
-                                                    (Just (DButton OkButton, [ ("OK", DButton OkButton, ())
-                                                              , ("Cancel", DButton CancelButton, ())]))
-                                                    w
-                                            )
-
-
-renderSearchDialog :: SearchDialog -> Widget Name
-renderSearchDialog sd = renderDialog (sd ^. sdDialog) $
-                           vLimit (V.length $ listElements $ sd ^. sdValues)
-                                  (renderList renderValue False $ sd ^. sdValues)
-
-
 maxWidth :: Int
 maxWidth = 40
 
@@ -383,27 +358,4 @@ withWidths f ws l = intersperse vBorder
 withWidth :: (a -> Widget Name) -> Int -> a -> Widget Name
 withWidth f w = hLimit w . padRight Max . f
 
-renderName :: Bool -> Text -> Widget Name
-renderName = (withAttr titleAttr .) . renderElement
 
-
-renderValue :: Bool -> Text -> Widget Name
-renderValue = renderElement
-
-renderValueEditor :: ValueEditor -> Widget Name
-renderValueEditor ve = Ed.renderEditor ((if ve ^. veIsError
-                        then withAttr errorAttr
-                        else id) . (txt . T.unlines)) True $ ve ^. veEditor
-
-renderElement :: Bool -> Text -> Widget Name
-renderElement False = myTxt
-renderElement True = withAttr selectedElementAttr . myTxt
-
-
-myTxt :: Text -> Widget n
-myTxt t = Widget Fixed Fixed $ do
-      w <- availWidth <$> getContext
-      let l = T.length t
-          t' | l <= w = T.justifyLeft w ' ' t
-             | otherwise = T.take (w-3) t <> "..."
-      render $ txt t'

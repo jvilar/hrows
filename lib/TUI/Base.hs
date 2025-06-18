@@ -18,8 +18,11 @@ module TUI.Base (
     , updateValueViewer
     , updateEditor
     , mkEditor
+    , renderName
+    , renderValue
     , renderValueViewer
     , renderValueEditor
+    , myTxt
 ) where
 
 
@@ -91,6 +94,13 @@ updateEditor f ve | t == T.concat (getEditContents $ ve ^. veEditor) = set veIsE
 mkEditor :: Name -> Field -> ValueEditor
 mkEditor n f = ValueEditor (editor n (Just 1) $ toString f) (isError f)
 
+renderValue :: Bool -> Text -> Widget Name
+renderValue = renderElement
+
+renderElement :: Bool -> Text -> Widget Name
+renderElement False = myTxt
+renderElement True = withAttr selectedElementAttr . myTxt
+
 renderValueViewer :: ValueViewer -> Widget Name
 renderValueViewer = either renderValueEditor renderField
   where renderField f = let
@@ -101,6 +111,9 @@ renderValueEditor :: ValueEditor -> Widget Name
 renderValueEditor ve = renderEditor ((if ve ^. veIsError
                         then withAttr errorAttr
                         else id) . (txt . T.unlines)) True $ ve ^. veEditor
+
+renderName :: Bool -> Text -> Widget Name
+renderName = (withAttr titleAttr .) . renderElement
 
 myTxt :: Text -> Widget n
 myTxt t = Widget Fixed Fixed $ do
