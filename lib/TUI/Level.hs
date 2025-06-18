@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module TUI.Level (
@@ -13,10 +12,6 @@ module TUI.Level (
   , isDialog
   , isZoomed
   , isBack
-  , TableViewer(..)
-  , tvLists
-  , tvCurrentField
-  , buildTable
   , renderDialogLevel
   , renderZoomLevel
   , renderBackLevel
@@ -35,6 +30,7 @@ module TUI.Level (
   , module TUI.RichZoomViewer
   , module TUI.RowViewer
   , module TUI.SearchDialog
+  , module TUI.TableViewer
   , module TUI.ZoomViewer
   ) where
 
@@ -42,19 +38,15 @@ module TUI.Level (
 import Brick hiding (getName, zoom)
 import Brick.Widgets.Border
 import Brick.Widgets.Center
-import Brick.Widgets.List hiding (splitAt, reverse)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
-import Data.List(transpose, intersperse)
 import Data.Text (Text)
-import Data.Text qualified as T
-import Data.Vector qualified as V
 import Model.Expression.RecursionSchemas ( Fix(..), bottomUp, cata, para )
-import Model.RowStore
 
 import TUI.Base
+import TUI.RichZoomViewer
 import TUI.RowViewer
 import TUI.SearchDialog
-import TUI.RichZoomViewer
+import TUI.TableViewer
 import TUI.ZoomViewer
 
 
@@ -87,22 +79,10 @@ type Interface = Fix Level
 updateLevels :: (Level Interface -> Level Interface) -> Interface -> Interface
 updateLevels = bottomUp
 
-data TableViewer = TableViewer { _tvFieldNames :: [Text]
-                               , _tvColWidths :: [Int]
-                               , _tvColumns :: [List Name Text]
-                               , _tvCurrentField :: Int
-                               }
-
-tvLists :: Traversal' TableViewer (List Name Text)
-tvLists f (TableViewer fl cw cs cf) = TableViewer fl cw <$> traverse f cs <*> pure cf
-
-makeLenses ''TableViewer
-
 instance HasEditor DialogLevel where
     editorLens = lens getter setter
         where getter _ = Nothing
               setter dl _ = dl
-
 
 instance HasEditor ZoomLevel where
     editorLens = lens getter setter
@@ -110,12 +90,6 @@ instance HasEditor ZoomLevel where
               getter (RichZoom iv) = iv ^. editorLens
               setter (NormalZoom zv) v = NormalZoom $ set editorLens v zv
               setter (RichZoom zv) v = RichZoom $ set editorLens v zv
-
-
-instance HasEditor TableViewer where
-    editorLens = lens (const Nothing) setter
-        where setter _ Nothing = error "Cannot remove editor from table viewer"
-              setter _ _ = error "Cannot set editor in table viewer"
 
 instance HasEditor BackLevel where
     editorLens = lens getter setter
@@ -220,15 +194,6 @@ activeEditor = lens getter setter
           addE ve (Back bl) = In $ Back $ set editorLens (Just ve) bl
 
 
-buildTable :: RowStore -> Int -> TableViewer
-buildTable rst = TableViewer ns ws cls
-    where cs = transpose $ map (map toString) $ rows rst
-          cls = zipWith f [0..] cs
-          f n r = list (ValueColumn n) (V.fromList r) 1
-          ns = fnames rst
-          ws = zipWith max (map T.length ns)
-                           $ map (maximum . map T.length) cs
-
 renderDialogLevel :: DialogLevel -> Widget Name
 renderDialogLevel (Searching sd) = renderSearchDialog sd
 
@@ -251,53 +216,3 @@ renderBack t content help = joinBorders $ center $
        <=>
        hCenter (txt help)
 
-
-renderTableViewer :: TableViewer -> Widget Name
-renderTableViewer tv = Widget Greedy Fixed $ do
-    h <- availHeight <$> getContext
-    w <- availWidth <$> getContext
-    let v = min (V.length $ listElements $ head $ tv ^. tvColumns) (h-4)
-        ws = allocateWidths (tv ^. tvCurrentField) w $ tv ^. tvColWidths
-    render ( vLimit 1 (hBox $ withWidths (\(i, t) ->
-                                              if i == tv ^. tvCurrentField
-                                              then withAttr selectedElementAttr $ myTxt t
-                                              else withAttr titleAttr $ myTxt t)
-                               ws
-                               (zip [0..] $ tv ^. tvFieldNames)
-                      )
-             <=>
-             hBorder
-             <=>
-             vLimit v ( hBox $ withWidths (renderList renderValue False)
-                               ws
-                               (tv ^. tvColumns)
-                      )
-           )
-
-
-allocateWidths :: Int -> Int -> [Int] -> [Int]
-allocateWidths curF w ws
-  | w < s = let
-               (lft, wcurF:rgt) = splitAt curF ws1
-               wCurrent = min w (wcurF - 1)
-               wsLeft= reverse . upto (w - wCurrent) $ reverse lft
-               wRest = w - wCurrent - sum wsLeft
-            in map (max 0 . subtract 1) $ wsLeft ++ [wCurrent + 1] ++ upto wRest rgt
-  | otherwise = over (taking n traversed) (+ (dw+1))
-              $ over (dropping n traversed) (+ dw) ws
-  where ws1 = map succ ws
-        s = sum ws1
-        l = length ws1
-        (dw, n) = (w - s) `divMod` l
-        upto _ [] = []
-        upto ml (x:xs) = v:upto (ml-v) xs
-            where v = min ml x
-
-withWidths :: (a -> Widget Name) -> [Int] -> [a] -> [Widget Name]
-withWidths f ws l = intersperse vBorder
-                  $ map (uncurry $ withWidth f)
-                  $ filter ((>0) . fst)
-                  $ zip ws l
-
-withWidth :: (a -> Widget Name) -> Int -> a -> Widget Name
-withWidth f w = hLimit w . padRight Max . f
