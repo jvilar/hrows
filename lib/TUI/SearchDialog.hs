@@ -1,4 +1,5 @@
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module TUI.SearchDialog (
@@ -34,6 +35,7 @@ mkSearchDialog n w ttle values = SearchDialog (list n (V.fromList values) 1)
                                             )
 
 renderSearchDialog :: SearchDialog -> Widget Name
-renderSearchDialog sd = renderDialog (sd ^. sdDialog) $
-                           vLimit (V.length $ listElements $ sd ^. sdValues)
-                                  (renderList renderValue False $ sd ^. sdValues)
+renderSearchDialog sd = Widget Fixed Greedy $ do
+    h <- availHeight <$> getContext
+    let l = min (h - 4) (V.length $ listElements $ sd ^. sdValues)
+    render $ renderDialog (sd ^. sdDialog) $ vLimit l (renderList renderValue False (sd ^. sdValues) <=> txt " ")
