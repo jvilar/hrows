@@ -16,7 +16,7 @@ import Brick.Widgets.Dialog
 import Brick.Widgets.Edit qualified as Ed
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Data.Text qualified as T
-import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl))
+import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl), Button (..))
 import Model.Expression.RecursionSchemas
 import Model.Field
 import Model.RowStore
@@ -24,6 +24,7 @@ import Model.RowStore
 import TUI.Base
 import TUI.Level
 import TUI.State
+import Brick.Widgets.List (handleListEvent)
 
 data BackupEvent = BackupEvent deriving (Show)
 
@@ -39,9 +40,11 @@ listKeys = [KDown, KUp, KPageUp, KPageDown, KHome, KEnd, KLeft, KRight]
 
 handleEvent :: BrickEvent Name EventType -> EventM Name State ()
 handleEvent (AppEvent BackupEvent) = doBackup
-handleEvent e@(MouseDown _ _ _ _) = logMessage $ "Mouse " <> T.pack (show e)
-handleEvent e = handleGlobalEvent e
-   >>->> (use sInterface >>= handleInLevel e . out)
+handleEvent e = do
+    case e of
+        MouseDown {} -> logMessage $ "Mouse " <> T.pack (show e)
+        _ -> return ()
+    handleGlobalEvent e >>->> (use sInterface >>= handleInLevel e . out)
 
 handleInLevel :: BrickEvent Name EventType -> Level Interface -> EventM Name State ()
 handleInLevel e (WithDialog dl _) = handleEventDialogLevel dl e
@@ -61,28 +64,45 @@ handleEventDialogLevel (Quitting _) = handleEventQuit
 
 handleEventSearch :: BrickEvent Name EventType -> EventM Name State ()
 handleEventSearch (VtyEvent (EvKey k ms)) = handleKeySearch k ms
+handleEventSearch (MouseDown SearchList BLeft [] (Location (_, r))) = moveToSelectedSearch r
+handleEventSearch (MouseDown SearchList BScrollDown [] _) = handleKeySearch KPageDown []
+handleEventSearch (MouseDown SearchList BScrollUp [] _) = handleKeySearch KPageUp []
+handleEventSearch (MouseDown (DButton OkButton) BLeft [] _) = moveToSelected
+handleEventSearch (MouseDown (DButton CancelButton) BLeft [] _) = deactivateSearch
 handleEventSearch _ = return ()
 
 handleKeySearch :: Key -> [Modifier] -> EventM Name State ()
-handleKeySearch k [] | k `elem` listKeys = moveSearchList (EvKey k [])
+handleKeySearch k [] | k `elem` listKeys = handleSearchList (EvKey k [])
 handleKeySearch KEnter [] = moveToSelected
 handleKeySearch KEsc [] = deactivateSearch
 handleKeySearch k ms = handleInSearchDialog (EvKey k ms)
 
+handleSearchList :: Event -> EventM Name State ()
+handleSearchList e = B.zoom (sInterface . searchDialog . _Just . sdValues) $ handleListEvent e
+
 handleEventQuit :: BrickEvent Name EventType -> EventM Name State ()
 handleEventQuit (VtyEvent (EvKey k ms)) = handleKeyQuit k ms
+handleEventQuit (MouseDown (DButton OkButton) BLeft [] _) = doQuit
+handleEventQuit (MouseDown (DButton CancelButton) BLeft [] _) = abortQuit
 handleEventQuit _ = return ()
 
 handleKeyQuit :: Key -> [Modifier] -> EventM Name State ()
 handleKeyQuit KEnter [] = use (sInterface . quitDialog) >>= \case
     Nothing -> return ()
     Just ynd -> case dialogSelection (ynd ^. ynDialog) of
-            Just (DButton OkButton, _) -> doFinalBackup >> halt
-            _ -> sInterface . quitDialog .= Nothing
-handleKeyQuit KEsc [] = sInterface . quitDialog .= Nothing
+            Just (DButton OkButton, _) -> doQuit
+            _ -> abortQuit
+handleKeyQuit KEsc [] = abortQuit
 handleKeyQuit k ms = handleInQuitDialog (EvKey k ms)
 
+doQuit :: EventM Name State ()
+doQuit = doFinalBackup >> halt
+
+abortQuit :: EventM Name State ()
+abortQuit = sInterface . quitDialog .= Nothing
+
 handleEventZoomLevel :: ZoomLevel -> BrickEvent Name EventType -> EventM Name State Bool
+handleEventZoomLevel _ (MouseDown {}) = return True
 handleEventZoomLevel (NormalZoom _) _ = return False
 handleEventZoomLevel (RichZoom _) e = handleEventRichZoom e
 
@@ -157,6 +177,9 @@ handleEventTable e = handleCommonKeys e >>->> case e of
     VtyEvent (EvKey KDown []) -> forward
     VtyEvent (EvKey KLeft []) -> fieldBackward
     VtyEvent (EvKey KRight []) -> fieldForward
+    MouseDown (ValueColumn c) BLeft [] (Location (_, r)) -> modify $ moveFieldTo c . moveTo r
+    MouseDown (ValueColumn _) BScrollUp [] _ -> backward
+    MouseDown (ValueColumn _) BScrollDown [] _ -> forward
     _ -> return ()
 
 
@@ -168,6 +191,9 @@ handleEventRows e = handleCommonKeys e >>->> case e of
     VtyEvent (EvKey KDown []) -> fieldForward
     VtyEvent (EvKey KEnter []) -> fieldForward
     VtyEvent (EvKey (KChar 'n') [MCtrl]) -> newRow
+    MouseDown FieldNames BLeft [] (Location (_, r)) -> modify $ moveFieldTo r
+    MouseDown ValueList BLeft [] (Location (_, r)) -> modify $ moveFieldTo r
+    MouseDown (ValueViewer r) BLeft [] _ -> modify (moveFieldTo r) >> handleEdition e
     _ -> handleEdition e
 
 handleEdition :: BrickEvent Name EventType -> EventM Name State ()

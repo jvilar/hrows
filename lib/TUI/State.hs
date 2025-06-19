@@ -33,8 +33,9 @@ module TUI.State (
     , deactivateSearch
     , toggleTable
     , moveTo
-    , moveSearchList
+    , moveFieldTo
     , moveToSelected
+    , moveToSelectedSearch
     , doSave
     , doBackup
     , doFinalBackup
@@ -51,6 +52,7 @@ import Control.Monad (when, void)
 import Control.Monad.IO.Class (liftIO)
 import Data.Text (Text)
 import Data.Text qualified as T
+import Data.Vector qualified as V
 import Graphics.Vty.Input.Events(Event(EvKey))
 import HRowsException (HRowsException(..))
 import Model.DefaultFileNames (defaultBackupFileName, defaultConfFileName)
@@ -204,9 +206,6 @@ toggleTable = do
                              modify $ moveTo idx
                              modify $ moveFieldTo fld
 
-moveSearchList :: Event -> EventM Name State ()
-moveSearchList e = B.zoom (sInterface . searchDialog . _Just . sdValues) $ handleListEvent e
-
 moveToSelected :: EventM Name State ()
 moveToSelected = do
     msd <- use $ sInterface . searchDialog
@@ -228,6 +227,21 @@ moveToSelected = do
         Just (DButton CancelButton, ()) -> deactivateSearch
         _ -> return ()
 
+moveToSelectedSearch :: Int -> EventM Name State ()
+moveToSelectedSearch r = do
+    msd <- use $ sInterface . searchDialog
+    case msd of
+        Nothing -> return ()
+        Just sd -> do
+            deactivateSearch
+            let vs = sd ^. sdValues . listElementsL
+            if r < 0 || r >= V.length vs
+            then return ()
+            else do
+                let t = vs V.! r
+                s <- get
+                let pos = nextPos (fromIntegral $ s ^. sCurrentField) t (s ^. sIndex) (s ^. sRowStore)
+                modify $ moveTo pos
 
 moveTo :: Int -> State -> State
 moveTo pos s
