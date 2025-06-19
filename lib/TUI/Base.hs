@@ -24,6 +24,7 @@ module TUI.Base (
     , renderValueEditor
     , myTxt
     , valueList
+    , maxWidth
 ) where
 
 
@@ -42,6 +43,9 @@ import Model.RowStore (RowStore, isFormula)
 import Brick.Widgets.List (List, list)
 import Model (row)
 
+
+maxWidth :: Int
+maxWidth = 40
 
 data Name = DButton DialogButton
           | FieldNames
