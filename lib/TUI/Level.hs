@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -21,6 +20,7 @@ module TUI.Level (
   , levelDialog
   , levelZoom
   , levelBack
+  , quitDialog
   , searchDialog
   , richZoom
   , tableViewer
@@ -31,6 +31,7 @@ module TUI.Level (
   , module TUI.RowViewer
   , module TUI.SearchDialog
   , module TUI.TableViewer
+  , module TUI.YesNoDialog
   , module TUI.ZoomViewer
   ) where
 
@@ -47,6 +48,7 @@ import TUI.RichZoomViewer
 import TUI.RowViewer
 import TUI.SearchDialog
 import TUI.TableViewer
+import TUI.YesNoDialog
 import TUI.ZoomViewer
 
 
@@ -54,7 +56,8 @@ data Level i = WithDialog DialogLevel i
              | Zoomed ZoomLevel i
              | Back BackLevel deriving Functor
 
-newtype DialogLevel = Searching SearchDialog
+data DialogLevel = Searching SearchDialog
+                 | Quitting YesNoDialog
 
 data ZoomLevel = NormalZoom ZoomViewer
                | RichZoom RichZoomViewer
@@ -157,6 +160,13 @@ searchDialog = lens getter setter
                         return sd
           setter i v = set levelDialog (fmap Searching v) i
 
+quitDialog :: Lens' Interface (Maybe YesNoDialog)
+quitDialog = lens getter setter
+    where getter i = do
+                        Quitting ynd <- i ^. levelDialog
+                        return ynd
+          setter i v = set levelDialog (fmap Quitting v) i
+
 richZoom :: Lens' Interface (Maybe RichZoomViewer)
 richZoom = lens getter setter
     where getter i = do
@@ -196,6 +206,7 @@ activeEditor = lens getter setter
 
 renderDialogLevel :: DialogLevel -> Widget Name
 renderDialogLevel (Searching sd) = renderSearchDialog sd
+renderDialogLevel (Quitting ynd) = renderYesNoDialog ynd
 
 renderZoomLevel :: ZoomLevel -> Widget Name
 renderZoomLevel (NormalZoom zv) = renderZoomViewer zv

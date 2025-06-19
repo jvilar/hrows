@@ -2,7 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module TUI.SearchDialog (
-  SearchDialog(..)
+  SearchDialog
   , sdValues
   , sdDialog
   , mkSearchDialog

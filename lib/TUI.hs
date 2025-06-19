@@ -158,12 +158,15 @@ handleInLevel e (Zoomed zl i) = handleEventZoomLevel zl e >>->> handleInLevel e 
 handleInLevel e (Back bl) = handleEventBackLevel bl e
 
 handleGlobalEvent :: BrickEvent Name EventType -> EventM Name State Bool
-handleGlobalEvent (VtyEvent (EvKey (KChar 'q') [MCtrl])) = doFinalBackup >> halt >> return True
+handleGlobalEvent (VtyEvent (EvKey (KChar 'q') [MCtrl])) = do
+            sInterface . quitDialog .= Just (mkYesNoDialog "Are you sure you want to quit?" "Quit")
+            return True
 handleGlobalEvent (VtyEvent (EvKey (KChar 'w') [MCtrl])) = doSave >> return True
 handleGlobalEvent _ = return False
 
 handleEventDialogLevel :: DialogLevel -> BrickEvent Name EventType -> EventM Name State ()
 handleEventDialogLevel (Searching _) = handleEventSearch
+handleEventDialogLevel (Quitting _) = handleEventQuit
 
 handleEventSearch :: BrickEvent Name EventType -> EventM Name State ()
 handleEventSearch (VtyEvent (EvKey k ms)) = handleKeySearch k ms
@@ -174,6 +177,19 @@ handleKeySearch k [] | k `elem` listKeys = moveSearchList (EvKey k [])
 handleKeySearch KEnter [] = moveToSelected
 handleKeySearch KEsc [] = deactivateSearch
 handleKeySearch k ms = handleInSearchDialog (EvKey k ms)
+
+handleEventQuit :: BrickEvent Name EventType -> EventM Name State ()
+handleEventQuit (VtyEvent (EvKey k ms)) = handleKeyQuit k ms
+handleEventQuit _ = return ()
+
+handleKeyQuit :: Key -> [Modifier] -> EventM Name State ()
+handleKeyQuit KEnter [] = use (sInterface . quitDialog) >>= \case
+    Nothing -> return ()
+    Just ynd -> case dialogSelection (ynd ^. ynDialog) of
+            Just (DButton OkButton, _) -> doFinalBackup >> halt
+            _ -> sInterface . quitDialog .= Nothing
+handleKeyQuit KEsc [] = sInterface . quitDialog .= Nothing
+handleKeyQuit k ms = handleInQuitDialog (EvKey k ms)
 
 handleEventZoomLevel :: ZoomLevel -> BrickEvent Name EventType -> EventM Name State Bool
 handleEventZoomLevel (NormalZoom _) _ = return False
@@ -407,6 +423,9 @@ moveToSelected = do
 
 handleInSearchDialog :: Event -> EventM Name State ()
 handleInSearchDialog ev = B.zoom (sInterface . searchDialog . _Just . sdDialog) $ handleDialogEvent ev
+
+handleInQuitDialog :: Event -> EventM Name State ()
+handleInQuitDialog ev = B.zoom (sInterface . quitDialog . _Just . ynDialog) $ handleDialogEvent ev
 
 moveTo :: Int -> State -> State
 moveTo pos s
