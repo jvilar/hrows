@@ -39,6 +39,7 @@ module TUI.State (
     , doSave
     , doBackup
     , doFinalBackup
+    , searchLetter
 ) where
 
 
@@ -65,6 +66,7 @@ import System.Directory (removeFile)
 
 import TUI.Base
 import TUI.Level
+import Data.Char (isLower)
 
 data State = State { _sRowStore :: RowStore
                    , _sSourceInfo :: Maybe (SourceInfo, [SourceInfo])
@@ -242,6 +244,22 @@ moveToSelectedSearch r = do
                 s <- get
                 let pos = nextPos (fromIntegral $ s ^. sCurrentField) t (s ^. sIndex) (s ^. sRowStore)
                 modify $ moveTo pos
+
+searchLetter :: Char -> EventM Name State ()
+searchLetter c = do
+    msd <- use $ sInterface . searchDialog
+    case msd of
+        Nothing -> return ()
+        Just sd -> do
+            let vs = sd ^. sdValues . listElementsL
+                mi = case V.findIndex (T.isPrefixOf (T.singleton c)) vs of
+                         Nothing -> if isLower c
+                                    then V.findIndex (T.isPrefixOf (T.toUpper (T.singleton c))) vs
+                                    else V.findIndex (T.isPrefixOf (T.toLower (T.singleton c))) vs
+                         Just i -> Just i
+            case mi of
+                Nothing -> return ()
+                Just i -> sInterface . searchDialog . _Just . sdValues %= listMoveTo i
 
 moveTo :: Int -> State -> State
 moveTo pos s

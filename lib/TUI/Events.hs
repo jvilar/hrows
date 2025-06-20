@@ -25,6 +25,7 @@ import TUI.Base
 import TUI.Level
 import TUI.State
 import Brick.Widgets.List (handleListEvent)
+import Data.Char (isAlpha)
 
 data BackupEvent = BackupEvent deriving (Show)
 
@@ -73,6 +74,7 @@ handleEventSearch _ = return ()
 
 handleKeySearch :: Key -> [Modifier] -> EventM Name State ()
 handleKeySearch k [] | k `elem` listKeys = handleSearchList (EvKey k [])
+handleKeySearch (KChar k) [] | isAlpha k = searchLetter k
 handleKeySearch KEnter [] = moveToSelected
 handleKeySearch KEsc [] = deactivateSearch
 handleKeySearch k ms = handleInSearchDialog (EvKey k ms)
