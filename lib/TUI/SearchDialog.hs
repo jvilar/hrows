@@ -37,5 +37,5 @@ mkSearchDialog n w ttle values = SearchDialog (list n (V.fromList values) 1)
 renderSearchDialog :: SearchDialog -> Widget Name
 renderSearchDialog sd = Widget Fixed Greedy $ do
     h <- availHeight <$> getContext
-    let l = min (h - 4) (V.length $ listElements $ sd ^. sdValues)
+    let l = min (h - 4) (1 + V.length (sd ^. sdValues . listElementsL))
     render $ renderDialog (sd ^. sdDialog) $ vLimit l (renderList renderValue False (sd ^. sdValues) <=> txt " ")
