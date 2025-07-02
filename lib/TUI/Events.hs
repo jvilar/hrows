@@ -10,22 +10,25 @@ module TUI.Events (
     ) where
 
 
+
 import Brick hiding (getName, zoom)
 import Brick qualified as B
 import Brick.Widgets.Dialog
 import Brick.Widgets.Edit qualified as Ed
+import Brick.Widgets.List (handleListEvent)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
+import Control.Monad (when)
+import Data.Char (isAlpha)
 import Data.Text qualified as T
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl), Button (..))
+import Model.Expression.Evaluation (evaluate)
+import Model.Expression.Parser (parseExpression)
 import Model.Expression.RecursionSchemas
-import Model.Field
 import Model.RowStore
-
 import TUI.Base
 import TUI.Level
 import TUI.State
-import Brick.Widgets.List (handleListEvent)
-import Data.Char (isAlpha)
+import Model.Expression.Manipulate (addPositions)
 
 data BackupEvent = BackupEvent deriving (Show)
 
@@ -62,6 +65,7 @@ handleGlobalEvent _ = return False
 handleEventDialogLevel :: DialogLevel -> BrickEvent Name EventType -> EventM Name State ()
 handleEventDialogLevel (Searching _) = handleEventSearch
 handleEventDialogLevel (Quitting _) = handleEventQuit
+handleEventDialogLevel (FieldProperties _) = handleEventFieldProperties
 
 handleEventSearch :: BrickEvent Name EventType -> EventM Name State ()
 handleEventSearch (VtyEvent (EvKey k ms)) = handleKeySearch k ms
@@ -88,6 +92,80 @@ handleEventQuit (MouseDown (DButton OkButton) BLeft [] _) = doQuit
 handleEventQuit (MouseDown (DButton CancelButton) BLeft [] _) = abortQuit
 handleEventQuit _ = return ()
 
+handleEventFieldProperties :: BrickEvent Name EventType -> EventM Name State ()
+handleEventFieldProperties (VtyEvent (EvKey k ms)) = handleKeyFieldProperties k ms
+handleEventFieldProperties _ = return ()
+
+handleKeyFieldProperties :: Key -> [Modifier] -> EventM Name State ()
+handleKeyFieldProperties KUp [] = sInterface . fieldProperties %= fmap fieldPropertiesMoveUp
+handleKeyFieldProperties KDown [] = sInterface . fieldProperties %= fmap fieldPropertiesMoveDown
+handleKeyFieldProperties (KChar '\t') [] = sInterface . fieldProperties %= fmap fieldPropertiesMoveDown
+handleKeyFieldProperties KBackTab [] = sInterface . fieldProperties %= fmap fieldPropertiesMoveUp
+handleKeyFieldProperties KEsc [] = closeFieldPropertiesDialog
+handleKeyFieldProperties KEnter [] = use (sInterface . fieldProperties) >>= \case
+    Nothing -> return ()
+    Just fp -> case fp ^. fpFocus of
+        FpCancel -> closeFieldPropertiesDialog
+        _ -> acceptFieldProperties
+handleKeyFieldProperties k ms = use (sInterface . fieldProperties) >>= \case
+     Nothing -> return ()
+     Just si -> case si ^. fpFocus of
+         FpType -> case (k, ms) of
+                      (KLeft, []) -> zl %= fieldPropertiesPrevType
+                      (KRight, []) -> zl %= fieldPropertiesNextType
+                      _ -> return ()
+         FpOK -> when (k ==  KChar ' ' && null ms) acceptFieldProperties
+         FpCancel -> when (k == KChar ' ' && null ms) closeFieldPropertiesDialog
+         FpName -> B.zoom (sInterface . activeEditor . _Just . veEditor) $ Ed.handleEditorEvent (VtyEvent (EvKey k ms))
+         FpValue -> use (sInterface . activeEditor) >>= \case
+                      Nothing -> return ()
+                      Just _ -> B.zoom (sInterface . activeEditor . _Just . veEditor) $ Ed.handleEditorEvent (VtyEvent (EvKey k ms))
+         FpFMark -> when (k == KChar ' ' && null ms) $ sInterface . fieldProperties . _Just . fpIsFormula %= not
+         FpFormula -> handleKeyInFormula k ms
+  where zl = sInterface . fieldProperties . _Just
+
+handleKeyInFormula :: Key -> [Modifier] -> EventM Name State ()
+handleKeyInFormula k ms = do
+    s <- get
+    rst <- use sRowStore
+
+    B.zoom (sInterface . fieldProperties . _Just) $ do
+       B.zoom (fpFormula . veEditor) $ Ed.handleEditorEvent (VtyEvent (EvKey k ms))
+       use fpIsFormula >>= \case
+          False -> return ()
+          True -> do
+                    f <- use (fpFormula . veEditor . to Ed.getEditContents)
+                    let ex = parseExpression $ T.concat f
+                        r = row (s ^. sIndex) rst
+                        v = evaluate r (getDataSources rst) $ addPositions rst ex
+                    fpValue .= Right v
+
+closeFieldPropertiesDialog :: EventM Name State ()
+closeFieldPropertiesDialog = sInterface . fieldProperties .= Nothing
+
+
+acceptFieldProperties :: EventM Name State ()
+acceptFieldProperties = use (sInterface . fieldProperties) >>= \case
+    Nothing -> return ()
+    Just fp -> do
+        let n = T.concat $ fp ^. fpName . veEditor . to Ed.getEditContents
+        changeCurrentFieldName n
+
+        case fp ^. fpValue of
+            Left ve -> do
+                let v = T.concat $ ve ^. veEditor . to Ed.getEditContents
+                updateCurrentField v
+            Right _ -> return ()
+
+        changeCurrentFieldType (fp ^. fpType)
+
+        let form = if fp ^. fpIsFormula
+                   then Just . T.concat $ fp ^. fpFormula . veEditor . to Ed.getEditContents
+                   else Nothing
+        changeCurrentFieldFormula form
+
+        closeFieldPropertiesDialog
+
 handleKeyQuit :: Key -> [Modifier] -> EventM Name State ()
 handleKeyQuit KEnter [] = use (sInterface . quitDialog) >>= \case
     Nothing -> return ()
@@ -106,53 +184,11 @@ abortQuit = sInterface . quitDialog .= Nothing
 handleEventZoomLevel :: ZoomLevel -> BrickEvent Name EventType -> EventM Name State Bool
 handleEventZoomLevel _ (MouseDown {}) = return True
 handleEventZoomLevel (NormalZoom _) _ = return False
-handleEventZoomLevel (RichZoom _) e = handleEventRichZoom e
-
-handleEventRichZoom :: BrickEvent Name EventType -> EventM Name State Bool
-handleEventRichZoom (VtyEvent (EvKey k ms)) = handleKeyRichZoom k ms
-handleEventRichZoom _ = return False
-
-handleKeyRichZoom :: Key -> [Modifier] -> EventM Name State Bool
-handleKeyRichZoom KUp [] = sInterface . richZoom %= fmap richZoomMoveUp >> return True
-handleKeyRichZoom KDown [] = sInterface . richZoom %= fmap richZoomMoveDown >> return True
-handleKeyRichZoom (KChar '\t') [] = sInterface . richZoom %= fmap richZoomMoveDown >> return True
-handleKeyRichZoom KBackTab [] = sInterface . richZoom %= fmap richZoomMoveUp >> return True
-handleKeyRichZoom KLeft [] = handleChangeType richZoomNextType
-handleKeyRichZoom KRight [] = handleChangeType richZoomPrevType
-handleKeyRichZoom (KChar ' ') [] = handleSwitchFormula
-handleKeyRichZoom _ _ = return False
-
-handleChangeType :: (RichZoomViewer -> Maybe (RichZoomViewer, FieldType)) -> EventM Name State Bool
-handleChangeType f = uses (sInterface . richZoom) (maybe Nothing f) >>= \case
-        Just (rz, t) -> do
-            sInterface . richZoom .= Just rz
-            changeType t
-            return True
-        Nothing -> return False
-
-handleSwitchFormula :: EventM Name State Bool
-handleSwitchFormula = use (sInterface . richZoom) >>= \case
-    Just rz -> if rz ^. rzFocus == RzFMark
-               then do
-                      sInterface . richZoom . _Just . rzIsFormula %= not
-                      f <- if rz ^. rzIsFormula
-                           then return Nothing
-                           else Just . T.concat <$> use (sInterface . activeEditor . _Just . veEditor . to Ed.getEditContents)
-                      changeCurrentFieldFormula f
-                      return True
-               else return False
-    Nothing -> return False
-changeType :: FieldType -> EventM Name State ()
-changeType t = do
-                 f <- use sCurrentField
-                 sRowStore %= changeFieldType t (fromIntegral f)
-                 n <- use sIndex
-                 modify $ moveTo n
 
 handleCommonKeys :: BrickEvent Name EventType -> EventM Name State Bool
 handleCommonKeys (VtyEvent (EvKey (KChar c) [MCtrl])) = case c of
     'f' -> activateSearch >> return True
-    'r' -> toggleInfo >> return True
+    'r' -> toggleProperties >> return True
     't' -> toggleTable >> return True
     'z' -> toggleZoom >> return True
     '\t' -> forward >> return True
@@ -199,18 +235,12 @@ handleEventRows e = handleCommonKeys e >>->> case e of
     _ -> handleEdition e
 
 handleEdition :: BrickEvent Name EventType -> EventM Name State ()
-handleEdition e = do
-    med <- use (sInterface . activeEditor)
-    case med of
+handleEdition e = use (sInterface . activeEditor) >>= \case
         Nothing -> return ()
         Just _ -> do
                      B.zoom (sInterface . activeEditor . _Just . veEditor) $ Ed.handleEditorEvent e
                      value <- T.concat <$> use (sInterface . activeEditor . _Just . veEditor . to Ed.getEditContents)
-                     use (sInterface . richZoom) >>= \case
-                        Just rz -> if rz ^. rzFocus == RzValue
-                            then updateCurrentField value
-                            else changeCurrentFieldFormula $ Just value
-                        _ -> updateCurrentField value
+                     updateCurrentField value
 
 handleInSearchDialog :: Event -> EventM Name State ()
 handleInSearchDialog ev = B.zoom (sInterface . searchDialog . _Just . sdDialog) $ handleDialogEvent ev

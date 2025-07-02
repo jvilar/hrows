@@ -10,6 +10,7 @@ module TUI.RowViewer (
   , rvValueList
   , mkRowViewer
   , renderRowViewer
+  , updateRvNames
   , updateRvValues
   ) where
 
@@ -57,6 +58,8 @@ updateRvValues ts rv = over rvValueList (listReplace v i) rv
         l = listElements (rv ^. rvValueList)
         v = V.fromList $ zipWith updateValueViewer ts (V.toList l)
 
+updateRvNames :: [Text] -> RowViewer -> RowViewer
+updateRvNames ns = set rvFieldNames (list FieldNames (V.fromList ns) 1)
 
 maxWidth :: Int
 maxWidth = 40

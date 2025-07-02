@@ -22,12 +22,12 @@ module TUI.Level (
   , levelBack
   , quitDialog
   , searchDialog
-  , richZoom
+  , fieldProperties
   , tableViewer
   , rowViewer
   , activeEditor
 
-  , module TUI.RichZoomViewer
+  , module TUI.FieldPropertiesDialog
   , module TUI.RowViewer
   , module TUI.SearchDialog
   , module TUI.TableViewer
@@ -44,7 +44,7 @@ import Data.Text (Text)
 import Model.Expression.RecursionSchemas ( Fix(..), bottomUp, cata, para )
 
 import TUI.Base
-import TUI.RichZoomViewer
+import TUI.FieldPropertiesDialog
 import TUI.RowViewer
 import TUI.SearchDialog
 import TUI.TableViewer
@@ -58,9 +58,9 @@ data Level i = WithDialog DialogLevel i
 
 data DialogLevel = Searching SearchDialog
                  | Quitting YesNoDialog
+                 | FieldProperties FieldPropertiesDialog
 
-data ZoomLevel = NormalZoom ZoomViewer
-               | RichZoom RichZoomViewer
+newtype ZoomLevel = NormalZoom ZoomViewer
 
 data BackLevel = AsTable TableViewer
                | AsRows RowViewer
@@ -84,15 +84,15 @@ updateLevels = bottomUp
 
 instance HasEditor DialogLevel where
     editorLens = lens getter setter
-        where getter _ = Nothing
+        where getter (FieldProperties fp) = fp ^. editorLens
+              getter _ = Nothing
+              setter (FieldProperties fp) v = FieldProperties $ set editorLens v fp
               setter dl _ = dl
 
 instance HasEditor ZoomLevel where
     editorLens = lens getter setter
         where getter (NormalZoom zv) = zv ^. editorLens
-              getter (RichZoom rz) = rz ^. editorLens
               setter (NormalZoom zv) v = NormalZoom $ set editorLens v zv
-              setter (RichZoom rz) v = RichZoom $ set editorLens v rz
 
 instance HasEditor BackLevel where
     editorLens = lens getter setter
@@ -167,13 +167,13 @@ quitDialog = lens getter setter
                         return ynd
           setter i v = set levelDialog (fmap Quitting v) i
 
-richZoom :: Lens' Interface (Maybe RichZoomViewer)
-richZoom = lens getter setter
+fieldProperties :: Lens' Interface (Maybe FieldPropertiesDialog)
+fieldProperties = lens getter setter
     where getter i = do
-                        RichZoom rz <- i ^. levelZoom
+                        FieldProperties rz <- i ^. levelDialog
                         return rz
 
-          setter i v = set levelZoom (fmap RichZoom v) i
+          setter i v = set levelDialog (fmap FieldProperties v) i
 
 tableViewer :: Lens' Interface (Maybe TableViewer)
 tableViewer = lens getter setter
@@ -191,32 +191,29 @@ rowViewer = lens getter setter
 
 activeEditor :: Lens' Interface (Maybe ValueEditor)
 activeEditor = lens getter setter
-    where getter = cata ae
-          ae (WithDialog dl _) = dl ^. editorLens
-          ae (Zoomed zl _) = zl ^. editorLens
-          ae (Back bl) = bl ^. editorLens
+    where getter (In (WithDialog dl _)) = dl ^. editorLens
+          getter (In (Zoomed zl _)) = zl ^. editorLens
+          getter (In (Back bl)) = bl ^. editorLens
 
           setter _ Nothing = error "Cannot remove editor"
-          setter i (Just ve) = para (addE ve) i
-          addE :: ValueEditor -> Level (Interface, Interface) -> Interface
-          addE _ (WithDialog dl (_, i)) = In $ WithDialog dl i
-          addE ve (Zoomed zl (i, _)) = In $ Zoomed (set editorLens (Just ve) zl) i
-          addE ve (Back bl) = In $ Back $ set editorLens (Just ve) bl
+          setter (In (WithDialog dl i)) (Just ve) = In (WithDialog (set editorLens (Just ve) dl) i)
+          setter (In (Zoomed zl i)) (Just ve) = In (Zoomed (set editorLens (Just ve) zl) i)
+          setter (In (Back bl)) (Just ve) = In (Back (set editorLens (Just ve) bl))
 
 
 renderDialogLevel :: DialogLevel -> Widget Name
 renderDialogLevel (Searching sd) = renderSearchDialog sd
 renderDialogLevel (Quitting ynd) = renderYesNoDialog ynd
+renderDialogLevel (FieldProperties fp) = renderFieldPropertiesDialog fp
 
 renderZoomLevel :: ZoomLevel -> Widget Name
 renderZoomLevel (NormalZoom zv) = renderZoomViewer zv
-renderZoomLevel (RichZoom rz) = renderRichZoomViewer rz
 
 renderBackLevel :: Text -> BackLevel -> Widget Name
 renderBackLevel title (AsTable tv) = renderBack title (renderTableViewer tv) tableHelp
-  where tableHelp = "C-z: zoom, C-r: rich zoom, C-t: return to field view, C-f: find, C-w: write, C-q: exit"
+  where tableHelp = "C-z: zoom, C-r: field pRoperties, C-t: return to field view, C-f: find, C-w: write, C-q: exit"
 renderBackLevel title (AsRows rv) = renderBack title (renderRowViewer rv) rowHelp
-  where rowHelp = "C-z: zoom, C-r: rich zoom, C-t: table view, C-f: find, C-n: new row, C-w: write, C-q: exit"
+  where rowHelp = "C-z: zoom, C-r: field pRoperties, C-t: table view, C-f: find, C-n: new row, C-w: write, C-q: exit"
 
 renderBack :: Text -> Widget Name -> Text -> Widget Name
 renderBack t content help = joinBorders $ center $

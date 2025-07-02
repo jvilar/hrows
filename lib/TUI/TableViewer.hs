@@ -4,6 +4,7 @@
 module TUI.TableViewer (
   TableViewer
   , tvLists
+  , tvFieldNames
   , tvCurrentField
   , buildTable
   , renderTableViewer

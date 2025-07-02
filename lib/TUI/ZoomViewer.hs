@@ -3,6 +3,7 @@
 
 module TUI.ZoomViewer (
     ZoomViewer
+  , zvTitle
   , zvValue
   , mkZoomViewer
   , renderZoomViewer

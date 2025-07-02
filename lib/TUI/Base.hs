@@ -50,8 +50,9 @@ maxWidth = 40
 data Name = DButton DialogButton
           | FieldNames
           | SearchList
-          | RichZoomValueEditor
-          | RichZoomFormulaEditor
+          | FieldPropertiesNameEditor
+          | FieldPropertiesValueEditor
+          | FieldPropertiesFormulaEditor
           | ValueColumn Int
           | ValueViewer Int
           | ValueList
@@ -80,7 +81,7 @@ myAttrMap = attrMap defAttr [ (selectedElementAttr, withStyle defAttr reverseVid
                             , (buttonSelectedAttr, withStyle defAttr reverseVideo)
                             , (titleAttr, withStyle defAttr bold)
                             , (formulaAttr, withBackColor (withForeColor defAttr black) $ rgbColor (160 :: Int) 255 255)
-                            , (errorAttr, withBackColor (withForeColor defAttr black) $ rgbColor 255 (160 :: Int) 255)
+                            , (errorAttr, withBackColor (withForeColor defAttr black) $ rgbColor 255 (160 :: Int) 0)
                             ]
 
 data ValueEditor = ValueEditor { _veEditor :: Editor Text Name

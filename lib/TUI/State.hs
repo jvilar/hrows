@@ -20,15 +20,17 @@ module TUI.State (
     , currentFieldType
     , currentFieldFormula
     , isFormulaCurrentField
-    , changeCurrentFieldFormula
     , updateCurrentField
+    , changeCurrentFieldFormula
+    , changeCurrentFieldName
+    , changeCurrentFieldType
     , newRow
     , backward
     , forward
     , fieldBackward
     , fieldForward
     , toggleZoom
-    , toggleInfo
+    , toggleProperties
     , activateSearch
     , deactivateSearch
     , toggleTable
@@ -54,7 +56,6 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Vector qualified as V
-import Graphics.Vty.Input.Events(Event(EvKey))
 import HRowsException (HRowsException(..))
 import Model.DefaultFileNames (defaultBackupFileName, defaultConfFileName)
 import Model.Expression.RecursionSchemas
@@ -124,9 +125,34 @@ updateCurrentField t = do
     uRow :: Row -> Field -> Level Interface -> Level Interface
     uRow _ _ s@(WithDialog _ _) = s
     uRow _ ft (Zoomed (NormalZoom zv) i) = Zoomed (NormalZoom (over zvValue (updateValueViewer ft) zv)) i
-    uRow _ ft (Zoomed (RichZoom rz) i) = Zoomed (RichZoom (over rzValue (updateValueViewer ft) rz)) i
     uRow _ _ a@(Back (AsTable _)) = a
     uRow r _ (Back (AsRows rv)) = Back . AsRows $ updateRvValues r rv
+
+replace :: Int -> a -> [a] -> [a]
+replace i x xs = take i xs ++ [x] ++ drop (i + 1) xs
+
+changeCurrentFieldName :: Text -> EventM Name State ()
+changeCurrentFieldName n = do
+    s <- get
+    let ns = fnames (s ^. sRowStore)
+    when (ns !! (s ^. sCurrentField) /= n) $ do
+        let ns' = replace (s ^. sCurrentField) n ns
+        sRowStore %= renameFields ns'
+        sInterface %= updateLevels (uFieldNames ns' (s ^. sCurrentField))
+  where
+    uFieldNames :: [Text] -> Int -> Level Interface -> Level Interface
+    uFieldNames _  _ s@(WithDialog _ _) = s
+    uFieldNames ns cf (Zoomed (NormalZoom zv) i) = Zoomed (NormalZoom (set zvTitle (ns !! cf) zv)) i
+    uFieldNames ns _ (Back (AsTable tv)) = Back $ AsTable (set tvFieldNames ns tv)
+    uFieldNames ns _ (Back (AsRows tv)) = Back $ AsRows (updateRvNames ns tv)
+
+changeCurrentFieldType :: Text -> EventM Name State ()
+changeCurrentFieldType t = do
+    s <- get
+    let nt = read $ T.unpack t
+    ts <- uses sRowStore types
+    when (ts  !! (s ^. sCurrentField) /= nt) $
+        sRowStore %= changeFieldType nt (fromIntegral $ s ^. sCurrentField)
 
 newRow :: EventM Name State ()
 newRow = do
@@ -160,23 +186,17 @@ zoomViewerFromState :: State -> ZoomViewer
 zoomViewerFromState s = mkZoomViewer (currentFieldName s)
                                       (isFormulaCurrentField s)
                                       (currentField s)
-richZoomViewerFromState :: State -> RichZoomViewer
-richZoomViewerFromState s = mkRichZoomViewer (currentFieldName s)
-                                                (isFormulaCurrentField s)
-                                                (currentField s)
-                                                (currentFieldType s)
-                                                (currentFieldFormula s)
 
 zoom :: State -> State
 zoom s = set (sInterface . levelZoom) (Just . NormalZoom $ zoomViewerFromState s) s
 
-toggleInfo :: EventM Name State ()
-toggleInfo = use (sInterface . richZoom) >>= \case
-                Just _ -> sInterface . richZoom .= Nothing
-                Nothing -> modify info
+toggleProperties :: EventM Name State ()
+toggleProperties = use (sInterface . fieldProperties) >>= \case
+                    Just _ -> sInterface . fieldProperties .= Nothing
+                    Nothing -> modify properties
 
-info :: State -> State
-info s = set (sInterface . richZoom) (Just $ mkRichZoomViewer (currentFieldName s)
+properties :: State -> State
+properties s = set (sInterface . fieldProperties) (Just $ mkFieldPropertiesDialog (currentFieldName s)
                                             (isFormulaCurrentField s)
                                             (currentField s)
                                             (currentFieldType s)
@@ -270,7 +290,6 @@ moveTo pos s
         moveInterface = updateLevels mi
         mi se@(WithDialog _ _) = se
         mi (Zoomed (NormalZoom zv) i) = Zoomed (NormalZoom (updateZoomViewer (currentField indexUpdated) zv)) i
-        mi (Zoomed (RichZoom rz) i) = Zoomed (RichZoom (updateRichZoomViewer (currentField indexUpdated) rz)) i
         mi (Back (AsTable tv)) = Back $ AsTable (over tvLists (listMoveTo pos) tv)
         mi (Back (AsRows rv)) = let
                            vList = case listSelected (rv ^. rvFieldNames) of
@@ -288,7 +307,6 @@ moveFieldTo pos s
           moveInterface = updateLevels mi
           mi (WithDialog dl i) = WithDialog dl i
           mi (Zoomed (NormalZoom _) i) = Zoomed (NormalZoom $ zoomViewerFromState posUpdated) i
-          mi (Zoomed (RichZoom _) i) = Zoomed (RichZoom $ richZoomViewerFromState posUpdated) i
           mi (Back (AsTable tv)) = Back $ AsTable (set tvCurrentField pos tv)
           mi (Back (AsRows rv)) = Back $ AsRows (over rvFieldNames (listMoveTo pos) $
                                         over rvValueList (listMoveTo pos) rv)
