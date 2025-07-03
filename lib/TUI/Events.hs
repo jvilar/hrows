@@ -119,10 +119,21 @@ handleKeyFieldProperties k ms = use (sInterface . fieldProperties) >>= \case
          FpName -> B.zoom (sInterface . activeEditor . _Just . veEditor) $ Ed.handleEditorEvent (VtyEvent (EvKey k ms))
          FpValue -> use (sInterface . activeEditor) >>= \case
                       Nothing -> return ()
-                      Just _ -> B.zoom (sInterface . activeEditor . _Just . veEditor) $ Ed.handleEditorEvent (VtyEvent (EvKey k ms))
-         FpFMark -> when (k == KChar ' ' && null ms) $ sInterface . fieldProperties . _Just . fpIsFormula %= not
+                      Just _ -> B.zoom (sInterface . activeEditor . _Just) $ handleEventValueEditor (VtyEvent (EvKey k ms))
+         FpFMark -> when (k == KChar ' ' && null ms) switchIsFormula
          FpFormula -> handleKeyInFormula k ms
   where zl = sInterface . fieldProperties . _Just
+
+switchIsFormula :: EventM Name State ()
+switchIsFormula = B.zoom (sInterface . fieldProperties . _Just) $ do
+    f <- use $ fpValue . vvValue
+    use fpIsFormula >>= \case
+        True -> do
+                  fpIsFormula .= False
+                  fpValue .= Left (mkEditor FieldPropertiesValueEditor f)
+        False -> do
+                   fpIsFormula .= True
+                   fpValue .= Right f
 
 handleKeyInFormula :: Key -> [Modifier] -> EventM Name State ()
 handleKeyInFormula k ms = do
@@ -134,10 +145,11 @@ handleKeyInFormula k ms = do
        use fpIsFormula >>= \case
           False -> return ()
           True -> do
-                    f <- use (fpFormula . veEditor . to Ed.getEditContents)
-                    let ex = parseExpression $ T.concat f
+                    f <- use $ fpFormula . veContent
+                    t <- use fpType
+                    let ex = parseExpression f
                         r = row (s ^. sIndex) rst
-                        v = evaluate r (getDataSources rst) $ addPositions rst ex
+                        v = convert t [evaluate r (getDataSources rst) $ addPositions rst ex]
                     fpValue .= Right v
 
 closeFieldPropertiesDialog :: EventM Name State ()
@@ -148,19 +160,17 @@ acceptFieldProperties :: EventM Name State ()
 acceptFieldProperties = use (sInterface . fieldProperties) >>= \case
     Nothing -> return ()
     Just fp -> do
-        let n = T.concat $ fp ^. fpName . veEditor . to Ed.getEditContents
+        let n = fp ^. fpName . veContent
         changeCurrentFieldName n
 
         case fp ^. fpValue of
-            Left ve -> do
-                let v = T.concat $ ve ^. veEditor . to Ed.getEditContents
-                updateCurrentField v
+            Left ve -> updateCurrentField $ ve ^. veField
             Right _ -> return ()
 
         changeCurrentFieldType (fp ^. fpType)
 
         let form = if fp ^. fpIsFormula
-                   then Just . T.concat $ fp ^. fpFormula . veEditor . to Ed.getEditContents
+                   then Just $ fp ^. fpFormula . veContent
                    else Nothing
         changeCurrentFieldFormula form
 
@@ -235,16 +245,22 @@ handleEventRows e = handleCommonKeys e >>->> case e of
     _ -> handleEdition e
 
 handleEdition :: BrickEvent Name EventType -> EventM Name State ()
-handleEdition e = use (sInterface . activeEditor) >>= \case
+handleEdition e = do
+    B.zoom (sInterface . activeEditor . _Just) $ handleEventValueEditor e
+    use (sInterface . activeEditor) >>= \case
         Nothing -> return ()
-        Just _ -> do
-                     B.zoom (sInterface . activeEditor . _Just . veEditor) $ Ed.handleEditorEvent e
-                     value <- T.concat <$> use (sInterface . activeEditor . _Just . veEditor . to Ed.getEditContents)
-                     updateCurrentField value
+        Just ve -> updateCurrentField $ ve ^. veField
 
 handleInSearchDialog :: Event -> EventM Name State ()
 handleInSearchDialog ev = B.zoom (sInterface . searchDialog . _Just . sdDialog) $ handleDialogEvent ev
 
 handleInQuitDialog :: Event -> EventM Name State ()
 handleInQuitDialog ev = B.zoom (sInterface . quitDialog . _Just . ynDialog) $ handleDialogEvent ev
+
+handleEventValueEditor :: BrickEvent Name EventType -> EventM Name ValueEditor ()
+handleEventValueEditor ev = do
+    B.zoom veEditor $ Ed.handleEditorEvent ev
+    ve <- get
+    let f = convertKeepText (ve ^. veType) (toField $ ve ^. veContent)
+    modify $ updateEditor f
 

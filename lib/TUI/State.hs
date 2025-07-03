@@ -97,8 +97,8 @@ currentFieldName s = fnames (s ^. sRowStore) !! (s ^. sCurrentField)
 currentField :: State -> Field
 currentField s = row (s ^. sIndex) (s ^. sRowStore) !! (s ^. sCurrentField)
 
-currentFieldType :: State -> Text
-currentFieldType s = T.pack $ show $ fieldType (fromIntegral $ s ^. sCurrentField) (s ^. sRowStore)
+currentFieldType :: State -> FieldType
+currentFieldType s = fieldType (fromIntegral $ s ^. sCurrentField) (s ^. sRowStore)
 
 currentFieldFormula :: State -> Maybe Text
 currentFieldFormula s = fieldFormula (fromIntegral $ s ^. sCurrentField) (s ^. sRowStore)
@@ -113,10 +113,10 @@ changeCurrentFieldFormula mf = do
     n <- use sIndex
     modify $ moveTo n
 
-updateCurrentField :: Text -> EventM Name State ()
-updateCurrentField t = do
+updateCurrentField :: Field -> EventM Name State ()
+updateCurrentField f = do
     s <- get
-    let (rst, ch) = changeField (s ^. sIndex) (fromIntegral $ s ^. sCurrentField) (toField t) (s ^. sRowStore)
+    let (rst, ch) = changeField (s ^. sIndex) (fromIntegral $ s ^. sCurrentField) f (s ^. sRowStore)
     when (notNull ch) $ do
         sRowStore .= rst
         let r = row (s ^. sIndex) rst
@@ -146,10 +146,9 @@ changeCurrentFieldName n = do
     uFieldNames ns _ (Back (AsTable tv)) = Back $ AsTable (set tvFieldNames ns tv)
     uFieldNames ns _ (Back (AsRows tv)) = Back $ AsRows (updateRvNames ns tv)
 
-changeCurrentFieldType :: Text -> EventM Name State ()
-changeCurrentFieldType t = do
+changeCurrentFieldType :: FieldType -> EventM Name State ()
+changeCurrentFieldType nt = do
     s <- get
-    let nt = read $ T.unpack t
     ts <- uses sRowStore types
     when (ts  !! (s ^. sCurrentField) /= nt) $
         sRowStore %= changeFieldType nt (fromIntegral $ s ^. sCurrentField)

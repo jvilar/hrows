@@ -15,7 +15,11 @@ module TUI.Base (
     , ValueEditor(..)
     , veEditor
     , veIsError
+    , veType
+    , veField
+    , veContent
     , updateValueViewer
+    , vvValue
     , updateEditor
     , mkEditor
     , renderName
@@ -31,14 +35,14 @@ module TUI.Base (
 import Brick ( AttrName, AttrMap, attrName, attrMap, Widget (..), Size (Fixed), Context (availWidth), getContext, txt, withAttr )
 import Brick.Widgets.Dialog (buttonSelectedAttr)
 import Brick.Widgets.Edit(Editor, getEditContents, applyEdit, editor, renderEditor)
-import Control.Lens (Lens', makeLenses, (^.), set, over)
+import Control.Lens (Lens', makeLenses, (^.), set, over, lens, Getter, to)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Zipper qualified as Tz
 import Data.Vector qualified as V
 import Graphics.Vty.Attributes (defAttr, bold, reverseVideo, withStyle, withBackColor, withForeColor, black, rgbColor)
 
-import Model.Field ( Field, isError, toString )
+import Model.Field ( Field, isError, toString, FieldType, typeOf )
 import Model.RowStore (RowStore, isFormula)
 import Brick.Widgets.List (List, list)
 import Model (row)
@@ -86,6 +90,8 @@ myAttrMap = attrMap defAttr [ (selectedElementAttr, withStyle defAttr reverseVid
 
 data ValueEditor = ValueEditor { _veEditor :: Editor Text Name
                                , _veIsError :: Bool
+                               , _veType :: FieldType
+                               , _veField :: Field
                                }
 
 makeLenses ''ValueEditor
@@ -95,14 +101,24 @@ type ValueViewer = Either ValueEditor Field
 updateValueViewer :: Field -> ValueViewer -> ValueViewer
 updateValueViewer f = either (Left . updateEditor f) (const $ Right f)
 
+vvValue :: Lens' ValueViewer Field
+vvValue = lens getter setter
+    where getter (Left ve) = ve ^. veField
+          getter (Right f) = f
+          setter (Left ve) f = Left $ set veField f ve
+          setter (Right _) f = Right f
+
 updateEditor :: Field -> ValueEditor -> ValueEditor
-updateEditor f ve | t == T.concat (getEditContents $ ve ^. veEditor) = set veIsError (isError f) ve
-                  | otherwise = over veEditor (applyEdit (const $ Tz.textZipper [t] $ Just 1))
-                                $ set veIsError (isError f) ve
-                  where t = toString f
+updateEditor f ve = over veEditor (applyEdit (const $ Tz.textZipper [toString f] $ Just 1))
+                         $ set veIsError (isError f)
+                         $ set veType (typeOf f)
+                         $ set veField f ve
+
+veContent :: Getter ValueEditor Text
+veContent = to $ T.concat . getEditContents . _veEditor
 
 mkEditor :: Name -> Field -> ValueEditor
-mkEditor n f = ValueEditor (editor n (Just 1) $ toString f) (isError f)
+mkEditor n f = ValueEditor (editor n (Just 1) $ toString f) (isError f) (typeOf f) f
 
 renderValue :: Bool -> Text -> Widget Name
 renderValue = renderElement

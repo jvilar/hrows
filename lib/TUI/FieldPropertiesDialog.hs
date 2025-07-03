@@ -21,15 +21,15 @@ module TUI.FieldPropertiesDialog (
   ) where
 
 
-import Brick ( Widget (Widget), txt, joinBorders, hLimitPercent, withAttr, (<=>), (<+>), getContext, Size (..), vSize, availWidthL, render )
+import Brick ( Widget (Widget), txt, joinBorders, hLimitPercent, withAttr, (<=>), (<+>), getContext, Size (..), vSize, availWidthL, render, str )
 import Brick.Widgets.Border ( borderWithLabel, hBorder )
 import Brick.Widgets.Center ( centerLayer, hCenter )
 import Brick.Widgets.Dialog ( Dialog, dialog, renderDialog, dialogWidthL, setDialogFocus )
-import Control.Lens ( makeLenses, over, (^.), lens, set )
+import Control.Lens ( makeLenses, over, (^.), lens, set, view )
 import Data.Maybe(fromMaybe, isJust)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Model.Expression ( FieldType(TypeEmpty), ToField(toField), Field, Formula )
+import Model.Expression ( FieldType(TypeEmpty), ToField(toField), Field, Formula, convertKeepText )
 
 import TUI.Base
     ( DialogButton(..),
@@ -42,7 +42,7 @@ import TUI.Base
       updateEditor,
       mkEditor,
       renderValueViewer,
-      renderValueEditor )
+      renderValueEditor, updateValueViewer, vvValue, veContent )
 import Brick.Widgets.Edit (Editor)
 
 data FieldPropertiesFocus = FpName | FpValue | FpType | FpFMark | FpFormula | FpOK | FpCancel deriving (Eq, Ord, Enum, Bounded)
@@ -50,7 +50,7 @@ data FieldPropertiesFocus = FpName | FpValue | FpType | FpFMark | FpFormula | Fp
 data FieldPropertiesDialog = FieldPropertiesDialog { _fpTitle :: Text
                                      , _fpName :: ValueEditor
                                      , _fpValue :: ValueViewer
-                                     , _fpType :: Text
+                                     , _fpType :: FieldType
                                      , _fpIsFormula :: Bool
                                      , _fpFormula :: ValueEditor
                                      , _fpFocus :: FieldPropertiesFocus
@@ -75,7 +75,7 @@ instance HasEditor FieldPropertiesDialog where
                                       FpFormula -> set fpFormula ve fp
                                       _ -> error "Bad focus in field properties dialog when setting editor"
 
-mkFieldPropertiesDialog :: Text -> Bool -> Field -> Text -> Maybe Formula -> FieldPropertiesDialog
+mkFieldPropertiesDialog :: Text -> Bool -> Field -> FieldType -> Maybe Formula -> FieldPropertiesDialog
 mkFieldPropertiesDialog fname isFormula field fType mFormula = FieldPropertiesDialog fname
                             (mkEditor FieldPropertiesNameEditor $ toField fname)
                             (if isFormula
@@ -110,7 +110,7 @@ renderFieldPropertiesDialog fp = renderResizeDialog 95 (fp ^. fpDialog) $ do
                          <=>
                          hBorder
                          <=>
-                         (txt "Type: " <+> wFocus FpType (txt $ fp ^. fpType))
+                         (txt "Type: " <+> wFocus FpType (str . show $ fp ^. fpType))
                          <=>
                          hBorder
                          <=>
@@ -148,16 +148,17 @@ fixFocus isUp fp = case fp ^. fpFocus of
 
 fieldPropertiesNextType :: FieldPropertiesDialog -> FieldPropertiesDialog
 fieldPropertiesNextType fp
-   | fp ^. fpFocus /= FpType || t == maxBound || t' == TypeEmpty = fp
-   | otherwise = set fpType (T.pack $ show t') fp
-   where t = read . T.unpack $ fp ^. fpType
-         t' = succ t
+   | fp ^. fpType == maxBound = fp
+   | otherwise = changeType (succ $ fp ^. fpType) fp
 
 fieldPropertiesPrevType :: FieldPropertiesDialog -> FieldPropertiesDialog
 fieldPropertiesPrevType fp
-   | fp ^. fpFocus /= FpType || t == minBound = fp
-   | otherwise = set fpType (T.pack $ show t') fp
-   where t :: FieldType
-         t = read . T.unpack $ fp ^. fpType
-         t' = pred t
+   | fp ^. fpType == minBound = fp
+   | otherwise = changeType (pred $ fp ^. fpType) fp
+
+changeType :: FieldType -> FieldPropertiesDialog -> FieldPropertiesDialog
+changeType t fp
+   | fp ^. fpFocus /= FpType || t == TypeEmpty = fp
+   | otherwise = set fpType t $ over fpValue (updateValueViewer f') fp
+   where f' = convertKeepText t $ either (toField . view veContent) id (fp ^. fpValue)
 
