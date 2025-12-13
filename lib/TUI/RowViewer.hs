@@ -15,7 +15,7 @@ module TUI.RowViewer (
   ) where
 
 
-import Brick ( Widget(Widget, render), availHeight, Size(..), vLimit, getContext, hBox, hLimit )
+import Brick ( str, Widget(Widget, render), availHeight, Size(..), vLimit, getContext, hBox, hLimit )
 import Brick.Widgets.Border ( vBorder )
 import Brick.Widgets.List ( List, listElements, listSelected, listReplace, listSelectedElement, list, renderList, listMoveTo )
 import Control.Lens ( makeLenses, over, (^.), lens, set, element )
@@ -78,11 +78,14 @@ fieldList rst = list FieldNames (V.fromList $ fnames rst) 1
 renderRowViewer :: RowViewer -> Widget Name
 renderRowViewer rv = Widget Greedy Fixed $ do
     h <- availHeight <$> getContext
-    let v = min (V.length $ listElements $ rv ^. rvFieldNames) (h-2)
-    render $ vLimit v $ hBox [
-                hLimit (rv ^. rvFieldWidth) (renderList renderName False $ rv ^. rvFieldNames)
-                , vBorder
-                , renderList (const renderValueViewer) False
-                      $ rv ^. rvValueList
-              ]
-
+    let l = V.length $ listElements $ rv ^. rvValueList
+    if l == 0
+    then render $ str "No fields"
+    else do
+            let v = min l (h-2)
+            render $ vLimit v $ hBox [
+                        hLimit (rv ^. rvFieldWidth) (renderList renderName False $ rv ^. rvFieldNames)
+                        , vBorder
+                        , renderList (const renderValueViewer) False
+                              $ rv ^. rvValueList
+                      ]
