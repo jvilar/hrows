@@ -246,10 +246,12 @@ handleEventRows e = handleCommonKeys e >>->> case e of
 
 handleEdition :: BrickEvent Name EventType -> EventM Name State ()
 handleEdition e = do
-    B.zoom (sInterface . activeEditor . _Just) $ handleEventValueEditor e
-    use (sInterface . activeEditor) >>= \case
-        Nothing -> return ()
-        Just ve -> updateCurrentField $ ve ^. veField
+    isF <- gets isFormulaCurrentField
+    when (not isF) $ do
+        B.zoom (sInterface . activeEditor . _Just) $ handleEventValueEditor e
+        use (sInterface . activeEditor) >>= \case
+            Nothing -> return ()
+            Just ve -> updateCurrentField $ ve ^. veField
 
 handleInSearchDialog :: Event -> EventM Name State ()
 handleInSearchDialog ev = B.zoom (sInterface . searchDialog . _Just . sdDialog) $ handleDialogEvent ev
