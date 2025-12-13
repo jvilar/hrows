@@ -16,7 +16,7 @@ import System.Console.JMVOptions
 import Col
 import Model.DefaultFileNames (defaultConfFileName)
 import Model.RowStore (writeRowStore, writeRowStoreStdout, RowStore)
-import Model.SourceInfo (mkSourceInfo, PathAndConf(PathAndConf))
+import Model.SourceInfo (mkSourceInfo, mkPathAndConf)
 
 data Options = Options { _colSpec :: ColSpec
                        , _cOptions :: ColOptions
@@ -62,16 +62,15 @@ helpMessage = usageInfo header options
 
 
 doWrite :: Options -> RowStore -> IO ()
-doWrite opts
-    | isNothing (opts ^. oFile) = writeRowStoreStdout (opts ^. cOptions . oOptions)
-    | otherwise = writeRowStore si []
-                  where
-                     Just f = opts ^. oFile
-                     pc = PathAndConf f (if opts ^. genConf
-                                         then Just $ defaultConfFileName f
-                                         else Nothing)
-                     si = mkSourceInfo Nothing pc (opts ^. cOptions . oOptions)
-
+doWrite opts rst
+    | isNothing (opts ^. oFile) = writeRowStoreStdout (opts ^. cOptions . oOptions) rst
+    | otherwise = do
+                     let Just f = opts ^. oFile
+                     pc <- mkPathAndConf f (if opts ^. genConf
+                                            then Just $ defaultConfFileName f
+                                            else Nothing)
+                     let si = mkSourceInfo Nothing pc (opts ^. cOptions . oOptions)
+                     writeRowStore si [] rst
 
 main :: IO ()
 main = do

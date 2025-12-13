@@ -22,16 +22,20 @@ import Model.SourceInfo
 -- |Reads a `RowStore` and its `RowStoreConf`(if any) using a `SourceInfo`
 readRowStore :: SourceInfo -> IO (RowStore, Maybe RowStoreConf)
 readRowStore si = do
-       let PathAndConf fp mconfFp = siPathAndConf si
-           ListatabFormat ltInfo = siFormat si
+       pc <- siPathAndConf si
+       let ListatabFormat ltInfo = siFormat si
            name = siName si
-       mconf <- readConf mconfFp
+       mconf <- if isNewConf pc
+                then return Nothing
+                else readConf $ confPath pc
        let info = case mconf of
                       Nothing -> ltInfo
                       Just f -> case formatConf f of
                                     NoFormatInfo -> ltInfo
                                     ListatabFormat inf -> inf
-       readListatab info (Just fp) >>= buildRowStore mconf name
+       if isNewPath pc
+       then buildRowStore mconf name (Nothing, [])
+       else readListatab info (Just $ path pc) >>= buildRowStore mconf name
 
 buildRowStore :: Maybe RowStoreConf
               -> RowStoreName
@@ -41,7 +45,7 @@ buildRowStore mconf name (mh, ds) = do
        let cnf = case mconf of
                      Just c -> c
                      Nothing -> case mh of
-                                  Nothing -> fromNumberOfFields $ maximum $ map length ds
+                                  Nothing -> fromNumberOfFields $ maximum $ 0:map length ds
                                   Just h -> fromListatabHeader h
            rst = mkRowStore name cnf ds
        case mconf of
@@ -62,10 +66,10 @@ ltHeader rs = case names rs of
 -- |Writes a `RowStore` using a `SourceInfo`
 writeRowStore :: SourceInfo -> [SourceInfo] -> RowStore -> IO ()
 writeRowStore si sInfos rs = do
-      let PathAndConf fp mconfFp = siPathAndConf si
-          ListatabFormat ltInfo = siFormat si
-      writeListatab ltInfo (Just fp) (ltHeader rs) (rows rs)
-      case mconfFp of
+      pc <- siPathAndConf si
+      let ListatabFormat ltInfo = siFormat si
+      writeListatab ltInfo (Just $ path pc) (ltHeader rs) (rows rs)
+      case confPath pc of
           Nothing -> return ()
           Just conf -> do
               r <- try ( BS.writeFile conf

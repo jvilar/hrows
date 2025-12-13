@@ -6,6 +6,7 @@ module Model.SourceInfo ( SourceInfo
                         , SourceName
                         , siName
                         , siFilePath
+                        , siConfFile
                         , siPathAndConf
                         , siFormat
                         , PathAndConf(..)
@@ -35,22 +36,27 @@ import Model.DefaultFileNames (defaultConfFileName)
 type SourceName = Text
 
 
--- |The location of a file possibly including the corresponding configuration file
-data PathAndConf = PathAndConf { path :: FilePath, confPath :: Maybe FilePath } deriving Show
+-- |The location of a file possibly including the corresponding configuration file. If
+-- the file does not exist, the `isNewPath` field is set to `True`. Likewise, if the
+-- configuration file does not exist, the `isNewConf` field is set to `True`.
+data PathAndConf = PathAndConf { path :: FilePath,
+                                 isNewPath :: Bool,
+                                 confPath :: Maybe FilePath,
+                                 isNewConf :: Bool } deriving Show
 
 -- |Build a `PathAndConf` from the path of the file and a `Maybe` of the configuration.
 -- If the configuration is `Nothing` the file system is tested to see if it is appropriate
 -- to use the default config file name (from `defaultConfFileName`). It will be used if the
 -- file is new and the config does not exist or if both the file and the config file exist.
 mkPathAndConf :: FilePath -> Maybe FilePath -> IO PathAndConf
-mkPathAndConf fn Nothing = do
-    let defFn = defaultConfFileName fn
+mkPathAndConf fn mcnf = do
+    let cnf = fromMaybe (defaultConfFileName fn) mcnf
     exFn <- doesFileExist fn
-    exCnf <- doesFileExist defFn
-    return . PathAndConf fn $ if exFn == exCnf
-                              then Just defFn
-                              else Nothing
-mkPathAndConf fn cnf = return $ PathAndConf fn cnf
+    exCnf <- doesFileExist cnf
+    let cnfName = if exFn == exCnf
+                     then Just cnf
+                     else Nothing
+    return $ PathAndConf fn (not exFn) cnfName (not exCnf)
 
 -- |The information about the source of the model. It contains the name,
 -- the file path, and the options related to the format.
@@ -101,8 +107,8 @@ changePathAndConf pc si = si { siFilePath = path pc
                              }
 
 
-siPathAndConf :: SourceInfo -> PathAndConf
-siPathAndConf (SourceInfo _ p cnf _) = PathAndConf p cnf
+siPathAndConf :: SourceInfo -> IO PathAndConf
+siPathAndConf (SourceInfo _ p cnf _) = mkPathAndConf p cnf
 
 
 changeFormatInfo :: FormatInfo -> SourceInfo -> SourceInfo

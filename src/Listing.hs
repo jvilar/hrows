@@ -229,8 +229,11 @@ createAnonDic opts rst = fmap (anonymizeDic (opts ^. anonLength))
                            <$> sequence (fromFile <|> fromRst)
     where fromFile = do
             f <- opts ^. anonFile
-            let sinfo = mkSourceInfo Nothing (PathAndConf f Nothing) def
-            return (keys (opts ^. anonKey) . fst <$> readRowStore sinfo)
+            let readAction = do
+                               pc <- mkPathAndConf f Nothing
+                               let sinfo = mkSourceInfo Nothing pc def
+                               readRowStore sinfo
+            return (keys (opts ^. anonKey) . fst <$> readAction)
           fromRst = if opts ^. anonymize
                     then Just . return $ keys (opts ^. key) rst
                     else Nothing

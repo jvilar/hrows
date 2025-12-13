@@ -171,7 +171,7 @@ askFile dialog button action parent = do
                     conf = if chk
                            then defaultConfFileName <$> file
                            else Nothing
-                action (PathAndConf fp conf)
+                action (PathAndConf fp True conf True)
 
 askImportFrom :: DialogFunction (FilePath, Char, HeaderType)
 askImportFrom dmg action parent = do

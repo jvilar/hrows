@@ -85,10 +85,10 @@ logMessage t = sLog %= reverse . take 10 . (t:) . reverse
 initialState :: RowStore -> Maybe (SourceInfo, [SourceInfo]) -> State
 initialState rst msi = State { _sRowStore = rst
                              , _sSourceInfo = msi
-                             , _sIndex = 0
+                             , _sIndex = if size rst > 0 then 0 else -1
                              , _sCurrentField = 0
                              , _sInterface = In . Back . AsRows $ mkRowViewer rst 0
-                             , _sLog = []
+                             , _sLog = [T.pack $ show $ fnames rst ]
                              }
 
 currentFieldName :: State -> Text
@@ -317,8 +317,8 @@ doSave = do
         Nothing -> logMessage "No source info available"
         Just (si, sis) -> do
             rst <- use sRowStore
-            let pc = siPathAndConf si
-                si' = case confPath pc of
+            pc <- liftIO $ siPathAndConf si
+            let si' = case confPath pc of
                          Nothing -> let
                                        cnf = defaultConfFileName $ path pc
                                     in changePathAndConf (pc { confPath = Just cnf }) si
@@ -334,9 +334,10 @@ doBackup = use sRowStore >>= (\case
         case msi of
             Nothing -> return ()
             Just (si, sis) -> do
-                let conf = defaultBackupFileName <$> confPath (siPathAndConf si)
-                    fp = defaultBackupFileName $ path (siPathAndConf si)
-                    si' = changePathAndConf (PathAndConf fp conf) si
+                pc <- liftIO $ siPathAndConf si
+                let conf = defaultBackupFileName <$> confPath pc
+                    fp = defaultBackupFileName $ path pc
+                    si' = changePathAndConf (PathAndConf fp True conf True) si
                 rst <- use sRowStore
                 (liftIO . try $ writeRowStore si' sis rst) >>= \case
                     Right _ -> return ()
@@ -351,8 +352,9 @@ doFinalBackup = use sRowStore >>= (\case
         case msi of
             Nothing -> return ()
             Just (si, _) -> do
-                let conf = defaultBackupFileName <$> confPath (siPathAndConf si)
-                    fp = defaultBackupFileName $ path (siPathAndConf si)
+                pc <- liftIO $ siPathAndConf si
+                let conf = defaultBackupFileName <$> confPath pc
+                    fp = defaultBackupFileName $ path pc
                 void . liftIO $ ((try $ do
                                     removeFile fp
                                     maybe (return ()) removeFile conf) :: IO (Either SomeException ())))

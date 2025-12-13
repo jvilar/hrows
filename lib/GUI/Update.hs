@@ -120,4 +120,4 @@ sourceInfoFromDialogResult (fp, c, t) = let
           ltSeparator = c
           , ltHeaderType = t
         }
-  in mkSourceInfo Nothing (PathAndConf fp Nothing) lti
+  in mkSourceInfo Nothing (PathAndConf fp True Nothing True) lti

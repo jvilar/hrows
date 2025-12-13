@@ -65,9 +65,9 @@ applyCommand (AddSourceFromSourceInfo name si) _ _  = do
 
 applyCommand WriteBackup model si = do
     when (changed `from` model) $ do
-        let conf = defaultBackupFileName <$> confPath (siPathAndConf si)
-            fp = defaultBackupFileName $ path (siPathAndConf si)
-            si' = changePathAndConf (PathAndConf fp conf) si
+        let conf = defaultBackupFileName <$> siConfFile si
+            fp = defaultBackupFileName $ siFilePath si
+            si' = changePathAndConf (PathAndConf fp True conf True) si
         r <- liftIO $ try $ writeRowStore si' (getSourceInfos model) <@ model
         case r of
             Right _ -> return ()
@@ -76,8 +76,8 @@ applyCommand WriteBackup model si = do
 applyCommand BackupOnExit model si
     | changed `from` model = applyCommand WriteBackup model si
     | otherwise = do
-                    let conf = defaultBackupFileName <$> confPath (siPathAndConf si)
-                        fp = defaultBackupFileName $ path (siPathAndConf si)
+                    let conf = defaultBackupFileName <$> siConfFile si
+                        fp = defaultBackupFileName $ siFilePath si
                     void . liftIO $ ((try $ do
                               removeFile fp
                               maybe (return ()) removeFile conf) :: IO (Either SomeException ()))

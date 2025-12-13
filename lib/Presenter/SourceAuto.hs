@@ -15,5 +15,5 @@ sourceAuto = accumM_ update
 
 update :: SourceInfo -> SourceCommand -> PresenterM SourceInfo
 update _ (SetMainSource si) = do
-    sendGUIM . ChangeTitle . T.pack . path $ siPathAndConf si
+    sendGUIM . ChangeTitle . T.pack $ siFilePath si
     return si
