@@ -8,17 +8,21 @@ nix:
     - haskellPackages.gi-gobject
     - lerc
     - libdatrie
+    - libdeflate
     - libepoxy
     - libselinux
     - libsepol
     - libsysprof-capture
     - libthai
+    - libwebp
     - libxkbcommon
     - pcre2
     - pkg-config
     - util-linux
     - xorg.libXdmcp
     - xorg.libXtst
+    - xz
+    - zstd
 
 packages:
 - .
