@@ -56,6 +56,8 @@ data Name = DButton DialogButton
           | SearchList
           | FieldPropertiesNameEditor
           | FieldPropertiesValueEditor
+          | FieldPropertiesTypeSelector
+          | FieldPropertiesFormulaMark
           | FieldPropertiesFormulaEditor
           | ValueColumn Int
           | ValueViewer Int

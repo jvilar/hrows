@@ -94,6 +94,18 @@ handleEventQuit _ = return ()
 
 handleEventFieldProperties :: BrickEvent Name EventType -> EventM Name State ()
 handleEventFieldProperties (VtyEvent (EvKey k ms)) = handleKeyFieldProperties k ms
+handleEventFieldProperties (MouseDown n BLeft [] _) = case n of
+    DButton OkButton -> acceptFieldProperties
+    DButton CancelButton -> closeFieldPropertiesDialog
+    FieldPropertiesNameEditor -> focus .= FpName
+    FieldPropertiesValueEditor -> focus .= FpValue
+    FieldPropertiesTypeSelector -> focus .= FpType
+    FieldPropertiesFormulaMark -> do
+                                    focus .= FpFMark
+                                    switchIsFormula
+    FieldPropertiesFormulaEditor -> focus .= FpFormula
+    _ -> return ()
+  where focus = sInterface . fieldProperties . _Just . fpFocus
 handleEventFieldProperties _ = return ()
 
 handleKeyFieldProperties :: Key -> [Modifier] -> EventM Name State ()

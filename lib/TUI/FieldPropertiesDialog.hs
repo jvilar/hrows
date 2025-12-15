@@ -21,7 +21,7 @@ module TUI.FieldPropertiesDialog (
   ) where
 
 
-import Brick ( Widget (Widget), txt, joinBorders, hLimitPercent, withAttr, (<=>), (<+>), getContext, Size (..), vSize, availWidthL, render, str )
+import Brick ( Widget (Widget), txt, joinBorders, hLimitPercent, withAttr, (<=>), (<+>), getContext, Size (..), vSize, availWidthL, render, str, clickable )
 import Brick.Widgets.Border ( borderWithLabel, hBorder )
 import Brick.Widgets.Center ( centerLayer, hCenter )
 import Brick.Widgets.Dialog ( Dialog, dialog, renderDialog, dialogWidthL, setDialogFocus )
@@ -102,25 +102,26 @@ renderResizeDialog pWidth d w = let
 
 renderFieldPropertiesDialog :: FieldPropertiesDialog -> Widget Name
 renderFieldPropertiesDialog fp = renderResizeDialog 95 (fp ^. fpDialog) $ do
-                         (txt "Name: " <+> wFocus FpName (renderValueEditor (fp ^. fpName)))
+                         (clickable FieldPropertiesNameEditor $ txt "Name: " <+> wFocus FpName (renderValueEditor (fp ^. fpName)))
                          <=>
                          hBorder
                          <=>
-                         (txt "Value: " <+> renderValueViewer (fp ^. fpValue))
+                         (clickable FieldPropertiesValueEditor $ txt "Value: " <+> renderValueViewer (fp ^. fpValue))
                          <=>
                          hBorder
                          <=>
-                         (txt "Type: " <+> wFocus FpType (str . show $ fp ^. fpType))
+                         (clickable FieldPropertiesTypeSelector $ txt "Type: " <+> wFocus FpType (str . show $ fp ^. fpType))
                          <=>
                          hBorder
                          <=>
-                         ( (if fp ^. fpIsFormula
+                         ( (clickable FieldPropertiesFormulaMark $ if fp ^. fpIsFormula
                            then wFocus FpFMark (txt "[X]")
                            else wFocus FpFMark (txt "[ ]"))
                            <+>
-                           txt " Formula: "
-                           <+>
-                           renderValueEditor (fp ^. fpFormula)
+                           (clickable FieldPropertiesFormulaEditor $ txt " Formula: "
+                             <+>
+                             renderValueEditor (fp ^. fpFormula)
+                           )
                          )
                          <=>
                          hBorder
