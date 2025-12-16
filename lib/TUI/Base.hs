@@ -111,10 +111,13 @@ vvValue = lens getter setter
           setter (Right _) f = Right f
 
 updateEditor :: Field -> ValueEditor -> ValueEditor
-updateEditor f ve = over veEditor (applyEdit (const $ Tz.textZipper [toString f] $ Just 1))
+updateEditor f ve = over veEditor (applyEdit chZipper)
                          $ set veIsError (isError f)
                          $ set veType (typeOf f)
                          $ set veField f ve
+    where chZipper z = let
+                          c = Tz.cursorPosition z
+                       in Tz.moveCursorClosest c . Tz.textZipper [toString f] $ Just 1
 
 veContent :: Getter ValueEditor Text
 veContent = to $ T.concat . getEditContents . _veEditor
