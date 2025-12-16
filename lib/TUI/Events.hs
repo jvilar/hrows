@@ -57,8 +57,11 @@ handleInLevel e (Back bl) = handleEventBackLevel bl e
 
 handleGlobalEvent :: BrickEvent Name EventType -> EventM Name State Bool
 handleGlobalEvent (VtyEvent (EvKey (KChar 'q') [MCtrl])) = do
-            sInterface . quitDialog .= Just (mkYesNoDialog "Are you sure you want to quit?" "Quit")
-            return True
+    rst <- use sRowStore
+    if changed rst
+    then sInterface . quitDialog .= Just (mkYesNoDialog "Are you sure you want to quit?" "Quit")
+    else doQuit
+    return True
 handleGlobalEvent (VtyEvent (EvKey (KChar 'w') [MCtrl])) = doSave >> return True
 handleGlobalEvent _ = return False
 
