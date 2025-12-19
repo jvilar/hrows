@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module TUI.Level (
   DialogLevel(..)
@@ -41,7 +43,7 @@ import Brick.Widgets.Border
 import Brick.Widgets.Center
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Data.Text (Text)
-import Model.Expression.RecursionSchemas ( Fix(..), bottomUp, cata, para )
+import Model.Expression.RecursionSchemas ( Fix(..), bottomUp, cata, para, applyToFirst )
 
 import TUI.Base
 import TUI.FieldPropertiesDialog
@@ -79,8 +81,17 @@ isBack _ = False
 
 type Interface = Fix Level
 
+instance Show(Interface) where
+    show = cata sl
+        where sl (WithDialog _ x) = "WithDialog(" ++ x ++ ")"
+              sl (Zoomed _ x) = "Zoomed(" ++ x ++ ")"
+              sl (Back _) = "Back"
+
 updateLevels :: (Level Interface -> Level Interface) -> Interface -> Interface
 updateLevels = bottomUp
+
+updateLevel :: (Level Interface -> Maybe (Level Interface)) -> Interface -> Interface
+updateLevel = applyToFirst
 
 instance HasEditor DialogLevel where
     editorLens = lens getter setter
@@ -101,57 +112,51 @@ instance HasEditor BackLevel where
               setter (AsTable tv) v = AsTable $ set editorLens v tv
               setter (AsRows rv) v = AsRows $ set editorLens v rv
 
-getLevel :: (forall i . Level i -> Bool) -> Interface -> Maybe Interface
+getLevel :: (forall i . Level i -> Bool) -> Interface -> Maybe (Level Interface)
 getLevel f = para search
-    where search :: Level (Interface, Maybe Interface) -> Maybe Interface
-          search l@(WithDialog dl (i, ms)) = if f l then Just (In $ WithDialog dl i) else ms
-          search l@(Zoomed zl (i, _)) = if f l then Just (In $ Zoomed zl i) else Nothing
-          search l@(Back bl) = if f l then Just (In $ Back bl) else Nothing
+    where search :: Level (Interface, Maybe (Level Interface)) -> Maybe (Level Interface)
+          search l@(WithDialog dl (i, ms)) = if f l then Just (WithDialog dl i) else ms
+          search l@(Zoomed zl (i, _)) = if f l then Just (Zoomed zl i) else Nothing
+          search l@(Back bl) = if f l then Just (Back bl) else Nothing
 
 removeLevel :: (forall i . Level i -> Bool) -> Interface -> Interface
-removeLevel f = updateLevels remL
-    where remL l@(WithDialog _ i) = if f l then out i else l
-          remL l@(Zoomed _ i) = if f l then out i else l
-          remL l@(Back _) = if f l then error "Cannot remove back" else l
+removeLevel f = updateLevel remL
+    where remL l@(WithDialog _ i) = if f l then Just (out i) else Nothing
+          remL l@(Zoomed _ i) = if f l then Just (out i) else Nothing
+          remL l@(Back _) = if f l then error "Cannot remove back" else Nothing
 
 levelDialog :: Lens' Interface (Maybe DialogLevel)
 levelDialog = lens getter setter
-    where getter i = case getLevel isDialog i of
-                         Just (In (WithDialog dl _)) -> Just dl
-                         _ -> Nothing
+    where getter i = do
+                       WithDialog dl _ <- getLevel isDialog i
+                       return dl
 
           setter i Nothing = removeLevel isDialog i
-          setter i (Just dl) = updateLevels (addD dl) i
-          addD :: DialogLevel -> Level Interface -> Level Interface
-          addD _ (WithDialog _ i) = out i
-          addD dl (Zoomed zl (In (WithDialog _ i))) = WithDialog dl (In $ Zoomed zl i)
-          addD _ z@(Zoomed _ _) = z
-          addD dl t@(Back _) = WithDialog dl (In t)
+          setter i (Just dl) = updateLevel (addD dl) i
+          addD dl (WithDialog _ i) = Just $ WithDialog dl i
+          addD dl l = Just $ WithDialog dl (In l)
 
 levelZoom :: Lens' Interface (Maybe ZoomLevel)
 levelZoom = lens getter setter
-    where getter i = case getLevel isZoomed i of
-                         Just (In (Zoomed zl _)) -> Just zl
-                         _ -> Nothing
+    where getter i = do
+                        Zoomed zl _ <- getLevel isZoomed i
+                        return zl
 
           setter i Nothing = removeLevel isZoomed i
-          setter i (Just z) = updateLevels (addZ z) i
-          addZ :: ZoomLevel -> Level Interface -> Level Interface
-          addZ _ s@(WithDialog _ _) = s
-          addZ _ (Zoomed _ i) = out i
-          addZ z t@(Back _) = Zoomed z (In t)
+          setter i (Just z) = updateLevel (addZ z) i
+          addZ _ (WithDialog _ _) = Nothing
+          addZ z (Zoomed _ i) = Just $ Zoomed z i
+          addZ z t@(Back _) = Just $ Zoomed z (In t)
 
 levelBack :: Lens' Interface (Maybe BackLevel)
 levelBack = lens getter setter
     where getter i = do
-                       In (Back bl) <- getLevel isBack i
+                       Back bl <- getLevel isBack i
                        return bl
           setter i Nothing = removeLevel isBack i
-          setter i (Just bl) = updateLevels (addB bl) i
-          addB :: BackLevel -> Level Interface -> Level Interface
-          addB _ s@(WithDialog _ _) = s
-          addB _ z@(Zoomed _ _) = z
-          addB bl (Back _) = Back bl
+          setter i (Just bl) = updateLevel (addB bl) i
+          addB bl (Back _) = Just $ Back bl
+          addB _ _ = Nothing
 
 searchDialog :: Lens' Interface (Maybe SearchDialog)
 searchDialog = lens getter setter

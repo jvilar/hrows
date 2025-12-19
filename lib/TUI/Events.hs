@@ -213,7 +213,11 @@ handleEventZoomLevel (NormalZoom _) _ = return False
 handleCommonKeys :: BrickEvent Name EventType -> EventM Name State Bool
 handleCommonKeys (VtyEvent (EvKey (KChar c) [MCtrl])) = case c of
     'f' -> activateSearch >> return True
-    'r' -> toggleProperties >> return True
+    -- 'r' -> toggleProperties >> return True
+    'r' -> do
+              toggleProperties
+              use sInterface >>= logMessage . T.pack . show
+              return True
     't' -> toggleTable >> return True
     'z' -> toggleZoom >> return True
     '\t' -> forward >> return True

@@ -1,6 +1,7 @@
 module Model.Expression.RecursionSchemas where
 
 import Control.Arrow((>>>), (<<<), (&&&))
+import Data.Maybe(fromMaybe)
 
 newtype Fix t = In { out :: t (Fix t) }
 
@@ -14,6 +15,9 @@ bottomUpM f v = mapM (bottomUpM f) (out v) >>= fmap In . f
 
 topDown  :: Functor a => (a (Fix a) -> a (Fix a)) -> Fix a -> Fix a
 topDown f = In <<< fmap (topDown f) <<< f <<< out
+
+applyToFirst :: Functor a => (a (Fix a) -> Maybe (a (Fix a))) -> Fix a -> Fix a
+applyToFirst f (In v) = In $ fromMaybe (fmap (applyToFirst f) v) (f v)
 
 cata :: Functor f => Algebra f a -> Fix f -> a
 cata f = out >>> fmap (cata f) >>> f
