@@ -15,9 +15,30 @@ packages:
   original:
     commit: 5ddff6621f5f76304340c8431a01b0535c42e313
     git: https://github.com/jvilar/jmvOptions.git
+- completed:
+    hackage: gi-gtk-hs-0.3.18@sha256:33a0db68546e8a6c5489e98e147fd38a2ea82ee94583957e97670853d5420321,2004
+    pantry-tree:
+      sha256: 6d0fb2e398341c7b03c5a88b75a2e01fc6e86567e152c0a5e5e3c448ed9c1dd9
+      size: 1137
+  original:
+    hackage: gi-gtk-hs-0.3.18@sha256:33a0db68546e8a6c5489e98e147fd38a2ea82ee94583957e97670853d5420321,2004
+- completed:
+    hackage: gi-gdk-3.0.30@sha256:b45f49758d48eb1171174a361bbf5eff70d0103f9ea70dfbec101e92656fc2dd,850
+    pantry-tree:
+      sha256: b0c61db0d07c11198a18d79a96d5eb9090515500018bcfcc21b364c1425b40e8
+      size: 199
+  original:
+    hackage: gi-gdk-3.0.30@sha256:b45f49758d48eb1171174a361bbf5eff70d0103f9ea70dfbec101e92656fc2dd,850
+- completed:
+    hackage: gi-gtk-3.0.43@sha256:2e33d82be6bfe3ac25f7562bac54c7d27a7968404037dc860bac1969c6b1a39c,40306
+    pantry-tree:
+      sha256: 50efdf1693a92838a91f267d4a1280a93bc7467dc5b72b5fbad5b0f8a85d0ae1
+      size: 359
+  original:
+    hackage: gi-gtk-3.0.43
 snapshots:
 - completed:
-    sha256: 069c8189232279d04bd107557d3a62132c04ae5ce3c710649e6b40f67f10b9d5
-    size: 684285
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/27.yaml
-  original: lts-23.27
+    sha256: 4bc8e0388916c4000645c068dff642482d6ed1b68b747c2d4d444857979963e0
+    size: 726334
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/24.yaml
+  original: lts-24.24

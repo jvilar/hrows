@@ -1,9 +1,12 @@
-resolver: lts-23.27
+resolver: lts-24.24
 
 nix:
   enable: true
   packages:
     - gtk3
+    - gtk4
+    - graphene
+    - gobject-introspection
     - haskellPackages.freetype2
     - haskellPackages.gi-gobject
     - lerc
@@ -32,4 +35,8 @@ extra-deps:
   commit: 5ddff6621f5f76304340c8431a01b0535c42e313
 - git: https://github.com/jvilar/auto.git
   commit: c44b4a5fe12c7818a98eb1fe6f65de202050a0d0
+- gi-gtk-hs-0.3.18@sha256:33a0db68546e8a6c5489e98e147fd38a2ea82ee94583957e97670853d5420321,2004
+- gi-gdk-3.0.30@sha256:b45f49758d48eb1171174a361bbf5eff70d0103f9ea70dfbec101e92656fc2dd,850
+- gi-gtk-3.0.43
+
 
