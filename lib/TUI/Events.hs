@@ -213,11 +213,7 @@ handleEventZoomLevel (NormalZoom _) _ = return False
 handleCommonKeys :: BrickEvent Name EventType -> EventM Name State Bool
 handleCommonKeys (VtyEvent (EvKey (KChar c) [MCtrl])) = case c of
     'f' -> activateSearch >> return True
-    -- 'r' -> toggleProperties >> return True
-    'r' -> do
-              toggleProperties
-              use sInterface >>= logMessage . T.pack . show
-              return True
+    'r' -> toggleProperties >> return True
     't' -> toggleTable >> return True
     'z' -> toggleZoom >> return True
     '\t' -> forward >> return True
@@ -235,11 +231,11 @@ handleCommonKeys (VtyEvent (EvKey k [])) = case k of
 handleCommonKeys _ = return False
 
 handleEventBackLevel :: BackLevel -> BrickEvent Name EventType -> EventM Name State ()
-handleEventBackLevel (AsTable _) e = handleEventTable e
-handleEventBackLevel (AsRows _) e = handleEventRows e
+handleEventBackLevel (AsTable _) e = handleCommonKeys e >>->> handleEventTable e
+handleEventBackLevel (AsRows _) e = handleCommonKeys e >>->> handleEventRows e
 
 handleEventTable :: BrickEvent Name EventType -> EventM Name State ()
-handleEventTable e = handleCommonKeys e >>->> case e of
+handleEventTable e = case e of
     VtyEvent (EvKey KUp []) -> backward
     VtyEvent (EvKey KDown []) -> forward
     VtyEvent (EvKey KLeft []) -> fieldBackward
@@ -251,7 +247,7 @@ handleEventTable e = handleCommonKeys e >>->> case e of
 
 
 handleEventRows :: BrickEvent Name EventType -> EventM Name State ()
-handleEventRows e = handleCommonKeys e >>->> case e of
+handleEventRows e = case e of
     VtyEvent (EvKey KPageUp []) -> backward
     VtyEvent (EvKey KPageDown []) -> forward
     VtyEvent (EvKey KUp []) -> fieldBackward

@@ -116,7 +116,7 @@ getLevel :: (forall i . Level i -> Bool) -> Interface -> Maybe (Level Interface)
 getLevel f = para search
     where search :: Level (Interface, Maybe (Level Interface)) -> Maybe (Level Interface)
           search l@(WithDialog dl (i, ms)) = if f l then Just (WithDialog dl i) else ms
-          search l@(Zoomed zl (i, _)) = if f l then Just (Zoomed zl i) else Nothing
+          search l@(Zoomed zl (i, ms)) = if f l then Just (Zoomed zl i) else ms
           search l@(Back bl) = if f l then Just (Back bl) else Nothing
 
 removeLevel :: (forall i . Level i -> Bool) -> Interface -> Interface
