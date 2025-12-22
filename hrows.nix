@@ -6,7 +6,7 @@
 }:
 mkDerivation {
   pname = "hrows";
-  version = "0.4.1.0";
+  version = "0.4.1.1";
   src = ./.;
   isLibrary = true;
   isExecutable = true;

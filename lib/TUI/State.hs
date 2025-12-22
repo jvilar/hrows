@@ -80,7 +80,8 @@ data State = State { _sRowStore :: RowStore
 makeLenses ''State
 
 logMessage :: Text -> EventM Name State ()
-logMessage t = sLog %= reverse . take 10 . (t:) . reverse
+-- logMessage t = sLog %= reverse . take 10 . (t:) . reverse
+logMessage _ = return ()
 
 initialState :: RowStore -> Maybe (SourceInfo, [SourceInfo]) -> State
 initialState rst msi = State { _sRowStore = rst
@@ -88,7 +89,7 @@ initialState rst msi = State { _sRowStore = rst
                              , _sIndex = if size rst > 0 then 0 else -1
                              , _sCurrentField = 0
                              , _sInterface = In . Back . AsRows $ mkRowViewer rst 0
-                             , _sLog = [T.pack $ show $ fnames rst ]
+                             , _sLog = []
                              }
 
 currentFieldName :: State -> Text
