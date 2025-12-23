@@ -29,8 +29,8 @@ library:
   - data-default
   - directory
   - filepath
-  - gi-gdk
-  - gi-gtk
+  - gi-gdk3
+  - gi-gtk3
   - haskell-gi-base
   - jmvOptions >= 0.2
   - lens
@@ -54,7 +54,7 @@ executables:
     - hrows
     - auto
     - data-default
-    - gi-gtk
+    - gi-gtk3
     - gi-gtk-hs
     - jmvOptions >= 0.2
     - lens
