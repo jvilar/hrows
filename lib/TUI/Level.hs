@@ -79,6 +79,16 @@ isBack :: Level i -> Bool
 isBack (Back _) = True
 isBack _ = False
 
+levelInfo :: Lens' (Level i) (Maybe i)
+levelInfo = lens getter setter
+    where getter (WithDialog _ i) = Just i
+          getter (Zoomed _ i) = Just i
+          getter (Back _) = Nothing
+
+          setter (WithDialog dl _) (Just i) = WithDialog dl i
+          setter (Zoomed dl _) (Just i) = Zoomed dl i
+          setter l _ = l
+
 type Interface = Fix Level
 
 instance Show(Interface) where
@@ -112,18 +122,30 @@ instance HasEditor BackLevel where
               setter (AsTable tv) v = AsTable $ set editorLens v tv
               setter (AsRows rv) v = AsRows $ set editorLens v rv
 
+instance HasEditor Interface where
+    editorLens = lens getter setter
+        where getter (In (WithDialog dl _)) = dl ^. editorLens
+              getter (In (Zoomed zl _)) = zl ^. editorLens
+              getter (In (Back bl)) = bl ^. editorLens
+
+              setter _ Nothing = error "Cannot remove editor"
+              setter (In (WithDialog dl i)) (Just ve) = In (WithDialog (set editorLens (Just ve) dl) i)
+              setter (In (Zoomed zl i)) (Just ve) = In (Zoomed (set editorLens (Just ve) zl) i)
+              setter (In (Back bl)) (Just ve) = In (Back (set editorLens (Just ve) bl))
+
 getLevel :: (forall i . Level i -> Bool) -> Interface -> Maybe (Level Interface)
 getLevel f = para search
     where search :: Level (Interface, Maybe (Level Interface)) -> Maybe (Level Interface)
-          search l@(WithDialog dl (i, ms)) = if f l then Just (WithDialog dl i) else ms
-          search l@(Zoomed zl (i, ms)) = if f l then Just (Zoomed zl i) else ms
-          search l@(Back bl) = if f l then Just (Back bl) else Nothing
+          search l = if f l
+                     then Just (fst <$> l)
+                     else do
+                            info <- l ^. levelInfo
+                            snd info
 
 removeLevel :: (forall i . Level i -> Bool) -> Interface -> Interface
 removeLevel f = updateLevel remL
-    where remL l@(WithDialog _ i) = if f l then Just (out i) else Nothing
-          remL l@(Zoomed _ i) = if f l then Just (out i) else Nothing
-          remL l@(Back _) = if f l then error "Cannot remove back" else Nothing
+    where remL l | f l = out <$> l ^. levelInfo
+                 | otherwise = Nothing
 
 levelDialog :: Lens' Interface (Maybe DialogLevel)
 levelDialog = lens getter setter
@@ -195,16 +217,7 @@ rowViewer = lens getter setter
           setter i v = set levelBack (fmap AsRows v) i
 
 activeEditor :: Lens' Interface (Maybe ValueEditor)
-activeEditor = lens getter setter
-    where getter (In (WithDialog dl _)) = dl ^. editorLens
-          getter (In (Zoomed zl _)) = zl ^. editorLens
-          getter (In (Back bl)) = bl ^. editorLens
-
-          setter _ Nothing = error "Cannot remove editor"
-          setter (In (WithDialog dl i)) (Just ve) = In (WithDialog (set editorLens (Just ve) dl) i)
-          setter (In (Zoomed zl i)) (Just ve) = In (Zoomed (set editorLens (Just ve) zl) i)
-          setter (In (Back bl)) (Just ve) = In (Back (set editorLens (Just ve) bl))
-
+activeEditor = editorLens
 
 renderDialogLevel :: DialogLevel -> Widget Name
 renderDialogLevel (Searching sd) = renderSearchDialog sd
