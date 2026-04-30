@@ -52,13 +52,17 @@ translatePositions newPos = second getAny . runWriter . bottomUpM tPos
               return $ Position n'
           tPos e = return e
 
+-- |Changes the names according to the list of new names. Returns True if any name changed.
+-- Does not change the names related to sources or for expressions inside the sources.
 translateNames :: [(Text, Text)] -> Expression -> (Expression, Changed)
-translateNames newNames = second getAny . runWriter . bottomUpM tNames
-    where tNames (NamedPosition name _) = do
-              let name' = fromMaybe name (lookup name newNames)
-              when (name' /= name) $ tell (Any True)
-              return $ NamedPosition name' Nothing
-          tNames e = return e
+translateNames newNames = para tNames
+    where tNames :: RAlgebra Node (Expression, Changed)
+          tNames (NamedPosition name _) = let
+                name' = fromMaybe name (lookup name newNames)
+              in (In $ NamedPosition name' Nothing, name' /= name)
+          tNames (FromSource (s, _) (es, _) (_, (er, c)) (es', _)) =
+              (In $ FromSource s es er es', c)
+          tNames e = (In $ fmap (fst . snd) e, or (fmap (snd . snd) e))
 
 -- |If the expression references a single position (i.e. it is a `Position` or a `NamedPosition`),
 -- it returns the position. Otherwise it returns Nothing.

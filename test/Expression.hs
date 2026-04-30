@@ -135,11 +135,14 @@ testAbsolutePositions = describe "Test absolute positions" $
                      it "Checks absolute positions" $
                        evalNoNames [1, 2, 3] "$1 + $2" `shouldBeI` 3
 
-evalNames :: [Int] -> RowStore -> Text -> Field
+evalNames :: [Int] -> RowStore -> Formula -> Field
 evalNames xs rst = let
     fs = map toField xs
     dss = getDataSources rst
   in evaluate fs dss . addPositions mainRst . parseExpression
+
+renameInFormula :: [(Text, Text)] -> Formula -> Formula
+renameInFormula newNames = toFormula . fst . translateNames newNames . parseExpression
 
 testNames :: Spec
 testNames = describe "Test names" $ do
@@ -168,6 +171,11 @@ testNames = describe "Test names" $ do
                                                                (mkKnownNamedPosition "name" 1)
                                                                (mkKnownNamedPosition "value" 2)
                                                  )
+                        it "Renames correctly" $ do
+                            renameInFormula [("first", "other")] "first + second" `shouldBe` "other+second"
+                            renameInFormula [("first", "other"), ("second", "initial")] "first+second" `shouldBe` "other+initial"
+                            renameInFormula [("first", "other"), ("second", "initial")] "first+second@child<-second<->first"
+                                `shouldBe` "other+second@child<-second<->other"
 
 
 
