@@ -51,7 +51,7 @@ import Brick.Widgets.Dialog
 import Brick.Widgets.List hiding (splitAt, reverse)
 import Control.Exception (try, SomeException)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
-import Control.Monad (when, void)
+import Control.Monad (when, void, unless)
 import Control.Monad.IO.Class (liftIO)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -178,7 +178,10 @@ fieldForward :: EventM Name State ()
 fieldForward = uses sCurrentField (+ 1) >>= modify . moveFieldTo
 
 toggleZoom :: EventM Name State ()
-toggleZoom = use (sInterface . levelZoom) >>= \case
+toggleZoom = do
+    rst <- use sRowStore
+    unless (nFields rst == 0) $
+        use (sInterface . levelZoom) >>= \case
                 Just _ -> sInterface . levelZoom .= Nothing
                 Nothing -> modify zoom
 
@@ -191,7 +194,10 @@ zoom :: State -> State
 zoom s = set (sInterface . levelZoom) (Just . NormalZoom $ zoomViewerFromState s) s
 
 toggleProperties :: EventM Name State ()
-toggleProperties = use (sInterface . fieldProperties) >>= \case
+toggleProperties = do
+    rst <- use sRowStore
+    unless (nFields rst == 0) $
+        use (sInterface . fieldProperties) >>= \case
                     Just _ -> sInterface . fieldProperties .= Nothing
                     Nothing -> modify properties
 
@@ -204,10 +210,12 @@ properties s = set (sInterface . fieldProperties) (Just $ mkFieldPropertiesDialo
 
 activateSearch :: EventM Name State ()
 activateSearch = do
-   index <- use sCurrentField
-   tle <- (!! index) <$> uses sRowStore fnames
-   vs <- uses sRowStore (fieldValues (fromIntegral index))
-   sInterface . searchDialog .= Just (mkSearchDialog SearchList maxWidth tle vs)
+   rst <- use sRowStore
+   unless (nFields rst == 0) $ do
+       index <- use sCurrentField
+       tle <- (!! index) <$> uses sRowStore fnames
+       vs <- uses sRowStore (fieldValues (fromIntegral index))
+       sInterface . searchDialog .= Just (mkSearchDialog SearchList maxWidth tle vs)
 
 
 deactivateSearch :: EventM Name State ()

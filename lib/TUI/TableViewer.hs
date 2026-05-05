@@ -21,7 +21,7 @@ import Brick (Widget(Widget, render),
       getContext,
       hBox,
       hLimit,
-      padRight)
+      padRight, str)
 import Brick.Widgets.Border (hBorder, vBorder)
 import Brick.Widgets.List (List, GenericList(listElements), list, renderList)
 import Control.Lens
@@ -69,7 +69,9 @@ buildTable rst = TableViewer ns ws cls
                            $ map (maximum . map T.length) cs
 
 renderTableViewer :: TableViewer -> Widget Name
-renderTableViewer tv = Widget Greedy Fixed $ do
+renderTableViewer tv
+  | null (tv ^. tvColumns) = str "No fields"
+  | otherwise = Widget Greedy Fixed $ do
     h <- availHeight <$> getContext
     w <- availWidth <$> getContext
     let v = min (V.length $ listElements $ head $ tv ^. tvColumns) (h-4)

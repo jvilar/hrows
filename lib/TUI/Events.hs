@@ -17,7 +17,7 @@ import Brick.Widgets.Dialog
 import Brick.Widgets.Edit qualified as Ed
 import Brick.Widgets.List (handleListEvent)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
-import Control.Monad (when)
+import Control.Monad (when, unless)
 import Data.Char (isAlpha)
 import Data.Text qualified as T
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl), Button (..))
@@ -261,12 +261,14 @@ handleEventRows e = case e of
 
 handleEdition :: BrickEvent Name EventType -> EventM Name State ()
 handleEdition e = do
-    isF <- gets isFormulaCurrentField
-    when (not isF) $ do
-        B.zoom (sInterface . activeEditor . _Just) $ handleEventValueEditor e
-        use (sInterface . activeEditor) >>= \case
-            Nothing -> return ()
-            Just ve -> updateCurrentField $ ve ^. veField
+    rst <- use sRowStore
+    unless (nFields rst == 0) $ do
+        isF <- gets isFormulaCurrentField
+        when (not isF) $ do
+            B.zoom (sInterface . activeEditor . _Just) $ handleEventValueEditor e
+            use (sInterface . activeEditor) >>= \case
+                Nothing -> return ()
+                Just ve -> updateCurrentField $ ve ^. veField
 
 handleInSearchDialog :: Event -> EventM Name State ()
 handleInSearchDialog ev = B.zoom (sInterface . searchDialog . _Just . sdDialog) $ handleDialogEvent ev
