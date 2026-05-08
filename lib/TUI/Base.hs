@@ -5,6 +5,7 @@
 module TUI.Base (
     Name(..)
     , DialogButton(..)
+    , DialogEventResult(..)
     , HasEditor(..)
     , selectedElementAttr
     , titleAttr
@@ -66,6 +67,12 @@ data Name = DButton DialogButton
           deriving (Eq, Ord, Show)
 
 data DialogButton = OkButton | CancelButton deriving (Eq, Ord, Show)
+
+-- | The result of handling the event by a dialog can be: DoNothing if then
+-- event is internal to the dialog (e.g. move selection), DialogResult if
+-- the event resulted in some option being selected, and DialogCancel if
+-- the dialog was cancelled. 
+data DialogEventResult r = DoNothing | DialogResult r | DialogCancel deriving (Eq, Show)
 
 class HasEditor i where
     editorLens :: Lens' i (Maybe ValueEditor)

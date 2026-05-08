@@ -26,6 +26,7 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Vector qualified as V
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Button (..))
+
 import TUI.Base
 
 data SearchDialog = SearchDialog { _sdValues :: List Name Text
@@ -56,11 +57,11 @@ listKeys = [KDown, KUp, KPageUp, KPageDown, KHome, KEnd, KLeft, KRight]
 
 
 handleEventSearchDialog :: BrickEvent Name e
-                        -> EventM Name SearchDialog (Either () (Maybe Text))
+                        -> EventM Name SearchDialog (DialogEventResult Text)
 handleEventSearchDialog (VtyEvent key@(EvKey k ms)) =
     case k of
          KEnter | null ms -> returnSelection
-         KEsc | null ms -> return $ Right Nothing
+         KEsc | null ms -> return DialogCancel
          KChar c | null ms && isAlphaNum c -> do
                     vs <- use $ sdValues . listElementsL
                     let mi = case V.findIndex (T.isPrefixOf (T.singleton c)) vs of
@@ -69,40 +70,42 @@ handleEventSearchDialog (VtyEvent key@(EvKey k ms)) =
                                           else V.findIndex (T.isPrefixOf (T.toLower (T.singleton c))) vs
                                Just i -> Just i
                     case mi of
-                        Nothing -> return $ Left ()
+                        Nothing -> return DoNothing
                         Just i -> do
                                      sdValues %= listMoveTo i
-                                     return $ Left ()
+                                     return DoNothing
 
          _ | null ms && k `elem` listKeys -> do
                   B.zoom sdValues $ handleListEvent key
-                  return $ Left ()
+                  return DoNothing
            | otherwise -> do
                   B.zoom sdDialog $ handleDialogEvent key
-                  return $ Left ()
+                  return DoNothing
 handleEventSearchDialog (MouseDown SearchList BLeft [] (Location (_, r))) = do
         vs <- use $ sdValues . listElementsL
         if r < 0 || r >= V.length vs
-            then return $ Left ()
+            then return DoNothing
             else returnSelection
 handleEventSearchDialog (MouseDown SearchList BScrollDown [] _) = do
     B.zoom sdValues (handleListEvent (EvKey KPageDown []))
-    return $ Left ()
+    return DoNothing
 handleEventSearchDialog (MouseDown SearchList BScrollUp [] _) = do
     B.zoom sdValues (handleListEvent (EvKey KPageUp []))
-    return $ Left ()
+    return DoNothing
 handleEventSearchDialog (MouseDown (DButton OkButton) BLeft [] _) = returnSelection
-handleEventSearchDialog (MouseDown (DButton CancelButton) BLeft [] _) = return $ Right Nothing
-handleEventSearchDialog _ = return $ Left ()
+handleEventSearchDialog (MouseDown (DButton CancelButton) BLeft [] _) = return DialogCancel
+handleEventSearchDialog _ = return DoNothing
 
 
-returnSelection :: EventM Name SearchDialog (Either () (Maybe Text))
+returnSelection :: EventM Name SearchDialog (DialogEventResult Text)
 returnSelection = do
     sel <- uses sdDialog dialogSelection
     case sel of
-        Nothing -> return $ Right Nothing
-        Just (DButton CancelButton, _) -> return $ Right Nothing
+        Nothing -> return DoNothing
+        Just (DButton CancelButton, _) -> return DialogCancel
         Just (DButton OkButton, _) -> do
             selVal <- uses sdValues listSelectedElement
-            return . Right $ (snd <$> selVal)
-        _ -> return $ Left ()
+            return $ case selVal of
+                Nothing -> DoNothing
+                Just (_, t) -> DialogResult t
+        _ -> return DoNothing

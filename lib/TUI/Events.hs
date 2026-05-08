@@ -13,7 +13,6 @@ module TUI.Events (
 
 import Brick hiding (getName, zoom)
 import Brick qualified as B
-import Brick.Widgets.Dialog
 import Brick.Widgets.Edit qualified as Ed
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Control.Monad (when, unless)
@@ -62,26 +61,25 @@ handleGlobalEvent _ = return False
 
 handleEventDialogLevel :: DialogLevel -> BrickEvent Name EventType -> EventM Name State ()
 handleEventDialogLevel (Searching _) ev = do
-    sel <- B.zoom (sInterface . searchDialog . anon emptySearchDialog (const False)) $ handleEventSearchDialog ev
-    case sel of
-        Left () -> return ()
-        Right r -> onSearchSelection r
-handleEventDialogLevel (Quitting _) ev = handleEventQuit ev
+    res <- B.zoom (sInterface . searchDialog . anon emptySearchDialog (const False)) $ handleEventSearchDialog ev
+    case res of
+        DoNothing -> return ()
+        DialogCancel -> deactivateSearch
+        DialogResult t -> searchSelection t
+handleEventDialogLevel (Quitting _) ev = do
+    res <- B.zoom (sInterface . quitDialog . anon emptyYesNoDialog (const False)) $ handleEventYesNoDialog ev
+    case res of
+        DoNothing -> return ()
+        DialogCancel -> abortQuit
+        DialogResult () -> doQuit
 handleEventDialogLevel (FieldProperties _) ev = handleEventFieldProperties ev
 
-onSearchSelection :: Maybe T.Text -> EventM Name State ()
-onSearchSelection Nothing = deactivateSearch
-onSearchSelection (Just t) = do
+searchSelection :: T.Text -> EventM Name State ()
+searchSelection t = do
     deactivateSearch
     s <- get
     let pos = nextPos (fromIntegral $ s ^. sCurrentField) t (s ^. sIndex) (s ^. sRowStore)
     modify $ moveTo pos
-
-handleEventQuit :: BrickEvent Name EventType -> EventM Name State ()
-handleEventQuit (VtyEvent (EvKey k ms)) = handleKeyQuit k ms
-handleEventQuit (MouseDown (DButton OkButton) BLeft [] _) = doQuit
-handleEventQuit (MouseDown (DButton CancelButton) BLeft [] _) = abortQuit
-handleEventQuit _ = return ()
 
 handleEventFieldProperties :: BrickEvent Name EventType -> EventM Name State ()
 handleEventFieldProperties (VtyEvent (EvKey k ms)) = handleKeyFieldProperties k ms
@@ -179,15 +177,6 @@ acceptFieldProperties = use (sInterface . fieldProperties) >>= \case
 
         closeFieldPropertiesDialog
 
-handleKeyQuit :: Key -> [Modifier] -> EventM Name State ()
-handleKeyQuit KEnter [] = use (sInterface . quitDialog) >>= \case
-    Nothing -> return ()
-    Just ynd -> case dialogSelection (ynd ^. ynDialog) of
-            Just (DButton OkButton, _) -> doQuit
-            _ -> abortQuit
-handleKeyQuit KEsc [] = abortQuit
-handleKeyQuit k ms = handleInQuitDialog (EvKey k ms)
-
 doQuit :: EventM Name State ()
 doQuit = doFinalBackup >> halt
 
@@ -257,12 +246,6 @@ handleEdition e = do
             use (sInterface . activeEditor) >>= \case
                 Nothing -> return ()
                 Just ve -> updateCurrentField $ ve ^. veField
-
-handleInSearchDialog :: Event -> EventM Name State ()
-handleInSearchDialog ev = B.zoom (sInterface . searchDialog . _Just . sdDialog) $ handleDialogEvent ev
-
-handleInQuitDialog :: Event -> EventM Name State ()
-handleInQuitDialog ev = B.zoom (sInterface . quitDialog . _Just . ynDialog) $ handleDialogEvent ev
 
 handleEventValueEditor :: BrickEvent Name EventType -> EventM Name ValueEditor ()
 handleEventValueEditor ev = do
