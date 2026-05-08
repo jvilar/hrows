@@ -36,26 +36,20 @@ module TUI.State (
     , toggleTable
     , moveTo
     , moveFieldTo
-    , moveToSelected
-    , moveToSelectedSearch
     , doSave
     , doBackup
     , doFinalBackup
-    , searchLetter
 ) where
 
 
 import Brick hiding (getName, zoom)
 import Brick qualified as B
-import Brick.Widgets.Dialog
 import Brick.Widgets.List hiding (splitAt, reverse)
 import Control.Exception (try, SomeException)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Control.Monad (when, void, unless)
 import Control.Monad.IO.Class (liftIO)
 import Data.Text (Text)
-import Data.Text qualified as T
-import Data.Vector qualified as V
 import HRowsException (HRowsException(..))
 import Model.DefaultFileNames (defaultBackupFileName, defaultConfFileName)
 import Model.Expression.RecursionSchemas
@@ -67,7 +61,6 @@ import System.Directory (removeFile)
 
 import TUI.Base
 import TUI.Level
-import Data.Char (isLower)
 
 data State = State { _sRowStore :: RowStore
                    , _sSourceInfo :: Maybe (SourceInfo, [SourceInfo])
@@ -236,58 +229,6 @@ toggleTable = do
                              modify $ moveTo idx
                              modify $ moveFieldTo fld
 
-moveToSelected :: EventM Name State ()
-moveToSelected = do
-    msd <- use $ sInterface . searchDialog
-    let ds = do
-               sd <- msd
-               dialogSelection (sd ^. sdDialog)
-    case ds of
-        Just (DButton OkButton, ()) -> do
-            deactivateSearch
-            let se = do
-                       sd <- msd
-                       listSelectedElement (sd ^. sdValues)
-            case se of
-                Nothing -> return ()
-                Just (_, t) -> do
-                    s <- get
-                    let pos = nextPos (fromIntegral $ s ^. sCurrentField) t (s ^. sIndex) (s ^. sRowStore)
-                    modify $ moveTo pos
-        Just (DButton CancelButton, ()) -> deactivateSearch
-        _ -> return ()
-
-moveToSelectedSearch :: Int -> EventM Name State ()
-moveToSelectedSearch r = do
-    msd <- use $ sInterface . searchDialog
-    case msd of
-        Nothing -> return ()
-        Just sd -> do
-            deactivateSearch
-            let vs = sd ^. sdValues . listElementsL
-            if r < 0 || r >= V.length vs
-            then return ()
-            else do
-                let t = vs V.! r
-                s <- get
-                let pos = nextPos (fromIntegral $ s ^. sCurrentField) t (s ^. sIndex) (s ^. sRowStore)
-                modify $ moveTo pos
-
-searchLetter :: Char -> EventM Name State ()
-searchLetter c = do
-    msd <- use $ sInterface . searchDialog
-    case msd of
-        Nothing -> return ()
-        Just sd -> do
-            let vs = sd ^. sdValues . listElementsL
-                mi = case V.findIndex (T.isPrefixOf (T.singleton c)) vs of
-                         Nothing -> if isLower c
-                                    then V.findIndex (T.isPrefixOf (T.toUpper (T.singleton c))) vs
-                                    else V.findIndex (T.isPrefixOf (T.toLower (T.singleton c))) vs
-                         Just i -> Just i
-            case mi of
-                Nothing -> return ()
-                Just i -> sInterface . searchDialog . _Just . sdValues %= listMoveTo i
 
 moveTo :: Int -> State -> State
 moveTo pos s

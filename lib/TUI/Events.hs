@@ -15,10 +15,8 @@ import Brick hiding (getName, zoom)
 import Brick qualified as B
 import Brick.Widgets.Dialog
 import Brick.Widgets.Edit qualified as Ed
-import Brick.Widgets.List (handleListEvent)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Control.Monad (when, unless)
-import Data.Char (isAlpha)
 import Data.Text qualified as T
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl), Button (..))
 import Model.Expression.Evaluation (evaluate)
@@ -33,9 +31,6 @@ import Model.Expression.Manipulate (addPositions)
 data BackupEvent = BackupEvent deriving (Show)
 
 type EventType = BackupEvent
-
-listKeys :: [Key]
-listKeys = [KDown, KUp, KPageUp, KPageDown, KHome, KEnd, KLeft, KRight]
 
 (>>->>) :: EventM Name State Bool -> EventM Name State () -> EventM Name State ()
 (>>->>) e1 e2 = e1 >>= \case
@@ -66,28 +61,21 @@ handleGlobalEvent (VtyEvent (EvKey (KChar 'w') [MCtrl])) = doSave >> return True
 handleGlobalEvent _ = return False
 
 handleEventDialogLevel :: DialogLevel -> BrickEvent Name EventType -> EventM Name State ()
-handleEventDialogLevel (Searching _) = handleEventSearch
-handleEventDialogLevel (Quitting _) = handleEventQuit
-handleEventDialogLevel (FieldProperties _) = handleEventFieldProperties
+handleEventDialogLevel (Searching _) ev = do
+    sel <- B.zoom (sInterface . searchDialog . anon emptySearchDialog (const False)) $ handleEventSearchDialog ev
+    case sel of
+        Left () -> return ()
+        Right r -> onSearchSelection r
+handleEventDialogLevel (Quitting _) ev = handleEventQuit ev
+handleEventDialogLevel (FieldProperties _) ev = handleEventFieldProperties ev
 
-handleEventSearch :: BrickEvent Name EventType -> EventM Name State ()
-handleEventSearch (VtyEvent (EvKey k ms)) = handleKeySearch k ms
-handleEventSearch (MouseDown SearchList BLeft [] (Location (_, r))) = moveToSelectedSearch r
-handleEventSearch (MouseDown SearchList BScrollDown [] _) = handleKeySearch KPageDown []
-handleEventSearch (MouseDown SearchList BScrollUp [] _) = handleKeySearch KPageUp []
-handleEventSearch (MouseDown (DButton OkButton) BLeft [] _) = moveToSelected
-handleEventSearch (MouseDown (DButton CancelButton) BLeft [] _) = deactivateSearch
-handleEventSearch _ = return ()
-
-handleKeySearch :: Key -> [Modifier] -> EventM Name State ()
-handleKeySearch k [] | k `elem` listKeys = handleSearchList (EvKey k [])
-handleKeySearch (KChar k) [] | isAlpha k = searchLetter k
-handleKeySearch KEnter [] = moveToSelected
-handleKeySearch KEsc [] = deactivateSearch
-handleKeySearch k ms = handleInSearchDialog (EvKey k ms)
-
-handleSearchList :: Event -> EventM Name State ()
-handleSearchList e = B.zoom (sInterface . searchDialog . _Just . sdValues) $ handleListEvent e
+onSearchSelection :: Maybe T.Text -> EventM Name State ()
+onSearchSelection Nothing = deactivateSearch
+onSearchSelection (Just t) = do
+    deactivateSearch
+    s <- get
+    let pos = nextPos (fromIntegral $ s ^. sCurrentField) t (s ^. sIndex) (s ^. sRowStore)
+    modify $ moveTo pos
 
 handleEventQuit :: BrickEvent Name EventType -> EventM Name State ()
 handleEventQuit (VtyEvent (EvKey k ms)) = handleKeyQuit k ms
