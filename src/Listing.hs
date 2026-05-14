@@ -11,7 +11,7 @@ import Data.Default(Default(def))
 import Data.List(intercalate, sortOn)
 import Data.Map(Map)
 import Data.Map qualified as M
-import Data.Maybe(catMaybes, isNothing)
+import Data.Maybe(catMaybes, isNothing, fromMaybe, fromJust)
 import Data.Text(Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as T
@@ -36,21 +36,16 @@ data ColIndices = ColIndices { _keyIndex :: Int
                              , _markStart :: Int
                              , _globalIndex :: Int
                              , _extrasStart :: Int
-                             , _messageIndex :: Int
+                             , _extrasEnd :: Int
+                             , _messageIndex :: Maybe Int
                              } deriving Show
 makeLenses ''ColIndices
-
-totalCols :: Getter ColIndices Int
-totalCols = messageIndex
 
 markEnd :: Getter ColIndices Int
 markEnd = globalIndex
 
 markInterval :: Getter ColIndices (Int, Int)
 markInterval = to $ view markStart &&& view markEnd
-
-extrasEnd :: Getter ColIndices Int
-extrasEnd = messageIndex
 
 extrasInterval :: Getter ColIndices (Int, Int)
 extrasInterval = to $ view extrasStart &&& view extrasEnd
@@ -76,6 +71,7 @@ data Options = Options { _anonymize :: Bool
                        , _global :: Maybe Col
                        , _globalDecimals :: Int
                        , _message :: Maybe Col
+                       , _messageExtension :: Maybe Int
                        , _extraCols :: ColSpec
 
                        , _optionsFile :: Maybe FilePath
@@ -100,6 +96,7 @@ instance Default Options where
                   , _global = Nothing
                   , _globalDecimals = 1
                   , _message = Nothing
+                  , _messageExtension = Nothing
                   , _extraCols = SelectedCols []
 
                   , _optionsFile = Nothing
@@ -133,6 +130,7 @@ options =  colOptions FullIOOptions cOptions ++
                'm' ~: "marks" ==> ReqArg (appendCols marks "marks") "COLS" ~: "Columns with the marks. May appear more than once. Default: no columns."
                'g' ~: "global" ==> ReqArg (setMaybeCol global "global") "COL" ~: "Column with the global mark."
                'M' ~: "message" ==> ReqArg (setMaybeCol message "message") "COL" ~: "Column that if not empty overrides the others. Default: no column."
+               'e' ~: "messageExtension" ==> ReqArg (set messageExtension . Just . read) "INT" ~: "Number of columns overriden by the message. Default: all columns."
                'x' ~: "extraCols" ==> ReqArg (appendCols extraCols "extraCols") "COLS" ~: "Columns with additional information. May apper more than once. Default: no extras."
                'd' ~: "decimals" ==> ReqArg (set decimals . read) "DECS" ~: "Number of decimal places. " ++ defValue decimals
                'D' ~: "globalDecimals" ==> ReqArg (set globalDecimals . read) "DECS" ~: "Number of decimal places of the global mark. " ++ defValue globalDecimals
@@ -189,7 +187,8 @@ translate opts mdic rst = let
                       , _markStart = nFields trKey
                       , _globalIndex = _markStart inds + nFields trMarks
                       , _extrasStart = _globalIndex inds + nFields trGlobal
-                      , _messageIndex = _extrasStart inds + nFields trExtras
+                      , _extrasEnd = _extrasStart inds + nFields trExtras
+                      , _messageIndex = const (_extrasStart inds + nFields trExtras) <$> opts ^. message
                       }
     conf = fromNamesTypes (concatMap fnames allTr) (concatMap types allTr)
   in (mkRowStore (getName rst) conf allRows, inds)
@@ -238,11 +237,13 @@ createAnonDic opts rst = fmap (anonymizeDic (opts ^. anonLength))
                     then Just . return $ keys (opts ^. key) rst
                     else Nothing
 
+data CellType = KeyCell | MarkCell | GlobalCell | ExtraCell | MessageCell Int deriving (Show, Eq)
+
 data Formatter = Formatter { _begin :: Text
                            , _end :: Text
                            , _titleLine :: [Text] -> Text
-                           , _normalLine :: ColIndices -> Options -> Int -> Row -> Text
-                           , _messageLine :: ColIndices -> Options -> Int -> Row -> Text
+                           , _cellFormatter :: Options -> (CellType, Field) -> Text
+                           , _lineFormatter :: Options -> Int -> [Text] -> Text
                            }
 
 makeLenses ''Formatter
@@ -252,8 +253,8 @@ hTMLFormatter = Formatter {
     _begin = "<TT><TABLE>"
     , _end = "</TABLE></TT>"
     , _titleLine = htmlTitle
-    , _normalLine = htmlLine
-    , _messageLine = htmlMessage
+    , _cellFormatter = htmlCell
+    , _lineFormatter = htmlLine
 }
 
 htmlTitle :: [Text] -> Text
@@ -292,50 +293,34 @@ trMark n | odd n = "<TR bgcolor=\"#bbbbbb\">"
 segment :: ColIndices -> Getter ColIndices (Int, Int) -> [a] -> [a]
 segment inds g = uncurry slice' (inds ^. g)
 
-htmlLine :: ColIndices -> Options -> Int -> Row -> Text
-htmlLine inds opts n r = T.concat
-  ( trMark n
-  : "<TD>&nbsp;"  -- key
-  : toString (r !! (inds ^. keyIndex))
-  : "&nbsp;</TD>"
-  :  [ "<TD align=\"center\">&nbsp;"
-       <> fToText (opts ^. decimals) t
-       <> "&nbsp;</TD>"
-       | t <- segment inds markInterval r
-     ]
-  ++ [ "<TD align=\"center\"><font color=\""
-          <> colorGlobal opts t <> "\">&nbsp;<b>"
-       <> fToText (opts ^. globalDecimals) t
-       <> "</font></TD>"
-     | t <- segment inds globalInterval r
-     ]
-  ++ [ "<TD align=\"left\">&nbsp;" <> toString t <> "</TD>"
-     | t <- segment inds extrasInterval r
-     ]
-  ++ [ "</TR>" ]
-  )
+htmlCell :: Options -> (CellType, Field) -> Text
+htmlCell _ (KeyCell, f) = "<TD>&nbsp;" <> toString f <> "&nbsp;</TD>"
+htmlCell opts (MarkCell, f) = "<TD align=\"center\">&nbsp;"
+                            <> fToText (opts ^. decimals) f
+                            <> "&nbsp;</TD>"
+htmlCell opts (GlobalCell, f) = "<TD align=\"center\"><font color=\""
+                            <> colorGlobal opts f <> "\">&nbsp;<b>"
+                            <> fToText (opts ^. globalDecimals) f
+                            <> "</font></TD>"
+htmlCell _ (ExtraCell, f) = "<TD align=\"left\">&nbsp;" <> toString f <> "</TD>"
+htmlCell _ (MessageCell c, f) = "<TD colspan =\"" <> T.pack (show c)
+                            <> "\"align = \"left\"><font color=\"red\">"
+                            <> toString f
+                            <> "</font></TD>"
 
-htmlMessage :: ColIndices -> Options -> Int -> Row -> Text
-htmlMessage inds _ n r = T.concat
-  ( trMark n
-  : "<TD>&nbsp;"  -- key
-  : toString (r !! (inds ^. keyIndex))
-  : "&nbsp;</TD>"
-  : [ "<TD colspan =\"" <> sp
-      <> "\"align = \"left\"><font color=\"red\">"
-      <> m
-      <> "</font></TD></TR>" ]
-  )
-  where m = toString (r !! (inds ^. messageIndex))
-        sp = T.pack $ show $ inds ^. totalCols - 1
+htmlLine :: Options -> Int -> [Text] -> Text
+htmlLine _ n ts = T.concat
+    ( trMark n
+    : ts ++ [ "</TR>" ]
+    )
 
 laTeXFormatter :: Formatter
 laTeXFormatter = Formatter {
     _begin = ""
     , _end = ""
     , _titleLine = laTeXTitle
-    , _normalLine = laTeXLine
-    , _messageLine = laTeXMessage
+    , _cellFormatter = laTeXCell
+    , _lineFormatter = laTeXLine
 }
 
 
@@ -357,34 +342,37 @@ escapeLaTeX = T.concatMap charEscape
 laTeXTitle :: [Text] -> Text
 laTeXTitle = (<> "\\\\\\hline") . T.intercalate " & " . map escapeLaTeX
 
-laTeXLine :: ColIndices -> Options -> Int -> Row -> Text
-laTeXLine inds opts n r = T.concat
-  ( (if odd n then "\\rowcolor[gray]{0.8}" else "")
-  : toString (r !! (inds ^. keyIndex))
-  :  [ " & " <> fToText (opts ^. decimals) t
-       | t <- segment inds markInterval r
-     ]
-  ++ [ " & \\textcolor{"
-          <> colorGlobal opts t <> "}{"
-       <> fToText (opts ^. globalDecimals) t
-       <> "}"
-     | t <- segment inds globalInterval r
-     ]
-  ++ [ " & " <> toString t
-     | t <- segment inds extrasInterval r
-     ]
-  ++ [ "\\\\" ]
-  )
+laTeXCell :: Options -> (CellType, Field) -> Text
+laTeXCell _ (KeyCell, f) = escapeLaTeX $ toString f
+laTeXCell opts (MarkCell, f) = escapeLaTeX $ fToText (opts ^. decimals) f
+laTeXCell opts (GlobalCell, f) = "\\textcolor{" <> colorGlobal opts f <> "}{"
+                                 <> escapeLaTeX (fToText (opts ^. globalDecimals) f)
+                                 <> "}"
+laTeXCell _ (ExtraCell, f) = escapeLaTeX $ toString f
+laTeXCell _ (MessageCell c, f) = "\\multicolumn{" <> T.pack (show c)
+                                 <> "}{l}{\\qquad\\textcolor{red}{" <> escapeLaTeX (toString f) <> "}}}"
 
-laTeXMessage :: ColIndices -> Options -> Int -> Row -> Text
-laTeXMessage inds _ n r = T.concat
-  ( (if odd n then "\\rowcolor[gray]{0.8}" else "")
-  : toString (r !! (inds ^. keyIndex))
-  : " & "
-  : [ "\\multicolumn{" <> sp <> "}{l}{\\qquad\\textcolor{red}{"<> m <> "}}\\\\" ]
-  )
-  where m = toString (r !! (inds ^. messageIndex))
-        sp = T.pack $ show $ inds ^. totalCols - 1
+
+laTeXLine :: Options -> Int -> [Text] -> Text
+laTeXLine _ n ts = T.concat
+  [ if odd n then "\\rowcolor[gray]{0.8}" else ""
+  , T.intercalate " & " ts
+  , "\\\\"
+  ]
+
+
+collectCells :: Options -> ColIndices -> Row -> [(CellType, Field)]
+collectCells opts inds r = let
+   fm = (r !!) <$> (inds ^. messageIndex)
+   sm = toString <$> fm
+   me = fromMaybe (inds ^. extrasEnd - 1) (opts ^. messageExtension)
+   cells = (KeyCell, r !! (inds ^. keyIndex))
+           : [ (MarkCell, t) | t <- segment inds markInterval r ]
+           ++ [ (GlobalCell, t) | t <- segment inds globalInterval r ]
+           ++ [ (ExtraCell, t) | t <- segment inds extrasInterval r ]
+ in if (T.null <$> sm) /= Just False
+    then cells
+    else cells !! 0 : (MessageCell me, fromJust fm) : drop (me + 1) cells
 
 writeListing :: Options -> ColIndices -> RowStore -> IO ()
 writeListing opts inds rst
@@ -412,10 +400,10 @@ writeListing opts inds rst
                    , segment inds extrasInterval nms
                    ]
     forM_ (zip [1..] $ rows rst) $ \(n, r) -> do
-         let t = toString (r !! (inds ^. messageIndex))
-         if inds ^. messageIndex >= nFields rst || T.null t
-         then T.putStrLn $ (fmter ^. normalLine) inds opts n r
-         else T.putStrLn $ (fmter ^. messageLine) inds opts n r
+         let cells = collectCells opts inds r
+             texts = map (fmter ^. cellFormatter $ opts) cells
+             line = (fmter ^. lineFormatter) opts n texts
+         T.putStrLn line
     unless (T.null $ fmter ^. end) $ T.putStrLn $ fmter ^. end
 
 main :: IO ()
