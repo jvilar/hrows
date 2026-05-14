@@ -10,6 +10,9 @@ module Col (
     ColSpec(..)
     , Col(..)
     -- *Functions
+    , colLength
+    , singleCol
+    , specLength
     , readRowStoreFromOptions
     , readRowStoreAndSourceInfo
     , parseCols
@@ -59,14 +62,44 @@ import HRowsException (HRowsException(HRowsException))
 import Control.Monad.State (execState, gets, modify)
 import Model.RowStore.RowStoreConf (RowStoreConf (sourceInfos))
 
+-- | The position of a column that is represented by an expression.
+pos :: Expression -> Int
+pos (In (Position n)) = n
+pos (In (NamedPosition _ (Just n))) = n
+pos e = error $ "Expression "
+                ++ T.unpack (toFormula e)
+                ++ " does not represent a position"
+
 -- |A Col especifies a column of the input in the command line. Single
 -- expressions especify a column, a couple of expressions that correspond
 -- each to a column, especify a range. 
 data Col = Single Expression (Maybe Text)
          | Range Expression Expression deriving Show
 
+-- |Number of columns specified by a `Col`.
+colLength :: RowStore -> Col -> Int
+colLength _ (Single _ _) = 1
+colLength rst (Range e1 e2) = pos (addPositions rst e2) - pos (addPositions rst e1) + 1
+
 -- | A ColSpec is either all columns or a list of `Col`.
 data ColSpec = AllCols | SelectedCols [Col] deriving Show
+
+-- | Create a `ColSpec` with a single column.
+singleCol :: Col -> ColSpec
+singleCol c = SelectedCols [c]
+
+-- |Number of columns specified by a `ColSpec`.
+specLength :: RowStore -> ColSpec -> Int
+specLength rst AllCols = nFields rst
+specLength rst (SelectedCols cs) = sum $ map (colLength rst) cs
+
+instance Semigroup ColSpec where
+    AllCols <> _ = AllCols
+    _ <> AllCols = AllCols
+    SelectedCols cs1 <> SelectedCols cs2 = SelectedCols (cs1 ++ cs2)
+
+instance Monoid ColSpec where
+    mempty = SelectedCols []
 
 -- |Options for cols like programs
 
@@ -103,7 +136,7 @@ expressionT f (Range e1 e2) = Range <$> f e1 <*> f e2
 -- |A fold of the Fields specified by a `Col`
 colF :: Col -> Fold RowStore Row
 colF col = folding getRows
-    where getRows rst = map (processRow dss $ SelectedCols [col']) $ rows rst
+    where getRows rst = map (processRow dss $ singleCol col') $ rows rst
              where col' = col & expressionT %~ addPositions rst
                    dss = getDataSources rst
 
@@ -132,8 +165,7 @@ setCols l n s = case parseCols (T.pack s) of
 appendCols :: Lens' o ColSpec -> String -> String -> o -> o
 appendCols l n s = case parseCols (T.pack s) of
                       Left e -> myError $ "Bad column especification in " ++ n ++ ": " ++ T.unpack e
-                      Right (SelectedCols cs) -> over l (\(SelectedCols cs0) -> SelectedCols (cs0 ++ cs))
-                      Right AllCols -> myError $ "Cannot append all columns in " ++ n
+                      Right cs -> over l (<> cs)
 
 setFilter :: String -> ColOptions -> ColOptions
 setFilter s = case parse expression $ T.pack s of
@@ -212,7 +244,7 @@ checkPosition :: Expression -> Parser ()
 checkPosition (In (Position _)) = return ()
 checkPosition (In (NamedPosition _ _)) = return ()
 checkPosition e = parsingError $ T.concat [ "Expression "
-
+                                          , toFormula e
                                           , " does not represent a position"
                                           ]
 
@@ -222,6 +254,8 @@ applyCols :: ColSpec -> RowStore -> RowStore
 applyCols AllCols rst = rst
 applyCols (SelectedCols cs0) rst = setChanged $ mkRSFromExpressions expNames rst
     where expNames = concatMap toExpName cs0
+          toExpName (Single (In (Position n)) Nothing) = [defExpNames !! n]
+          toExpName (Single e@(In (NamedPosition n _)) Nothing) = [(e, n)]
           toExpName (Single e Nothing) = [(e, toFormula e)]
           toExpName (Single e (Just n)) = [(e, n)]
           toExpName (Range e1 e2) = slice (pos $ addPositions rst e1) (pos $ addPositions rst e2) defExpNames
@@ -242,13 +276,6 @@ slice p1 p2 = take (p2 - p1 + 1) . drop p1
 -- The elements of the list from p1 to p2, p2 excluded
 slice' :: Int -> Int -> [a] -> [a]
 slice' p1 p2 = take (p2 - p1) . drop p1
-
-pos :: Expression -> Int
-pos (In (Position n)) = n
-pos (In (NamedPosition _ (Just n))) = n
-pos e = error $ "Expression "
-                ++ T.unpack (toFormula e)
-                ++ " does not represent a position"
 
 load :: ColOptions -> IO (RowStore, Maybe (SourceInfo, [SourceInfo]))
 load opts = case opts ^. inputFileName of

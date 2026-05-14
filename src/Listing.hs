@@ -175,23 +175,19 @@ helpMessage = usageInfo header options
 
 translate :: Options -> Maybe AnonDic -> RowStore -> (RowStore, ColIndices)
 translate opts mdic rst = let
-    trKey = getKeyCol opts mdic rst
-    trMarks = applyCols (opts ^. marks) rst
-    trGlobal = applyCols (SelectedCols $ catMaybes [opts ^. global]) rst
-    trExtras = applyCols (opts ^. extraCols) rst
-    trMessage = applyCols (SelectedCols $ catMaybes [opts ^. message]) rst
-    allTr = [trKey, trMarks, trGlobal, trExtras, trMessage]
-    allRows = map concat . getZipList . sequenceA $
-                ZipList . rows <$> allTr
+    allCols = singleCol (opts ^. key)
+              <> (opts ^. marks)
+              <> (SelectedCols $ catMaybes [opts ^. global])
+              <> (opts ^. extraCols)
+              <> (SelectedCols $ catMaybes [opts ^. message])
     inds = ColIndices { _keyIndex = 0
-                      , _markStart = nFields trKey
-                      , _globalIndex = _markStart inds + nFields trMarks
-                      , _extrasStart = _globalIndex inds + nFields trGlobal
-                      , _extrasEnd = _extrasStart inds + nFields trExtras
-                      , _messageIndex = const (_extrasStart inds + nFields trExtras) <$> opts ^. message
+                      , _markStart = 1
+                      , _globalIndex = _markStart inds + specLength rst (opts ^. marks) 
+                      , _extrasStart = _globalIndex inds + maybe 0 (const 1) (opts ^. global)
+                      , _extrasEnd = _extrasStart inds + specLength rst (opts ^. extraCols)
+                      , _messageIndex = const (_extrasEnd inds) <$> opts ^. message
                       }
-    conf = fromNamesTypes (concatMap fnames allTr) (concatMap types allTr)
-  in (mkRowStore (getName rst) conf allRows, inds)
+  in (applyCols allCols rst, inds)
 
 getKeyCol :: Options -> Maybe AnonDic -> RowStore -> RowStore
 getKeyCol opts mdic rst
