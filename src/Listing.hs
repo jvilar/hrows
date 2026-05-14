@@ -187,15 +187,12 @@ translate opts mdic rst = let
                       , _extrasEnd = _extrasStart inds + specLength rst (opts ^. extraCols)
                       , _messageIndex = const (_extrasEnd inds) <$> opts ^. message
                       }
-  in (applyCols allCols rst, inds)
-
-getKeyCol :: Options -> Maybe AnonDic -> RowStore -> RowStore
-getKeyCol opts mdic rst
-    | isNothing mdic = col
-    | otherwise = mapCol 0 mkAnon col
-    where col = applyCols (SelectedCols [opts ^. key]) rst
-          Just dic = mdic
-          mkAnon = toField . (dic M.!) . toString
+    rst' = applyCols allCols rst
+  in case mdic of
+       Nothing -> (rst', inds)
+       Just dic -> let
+                     mkAnon = toField . (dic M.!) . toString
+                   in (mapCol (fromIntegral $ inds ^. keyIndex) mkAnon rst', inds)
 
 keys :: Col -> RowStore -> [Text]
 keys col rst = rst ^..  colF col . element 0 . to toString
