@@ -5,7 +5,7 @@ module Main where
 import Control.Monad(unless, when)
 import Control.Lens(makeLenses, (^.), set)
 import Data.Default(Default(..))
-import System.Environment(getArgs)
+import System.Environment(getArgs, setEnv, lookupEnv)
 import System.Exit(exitSuccess)
 
 import System.Console.JMVOptions
@@ -48,9 +48,17 @@ helpMessage :: String
 helpMessage = usageInfo header options
               where header = "Usage: vrows [Options] <file> [<conf>]"
 
+-- Workaround for supporting mouse events in alacritty.
+forceTerm :: IO ()
+forceTerm = do
+  term <- lookupEnv "TERM"
+  case term of
+    Just "alacritty" -> setEnv "TERM" "xterm-256color"
+    _ -> return ()
 
 main :: IO ()
 main = do
   opts <- getOptions
   (rst, msi) <- readRowStoreAndSourceInfo $ opts ^. cOptions
+  forceTerm
   startTUI (applyCols (opts ^. colSpec) rst) msi

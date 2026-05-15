@@ -100,7 +100,10 @@ startTUI :: RowStore -> Maybe (SourceInfo, [SourceInfo]) -> IO ()
 startTUI rst msi = do
   eventChan <- B.newBChan 10
   _ <- forkIO $ backupLoop eventChan
-  let buildVty = Vty.mkVty Vty.defaultConfig
+  let buildVty = do
+                   v <- Vty.mkVty Vty.defaultConfig
+                   setMode (outputIface v) Mouse True
+                   return v
   initialVty <- buildVty
-  finalState <- customMain initialVty buildVty (Just eventChan) app (initialState rst msi)
+  _ <- customMain initialVty buildVty (Just eventChan) app (initialState rst msi)
   return ()
