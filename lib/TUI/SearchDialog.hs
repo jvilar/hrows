@@ -6,8 +6,6 @@
 
 module TUI.SearchDialog (
   SearchDialog
-  , sdValues
-  , sdDialog
   , mkSearchDialog
   , emptySearchDialog
   , renderSearchDialog

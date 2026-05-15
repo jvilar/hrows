@@ -5,7 +5,6 @@
 module TUI.YesNoDialog (
   YesNoDialog
   , emptyYesNoDialog
-  , ynDialog
   , mkYesNoDialog
   , renderYesNoDialog
   , handleEventYesNoDialog
