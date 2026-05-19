@@ -1,51 +1,50 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module TUI.FieldPropertiesDialog (
     FieldPropertiesDialog
-  , FieldPropertiesFocus(..)
-  , fpFocus
-  , fpName
-  , fpType
-  , fpValue
-  , fpIsFormula
-  , fpFormula
+  , FieldPropertiesInfo
+  , fpiName
+  , fpiType
+  , fpiFormulaOrValue
   , mkFieldPropertiesDialog
   , renderFieldPropertiesDialog
   , updateFieldPropertiesDialog
-  , fieldPropertiesMoveUp
-  , fieldPropertiesMoveDown
-  , fieldPropertiesNextType
-  , fieldPropertiesPrevType
+  , handleEventFieldPropertiesDialog
   ) where
 
 
-import Brick ( Widget (Widget), txt, joinBorders, hLimitPercent, withAttr, (<=>), (<+>), getContext, Size (..), vSize, availWidthL, render, str, clickable )
-import Brick.Widgets.Border ( borderWithLabel, hBorder )
-import Brick.Widgets.Center ( centerLayer, hCenter )
+
+import Brick ( Widget (Widget), txt, withAttr, (<=>), (<+>), getContext, Size (..), vSize, availWidthL, render, str, clickable, EventM, BrickEvent (VtyEvent, MouseDown) )
+import Brick qualified as B
+import Brick.Widgets.Border ( hBorder )
 import Brick.Widgets.Dialog ( Dialog, dialog, renderDialog, dialogWidthL, setDialogFocus )
-import Control.Lens ( makeLenses, over, (^.), lens, set, view )
+import Brick.Widgets.Edit qualified as Ed
+import Control.Lens ( makeLenses, over, (^.), lens, set, view, (.=), use, _Left )
+import Control.Monad.State (get, modify)
 import Data.Maybe(fromMaybe, isJust)
 import Data.Text (Text)
-import Data.Text qualified as T
-import Model.Expression ( FieldType(TypeEmpty), ToField(toField), Field, Formula, convertKeepText )
+import Graphics.Vty (Event(EvKey), Button (..), Key (..), Modifier)
 
+import Model.Expression.Evaluation (evaluate)
+import Model.Expression.Manipulate (addPositions)
+import Model.Expression.Parser (parseExpression)
+import Model.RowStore
 import TUI.Base
-    ( DialogButton(..),
-      ValueEditor,
-      HasEditor(..),
-      Name(..),
-      selectedElementAttr,
-      titleAttr,
-      ValueViewer,
-      updateEditor,
-      mkEditor,
-      renderValueViewer,
-      renderValueEditor, updateValueViewer, vvValue, veContent )
-import Brick.Widgets.Edit (Editor)
 
 data FieldPropertiesFocus = FpName | FpValue | FpType | FpFMark | FpFormula | FpOK | FpCancel deriving (Eq, Ord, Enum, Bounded)
+
+data FieldPropertiesInfo = FieldPropertiesInfo { _fpiName :: Text
+                                               , _fpiType :: FieldType
+                                               , _fpiFormulaOrValue :: Either Formula Field
+                                               }
+
+makeLenses ''FieldPropertiesInfo
+
+instance Semigroup FieldPropertiesInfo where
+    a <> _ = a
 
 data FieldPropertiesDialog = FieldPropertiesDialog { _fpTitle :: Text
                                      , _fpName :: ValueEditor
@@ -55,7 +54,10 @@ data FieldPropertiesDialog = FieldPropertiesDialog { _fpTitle :: Text
                                      , _fpFormula :: ValueEditor
                                      , _fpFocus :: FieldPropertiesFocus
                                      , _fpDialog :: Dialog () Name
+                                     , _fpRst :: RowStore
+                                     , _fpIndex :: Int
                                      }
+
 
 makeLenses ''FieldPropertiesDialog
 
@@ -75,8 +77,8 @@ instance HasEditor FieldPropertiesDialog where
                                       FpFormula -> set fpFormula ve fp
                                       _ -> error "Bad focus in field properties dialog when setting editor"
 
-mkFieldPropertiesDialog :: Text -> Bool -> Field -> FieldType -> Maybe Formula -> FieldPropertiesDialog
-mkFieldPropertiesDialog fname isFormula field fType mFormula = FieldPropertiesDialog fname
+mkFieldPropertiesDialog :: Text -> Bool -> Field -> FieldType -> Maybe Formula -> RowStore -> Int -> FieldPropertiesDialog
+mkFieldPropertiesDialog fname isFormula field fType mFormula rst index = FieldPropertiesDialog fname
                             (mkEditor FieldPropertiesNameEditor $ toField fname)
                             (if isFormula
                              then Right field
@@ -90,6 +92,8 @@ mkFieldPropertiesDialog fname isFormula field fType mFormula = FieldPropertiesDi
                                     (Just (DButton OkButton, [ ("OK", DButton OkButton, ())
                                                              , ("Cancel", DButton CancelButton, ())]))
                                     400)
+                            rst
+                            index
 
 renderResizeDialog :: Ord n => Int -> Dialog a n -> Widget n -> Widget n
 renderResizeDialog pWidth d w = let
@@ -129,14 +133,108 @@ renderFieldPropertiesDialog fp = renderResizeDialog 95 (fp ^. fpDialog) $ do
                       then withAttr selectedElementAttr
                       else id
 
+handleEventFieldPropertiesDialog :: BrickEvent Name e -> EventM Name FieldPropertiesDialog (DialogEventResult FieldPropertiesInfo)
+handleEventFieldPropertiesDialog (VtyEvent (EvKey k ms)) = handleKey k ms
+handleEventFieldPropertiesDialog (MouseDown n BLeft [] _) = case n of
+    DButton OkButton -> returnFieldProperties
+    DButton CancelButton -> return DialogCancel
+    FieldPropertiesNameEditor -> changeFocus FpName
+    FieldPropertiesValueEditor -> changeFocus FpValue
+    FieldPropertiesTypeSelector -> changeFocus FpType
+    FieldPropertiesFormulaMark -> switchIsFormula >> changeFocus FpFMark
+    FieldPropertiesFormulaEditor -> changeFocus FpFormula
+    _ -> return DoNothing
+handleEventFieldPropertiesDialog _ = return DoNothing
+
+type FPMonad = EventM Name FieldPropertiesDialog (DialogEventResult FieldPropertiesInfo)
+
+whenFPM :: Bool -> FPMonad -> FPMonad
+whenFPM cond action = if cond then action else return DoNothing
+
+handleKey :: Key -> [Modifier] -> FPMonad
+handleKey KUp [] = onDialog moveUp
+handleKey KDown [] = onDialog moveDown
+handleKey (KChar '\t') [] = onDialog moveDown
+handleKey KBackTab [] = onDialog moveUp
+handleKey KEsc [] = return DialogCancel
+handleKey KEnter [] = use fpFocus >>= \case
+        FpCancel -> return DialogCancel
+        _ -> returnFieldProperties
+handleKey k ms = use fpFocus >>= \case
+         FpType -> case (k, ms) of
+                      (KLeft, []) -> onDialog prevType
+                      (KRight, []) -> onDialog nextType
+                      _ -> return DoNothing
+         FpOK -> whenFPM (k ==  KChar ' ' && null ms) returnFieldProperties
+         FpCancel -> whenFPM (k == KChar ' ' && null ms) $ return DialogCancel
+         FpName -> B.zoom (fpName . veEditor) (Ed.handleEditorEvent (VtyEvent (EvKey k ms))) >> return DoNothing
+         FpValue -> handleEventValueEditor (VtyEvent (EvKey k ms))
+         FpFMark -> whenFPM (k == KChar ' ' && null ms) switchIsFormula
+         FpFormula -> handleKeyInFormula k ms
+
+switchIsFormula :: FPMonad
+switchIsFormula = do
+    f <- use $ fpValue . vvValue
+    use fpIsFormula >>= \case
+        True -> do
+                  fpIsFormula .= False
+                  fpValue .= Left (mkEditor FieldPropertiesValueEditor f)
+        False -> do
+                   fpIsFormula .= True
+                   fpValue .= Right f
+    return DoNothing
+
+handleEventValueEditor :: BrickEvent Name a -> FPMonad
+handleEventValueEditor ev = use fpValue >>= \case
+    Left _ -> B.zoom (fpValue . _Left ) $ do
+                 B.zoom veEditor $ Ed.handleEditorEvent ev
+                 ve <- get
+                 let f = convertKeepText (ve ^. veType) (toField $ ve ^. veContent)
+                 modify $ updateEditor f
+                 return DoNothing
+    Right _ -> return DoNothing
+
+handleKeyInFormula :: Key -> [Modifier] -> FPMonad
+handleKeyInFormula k ms = do
+    B.zoom (fpFormula . veEditor) $ Ed.handleEditorEvent (VtyEvent (EvKey k ms))
+    use fpIsFormula >>= \case
+       False -> return ()
+       True -> do
+                 f <- use $ fpFormula . veContent
+                 t <- use fpType
+                 rst <- use fpRst
+                 index <- use fpIndex
+                 let ex = parseExpression f
+                     r = row index rst
+                     v = convert t [evaluate r (getDataSources rst) $ addPositions rst ex]
+                 fpValue .= Right v
+    return DoNothing
+
+returnFieldProperties :: FPMonad
+returnFieldProperties = do
+    fp <- get
+    let name = fp ^. fpName . veContent
+        fType = fp ^. fpType
+        formulaOrValue = if fp ^. fpIsFormula
+                         then Left $ fp ^. fpFormula . veContent
+                         else case fp ^. fpValue of
+                                 Left ve -> Right $ ve ^. veField
+                                 Right f -> Right f
+    return . DialogResult $ FieldPropertiesInfo name fType formulaOrValue
 updateFieldPropertiesDialog :: Field -> FieldPropertiesDialog -> FieldPropertiesDialog
 updateFieldPropertiesDialog f = over fpValue (either (Left . updateEditor f) (Right . const f))
 
-fieldPropertiesMoveUp :: FieldPropertiesDialog -> FieldPropertiesDialog
-fieldPropertiesMoveUp = fixFocus True . over fpFocus (\i -> if i > minBound then pred i else minBound)
+changeFocus :: FieldPropertiesFocus -> FPMonad
+changeFocus f = fpFocus .= f >> return DoNothing
 
-fieldPropertiesMoveDown :: FieldPropertiesDialog -> FieldPropertiesDialog
-fieldPropertiesMoveDown = fixFocus False . over fpFocus (\i -> if i < maxBound then succ i else maxBound)
+onDialog :: (FieldPropertiesDialog -> FieldPropertiesDialog) -> FPMonad
+onDialog f = modify f >> return DoNothing
+
+moveUp :: FieldPropertiesDialog -> FieldPropertiesDialog
+moveUp = fixFocus True . over fpFocus (\i -> if i > minBound then pred i else minBound)
+
+moveDown :: FieldPropertiesDialog -> FieldPropertiesDialog
+moveDown = fixFocus False . over fpFocus (\i -> if i < maxBound then succ i else maxBound)
 
 fixFocus :: Bool -> FieldPropertiesDialog -> FieldPropertiesDialog
 fixFocus isUp fp = case fp ^. fpFocus of
@@ -147,13 +245,13 @@ fixFocus isUp fp = case fp ^. fpFocus of
                                   else set fpFocus ((if isUp then pred else succ)  FpFormula) fp
                      _ -> fp
 
-fieldPropertiesNextType :: FieldPropertiesDialog -> FieldPropertiesDialog
-fieldPropertiesNextType fp
+nextType :: FieldPropertiesDialog -> FieldPropertiesDialog
+nextType fp
    | fp ^. fpType == maxBound = fp
    | otherwise = changeType (succ $ fp ^. fpType) fp
 
-fieldPropertiesPrevType :: FieldPropertiesDialog -> FieldPropertiesDialog
-fieldPropertiesPrevType fp
+prevType :: FieldPropertiesDialog -> FieldPropertiesDialog
+prevType fp
    | fp ^. fpType == minBound = fp
    | otherwise = changeType (pred $ fp ^. fpType) fp
 

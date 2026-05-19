@@ -28,6 +28,7 @@ library:
   - containers
   - data-default
   - directory
+  - either
   - filepath
   - gi-gdk3
   - gi-gtk3

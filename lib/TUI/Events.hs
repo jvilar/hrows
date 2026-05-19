@@ -16,16 +16,15 @@ import Brick qualified as B
 import Brick.Widgets.Edit qualified as Ed
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Control.Monad (when, unless)
+import Data.Either.Combinators (leftToMaybe)
 import Data.Text qualified as T
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl), Button (..))
-import Model.Expression.Evaluation (evaluate)
-import Model.Expression.Parser (parseExpression)
 import Model.Expression.RecursionSchemas
 import Model.RowStore
+
 import TUI.Base
 import TUI.Level
 import TUI.State
-import Model.Expression.Manipulate (addPositions)
 
 data BackupEvent = BackupEvent deriving (Show)
 
@@ -60,19 +59,24 @@ handleGlobalEvent (VtyEvent (EvKey (KChar 'w') [MCtrl])) = doSave >> return True
 handleGlobalEvent _ = return False
 
 handleEventDialogLevel :: DialogLevel -> BrickEvent Name EventType -> EventM Name State ()
-handleEventDialogLevel (Searching _) ev = do
-    res <- B.zoom (sInterface . searchDialog . anon emptySearchDialog (const False)) $ handleEventSearchDialog ev
+handleEventDialogLevel (Searching dl) ev = do
+    res <- B.zoom (sInterface . searchDialog . anon dl (const False)) $ handleEventSearchDialog ev
     case res of
         DoNothing -> return ()
         DialogCancel -> deactivateSearch
         DialogResult t -> searchSelection t
-handleEventDialogLevel (Quitting _) ev = do
-    res <- B.zoom (sInterface . quitDialog . anon emptyYesNoDialog (const False)) $ handleEventYesNoDialog ev
+handleEventDialogLevel (Quitting dl) ev = do
+    res <- B.zoom (sInterface . quitDialog . anon dl (const False)) $ handleEventYesNoDialog ev
     case res of
         DoNothing -> return ()
         DialogCancel -> abortQuit
         DialogResult () -> doQuit
-handleEventDialogLevel (FieldProperties _) ev = handleEventFieldProperties ev
+handleEventDialogLevel (FieldProperties dl) ev = do
+    res <- B.zoom (sInterface . fieldProperties . anon dl (const False)) $ handleEventFieldPropertiesDialog ev
+    case res of
+        DoNothing -> return ()
+        DialogCancel -> closeFieldPropertiesDialog
+        DialogResult t -> acceptFieldProperties t
 
 searchSelection :: T.Text -> EventM Name State ()
 searchSelection t = do
@@ -81,101 +85,20 @@ searchSelection t = do
     let pos = nextPos (fromIntegral $ s ^. sCurrentField) t (s ^. sIndex) (s ^. sRowStore)
     modify $ moveTo pos
 
-handleEventFieldProperties :: BrickEvent Name EventType -> EventM Name State ()
-handleEventFieldProperties (VtyEvent (EvKey k ms)) = handleKeyFieldProperties k ms
-handleEventFieldProperties (MouseDown n BLeft [] _) = case n of
-    DButton OkButton -> acceptFieldProperties
-    DButton CancelButton -> closeFieldPropertiesDialog
-    FieldPropertiesNameEditor -> focus .= FpName
-    FieldPropertiesValueEditor -> focus .= FpValue
-    FieldPropertiesTypeSelector -> focus .= FpType
-    FieldPropertiesFormulaMark -> do
-                                    focus .= FpFMark
-                                    switchIsFormula
-    FieldPropertiesFormulaEditor -> focus .= FpFormula
-    _ -> return ()
-  where focus = sInterface . fieldProperties . _Just . fpFocus
-handleEventFieldProperties _ = return ()
-
-handleKeyFieldProperties :: Key -> [Modifier] -> EventM Name State ()
-handleKeyFieldProperties KUp [] = sInterface . fieldProperties %= fmap fieldPropertiesMoveUp
-handleKeyFieldProperties KDown [] = sInterface . fieldProperties %= fmap fieldPropertiesMoveDown
-handleKeyFieldProperties (KChar '\t') [] = sInterface . fieldProperties %= fmap fieldPropertiesMoveDown
-handleKeyFieldProperties KBackTab [] = sInterface . fieldProperties %= fmap fieldPropertiesMoveUp
-handleKeyFieldProperties KEsc [] = closeFieldPropertiesDialog
-handleKeyFieldProperties KEnter [] = use (sInterface . fieldProperties) >>= \case
-    Nothing -> return ()
-    Just fp -> case fp ^. fpFocus of
-        FpCancel -> closeFieldPropertiesDialog
-        _ -> acceptFieldProperties
-handleKeyFieldProperties k ms = use (sInterface . fieldProperties) >>= \case
-     Nothing -> return ()
-     Just si -> case si ^. fpFocus of
-         FpType -> case (k, ms) of
-                      (KLeft, []) -> zl %= fieldPropertiesPrevType
-                      (KRight, []) -> zl %= fieldPropertiesNextType
-                      _ -> return ()
-         FpOK -> when (k ==  KChar ' ' && null ms) acceptFieldProperties
-         FpCancel -> when (k == KChar ' ' && null ms) closeFieldPropertiesDialog
-         FpName -> B.zoom (sInterface . activeEditor . _Just . veEditor) $ Ed.handleEditorEvent (VtyEvent (EvKey k ms))
-         FpValue -> use (sInterface . activeEditor) >>= \case
-                      Nothing -> return ()
-                      Just _ -> B.zoom (sInterface . activeEditor . _Just) $ handleEventValueEditor (VtyEvent (EvKey k ms))
-         FpFMark -> when (k == KChar ' ' && null ms) switchIsFormula
-         FpFormula -> handleKeyInFormula k ms
-  where zl = sInterface . fieldProperties . _Just
-
-switchIsFormula :: EventM Name State ()
-switchIsFormula = B.zoom (sInterface . fieldProperties . _Just) $ do
-    f <- use $ fpValue . vvValue
-    use fpIsFormula >>= \case
-        True -> do
-                  fpIsFormula .= False
-                  fpValue .= Left (mkEditor FieldPropertiesValueEditor f)
-        False -> do
-                   fpIsFormula .= True
-                   fpValue .= Right f
-
-handleKeyInFormula :: Key -> [Modifier] -> EventM Name State ()
-handleKeyInFormula k ms = do
-    s <- get
-    rst <- use sRowStore
-
-    B.zoom (sInterface . fieldProperties . _Just) $ do
-       B.zoom (fpFormula . veEditor) $ Ed.handleEditorEvent (VtyEvent (EvKey k ms))
-       use fpIsFormula >>= \case
-          False -> return ()
-          True -> do
-                    f <- use $ fpFormula . veContent
-                    t <- use fpType
-                    let ex = parseExpression f
-                        r = row (s ^. sIndex) rst
-                        v = convert t [evaluate r (getDataSources rst) $ addPositions rst ex]
-                    fpValue .= Right v
-
 closeFieldPropertiesDialog :: EventM Name State ()
 closeFieldPropertiesDialog = sInterface . fieldProperties .= Nothing
 
-
-acceptFieldProperties :: EventM Name State ()
-acceptFieldProperties = use (sInterface . fieldProperties) >>= \case
-    Nothing -> return ()
-    Just fp -> do
-        let n = fp ^. fpName . veContent
-        changeCurrentFieldName n
-
-        case fp ^. fpValue of
-            Left ve -> updateCurrentField $ ve ^. veField
-            Right _ -> return ()
-
-        changeCurrentFieldType (fp ^. fpType)
-
-        let form = if fp ^. fpIsFormula
-                   then Just $ fp ^. fpFormula . veContent
-                   else Nothing
-        changeCurrentFieldFormula form
-
-        closeFieldPropertiesDialog
+acceptFieldProperties :: FieldPropertiesInfo -> EventM Name State ()
+acceptFieldProperties t = do
+    changeCurrentFieldName $ t ^. fpiName
+    changeCurrentFieldType $ t ^. fpiType
+    changeCurrentFieldFormula . leftToMaybe $ t ^. fpiFormulaOrValue
+    case t ^. fpiFormulaOrValue of
+        Left f -> changeCurrentFieldFormula $ Just f
+        Right v -> do
+                      changeCurrentFieldFormula Nothing
+                      updateCurrentField v
+    closeFieldPropertiesDialog
 
 doQuit :: EventM Name State ()
 doQuit = doFinalBackup >> halt

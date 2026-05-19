@@ -199,7 +199,10 @@ properties s = set (sInterface . fieldProperties) (Just $ mkFieldPropertiesDialo
                                             (isFormulaCurrentField s)
                                             (currentField s)
                                             (currentFieldType s)
-                                            (currentFieldFormula s)) s
+                                            (currentFieldFormula s)
+                                            (s ^. sRowStore)
+                                            (s ^. sIndex)
+                                            ) s
 
 activateSearch :: EventM Name State ()
 activateSearch = do

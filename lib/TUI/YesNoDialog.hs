@@ -4,7 +4,6 @@
 
 module TUI.YesNoDialog (
   YesNoDialog
-  , emptyYesNoDialog
   , mkYesNoDialog
   , renderYesNoDialog
   , handleEventYesNoDialog
@@ -32,9 +31,6 @@ mkYesNoDialog message ttle = YesNoDialog message
                                            (Just (DButton OkButton, [ ("OK", DButton OkButton, ())
                                                                     , ("Cancel", DButton CancelButton, ())]))
                                            (T.length message + 4))
-
-emptyYesNoDialog :: YesNoDialog
-emptyYesNoDialog = mkYesNoDialog "" ""
 
 renderYesNoDialog :: YesNoDialog -> Widget Name
 renderYesNoDialog ynd = renderDialog (ynd ^. ynDialog) $ txt " " <=> myTxt (" " <> ynd ^. ynMessage) <=> txt " "

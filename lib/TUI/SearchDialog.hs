@@ -7,7 +7,6 @@
 module TUI.SearchDialog (
   SearchDialog
   , mkSearchDialog
-  , emptySearchDialog
   , renderSearchDialog
   , handleEventSearchDialog
   ) where
@@ -41,10 +40,6 @@ mkSearchDialog n w ttle values = SearchDialog (list n (V.fromList values) 1)
                                                     w
                                             )
 
-emptySearchDialog :: SearchDialog
-emptySearchDialog = SearchDialog (list SearchList V.empty 1) (dialog Nothing Nothing 0)
-
-renderSearchDialog :: SearchDialog -> Widget Name
 renderSearchDialog sd = Widget Fixed Greedy $ do
     h <- availHeight <$> getContext
     let l = min (h - 4) (1 + V.length (sd ^. sdValues . listElementsL))

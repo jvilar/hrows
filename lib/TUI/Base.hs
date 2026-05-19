@@ -74,6 +74,16 @@ data DialogButton = OkButton | CancelButton deriving (Eq, Ord, Show)
 -- the dialog was cancelled. 
 data DialogEventResult r = DoNothing | DialogResult r | DialogCancel deriving (Eq, Show)
 
+instance Semigroup r => Semigroup (DialogEventResult r) where
+    DoNothing <> r = r
+    r <> DoNothing = r
+    DialogCancel <> _ = DialogCancel
+    _ <> DialogCancel = DialogCancel
+    DialogResult r1 <> DialogResult r2 = DialogResult (r1 <> r2)
+
+instance Semigroup r => Monoid (DialogEventResult r) where
+    mempty = DoNothing
+
 class HasEditor i where
     editorLens :: Lens' i (Maybe ValueEditor)
 
