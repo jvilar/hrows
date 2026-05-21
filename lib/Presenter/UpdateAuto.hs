@@ -18,28 +18,13 @@ import Presenter.Auto
 import Presenter.Input
 import Model.Expression.Parser (expression, eof, parse)
 import Model.Expression.Manipulate (addPositions)
-
-data UndoZipper a = UndoZipper [a] a [a]
-
-current :: UndoZipper a -> a
-current (UndoZipper _ c _) = c
-
-back :: UndoZipper a -> Maybe (UndoZipper a)
-back (UndoZipper (u:us) c rs) = Just $ UndoZipper us u (c:rs)
-back _ = Nothing
-
-forward :: UndoZipper a -> Maybe (UndoZipper a)
-forward (UndoZipper us c (r:rs)) = Just $ UndoZipper (c:us) r rs
-forward _ = Nothing
-
-push :: UndoZipper a -> a -> UndoZipper a
-push (UndoZipper us c _) m = UndoZipper (c:us) m []
+import Model.UndoZipper
 
 type ModelFilter = (Model, Filter)
 type ZM = UndoZipper (ModelFilter, RowPos)
 
 initialZM :: ZM
-initialZM = UndoZipper [] ((empty, Nothing), 0) []
+initialZM = mkUndoZipper ((empty, Nothing), 0)
 
 message :: Message -> PresenterM ()
 message = sendGUIM . ShowIteration . DisplayMessage
@@ -50,7 +35,6 @@ updateAuto = fst . current <$> accumM_ undoOrUpdate initialZM
 undoOrUpdate :: ZM -> (UpdateCommand, RowPos) -> PresenterM ZM
 undoOrUpdate zm (Undo, _) = tryToMoveZM zm back "No puedo deshacer"
 undoOrUpdate zm (Redo, _) =  tryToMoveZM zm forward "No puedo rehacer"
-undoOrUpdate zm (BlockUndo, _) = return $ UndoZipper [] (current zm) []
 undoOrUpdate zm (DoNothing, _) = return zm
 undoOrUpdate zm p@(_, pos) = push zm . (,pos) <$> update (fst $ current zm) p
 
@@ -126,7 +110,6 @@ update modelFilter (DeleteSources ns, pos) =
     partialRefresh pos $ first (deleteSources ns) modelFilter
 update _ (Undo, _) = liftIO $ throwIO $ HRowsException "No puede llegar un Undo al método update de UpdateAuto"
 update _ (Redo, _) = liftIO $ throwIO $ HRowsException "No puede llegar un Redo al método update de UpdateAuto"
-update _ (BlockUndo, _) = liftIO $ throwIO $ HRowsException "No puede llegar un BlockUndo al método update de UpdateAuto"
 
 processFilter :: Model -> Formula -> PresenterM Filter
 processFilter _ formula | T.null formula = do
