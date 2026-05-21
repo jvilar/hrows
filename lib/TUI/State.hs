@@ -70,7 +70,19 @@ data State = State { _sRowStore :: RowStore
                    , _sLog :: [Text]
                    }
 
-makeLenses ''State
+makeLensesFor [
+  ("_sSourceInfo", "sSourceInfo")
+  , ("_sIndex", "sIndex")
+  , ("_sCurrentField", "sCurrentField")
+  , ("_sInterface", "sInterface")
+  , ("_sLog", "sLog")
+  ] 'State
+
+sRowStore :: Getter State RowStore
+sRowStore = to _sRowStore
+
+setSRowStore :: Setter' State RowStore
+setSRowStore = sets $ \f s -> s { _sRowStore = f (_sRowStore s) }
 
 logMessage :: Text -> EventM Name State ()
 -- logMessage t = sLog %= reverse . take 10 . (t:) . reverse
@@ -103,7 +115,7 @@ isFormulaCurrentField s = isFormula (fromIntegral $ s ^. sCurrentField) (s ^. sR
 changeCurrentFieldFormula :: Maybe Formula -> EventM Name State ()
 changeCurrentFieldFormula mf = do
     f <- use sCurrentField
-    sRowStore %= changeFieldFormula mf (fromIntegral f)
+    setSRowStore %= changeFieldFormula mf (fromIntegral f)
     n <- use sIndex
     modify $ moveTo n
 
@@ -112,7 +124,7 @@ updateCurrentField f = do
     s <- get
     let (rst, ch) = changeField (s ^. sIndex) (fromIntegral $ s ^. sCurrentField) f (s ^. sRowStore)
     when (notNull ch) $ do
-        sRowStore .= rst
+        setSRowStore .= rst
         let r = row (s ^. sIndex) rst
         sInterface %= updateLevels (uRow r (r !! (s ^. sCurrentField)))
   where
@@ -131,7 +143,7 @@ changeCurrentFieldName n = do
     let ns = fnames (s ^. sRowStore)
     when (ns !! (s ^. sCurrentField) /= n) $ do
         let ns' = replace (s ^. sCurrentField) n ns
-        sRowStore %= renameFields ns'
+        setSRowStore %= renameFields ns'
         sInterface %= updateLevels (uFieldNames ns' (s ^. sCurrentField))
   where
     uFieldNames :: [Text] -> Int -> Level Interface -> Level Interface
@@ -145,11 +157,11 @@ changeCurrentFieldType nt = do
     s <- get
     ts <- uses sRowStore types
     when (ts  !! (s ^. sCurrentField) /= nt) $
-        sRowStore %= changeFieldType nt (fromIntegral $ s ^. sCurrentField)
+        setSRowStore %= changeFieldType nt (fromIntegral $ s ^. sCurrentField)
 
 newRow :: EventM Name State ()
 newRow = do
-    B.zoom sRowStore $ modify addEmptyRow
+    setSRowStore %= addEmptyRow
     s <- uses sRowStore size
     modify $ moveTo (s - 1)
 
@@ -277,7 +289,7 @@ doSave = do
                                     in changePathAndConf (pc { confPath = Just cnf }) si
                          Just _ -> si
             liftIO $ writeRowStore si' sis rst
-            sRowStore %= setUnchanged
+            setSRowStore %= setUnchanged
 
 doBackup :: EventM Name State ()
 doBackup = use sRowStore >>= (\case
