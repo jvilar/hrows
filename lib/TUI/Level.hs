@@ -23,6 +23,7 @@ module TUI.Level (
   , levelZoom
   , levelBack
   , quitDialog
+  , messageDialog
   , searchDialog
   , fieldProperties
   , tableViewer
@@ -60,6 +61,7 @@ data Level i = WithDialog DialogLevel i
 
 data DialogLevel = Searching SearchDialog
                  | Quitting MessageDialog
+                 | Informing MessageDialog
                  | FieldProperties FieldPropertiesDialog
 
 newtype ZoomLevel = NormalZoom ZoomViewer
@@ -194,6 +196,13 @@ quitDialog = lens getter setter
                         return msgd
           setter i v = set levelDialog (fmap Quitting v) i
 
+messageDialog :: Lens' Interface (Maybe MessageDialog)
+messageDialog = lens getter setter
+    where getter i = do
+                        Informing msgd <- i ^. levelDialog
+                        return msgd
+          setter i v = set levelDialog (fmap Informing v) i
+
 fieldProperties :: Lens' Interface (Maybe FieldPropertiesDialog)
 fieldProperties = lens getter setter
     where getter i = do
@@ -222,6 +231,7 @@ activeEditor = editorLens
 renderDialogLevel :: DialogLevel -> Widget Name
 renderDialogLevel (Searching sd) = renderSearchDialog sd
 renderDialogLevel (Quitting msgd) = renderMessageDialog msgd
+renderDialogLevel (Informing msgd) = renderMessageDialog msgd
 renderDialogLevel (FieldProperties fp) = renderFieldPropertiesDialog fp
 
 renderZoomLevel :: ZoomLevel -> Widget Name

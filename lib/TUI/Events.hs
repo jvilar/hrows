@@ -73,6 +73,11 @@ handleEventDialogLevel (Quitting dl) ev = do
         DoNothing -> return ()
         DialogCancel -> abortQuit
         DialogResult () -> doQuit
+handleEventDialogLevel (Informing dl) ev = do
+    res <- B.zoom (sInterface . messageDialog . anon dl (const False)) $ handleEventMessageDialog ev
+    case res of
+        DoNothing -> return ()
+        _ -> sInterface . messageDialog .= Nothing
 handleEventDialogLevel (FieldProperties dl) ev = do
     res <- B.zoom (sInterface . fieldProperties . anon dl (const False)) $ handleEventFieldPropertiesDialog ev
     case res of
@@ -120,9 +125,17 @@ handleCommonKeys (VtyEvent (EvKey (KChar c) [m]))
     _ -> return False
   | m == MCtrl = case c of
     'f' -> activateSearch >> return True
-    'r' -> redo >> return True
+    'r' -> do
+              redo >>= \case
+                True -> return ()
+                False -> sInterface . messageDialog .= Just (mkMessageDialog "Nothing to redo" "Redo" False)
+              return True
     't' -> toggleTable >> return True
-    'z' -> undo >> return True
+    'z' -> do
+              undo >>= \case
+                True -> return ()
+                False -> sInterface . messageDialog .= Just (mkMessageDialog "Nothing to undo" "Undo" False)
+              return True
     '\t' -> forward >> return True
     _ -> return False
 handleCommonKeys (VtyEvent (EvKey k [MCtrl])) = case k of
