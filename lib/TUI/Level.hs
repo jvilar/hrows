@@ -229,9 +229,9 @@ renderZoomLevel (NormalZoom zv) = renderZoomViewer zv
 
 renderBackLevel :: Text -> BackLevel -> Widget Name
 renderBackLevel title (AsTable tv) = renderBack title (renderTableViewer tv) tableHelp
-  where tableHelp = "C-z: zoom, C-r: field pRoperties, C-t: return to field view, C-f: find, C-w: write, C-q: exit"
+  where tableHelp = "A-z: zoom, A-r: field pRoperties, C-t: return to field view, C-f: find, C-w: write, C-z: undo, C-r: redo, C-q: exit"
 renderBackLevel title (AsRows rv) = renderBack title (renderRowViewer rv) rowHelp
-  where rowHelp = "C-z: zoom, C-r: field pRoperties, C-t: table view, C-f: find, C-n: new row, C-w: write, C-q: exit"
+  where rowHelp = "A-z: zoom, A-r: field pRoperties, C-t: table view, C-f: find, C-n: new row, C-w: write, C-z: undo, C-r: redo, C-q: exit"
 
 renderBack :: Text -> Widget Name -> Text -> Widget Name
 renderBack t content help = joinBorders $ center $

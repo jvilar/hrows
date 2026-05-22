@@ -29,5 +29,5 @@ forward (UndoZipper us c (r:rs)) = Just $ UndoZipper (c:us) r rs
 forward _ = Nothing
 
 -- | Add a new value, remove all forward values.
-push :: UndoZipper a -> a -> UndoZipper a
-push (UndoZipper us c _) m = UndoZipper (c:us) m []
+push :: a -> UndoZipper a -> UndoZipper a
+push m (UndoZipper us c _) = UndoZipper (c:us) m []

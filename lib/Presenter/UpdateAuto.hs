@@ -36,7 +36,7 @@ undoOrUpdate :: ZM -> (UpdateCommand, RowPos) -> PresenterM ZM
 undoOrUpdate zm (Undo, _) = tryToMoveZM zm back "No puedo deshacer"
 undoOrUpdate zm (Redo, _) =  tryToMoveZM zm forward "No puedo rehacer"
 undoOrUpdate zm (DoNothing, _) = return zm
-undoOrUpdate zm p@(_, pos) = push zm . (,pos) <$> update (fst $ current zm) p
+undoOrUpdate zm p@(_, pos) = (flip push zm) . (,pos) <$> update (fst $ current zm) p
 
 tryToMoveZM :: ZM -> (ZM -> Maybe ZM) -> Text -> PresenterM ZM
 tryToMoveZM zm dir m = case dir zm of

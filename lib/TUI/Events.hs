@@ -18,13 +18,14 @@ import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Control.Monad (when, unless)
 import Data.Either.Combinators (leftToMaybe)
 import Data.Text qualified as T
-import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl), Button (..))
+import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl, MAlt), Button (..))
 import Model.Expression.RecursionSchemas
 import Model.RowStore
 
 import TUI.Base
 import TUI.Level
 import TUI.State
+import Graphics.Vty (Modifier(..))
 
 data BackupEvent = BackupEvent deriving (Show)
 
@@ -40,6 +41,7 @@ handleEvent (AppEvent BackupEvent) = doBackup
 handleEvent e = do
     case e of
         MouseDown {} -> logMessage $ "Mouse " <> T.pack (show e)
+        VtyEvent k@(EvKey {}) -> logMessage $ "Key " <> T.pack (show k)
         _ -> return ()
     handleGlobalEvent e >>->> (use sInterface >>= handleInLevel e . out)
 
@@ -111,11 +113,16 @@ handleEventZoomLevel _ (MouseDown {}) = return True
 handleEventZoomLevel (NormalZoom _) _ = return False
 
 handleCommonKeys :: BrickEvent Name EventType -> EventM Name State Bool
-handleCommonKeys (VtyEvent (EvKey (KChar c) [MCtrl])) = case c of
-    'f' -> activateSearch >> return True
+handleCommonKeys (VtyEvent (EvKey (KChar c) [m]))
+  | m == MAlt || m == MMeta = case c of
     'r' -> toggleProperties >> return True
-    't' -> toggleTable >> return True
     'z' -> toggleZoom >> return True
+    _ -> return False
+  | m == MCtrl = case c of
+    'f' -> activateSearch >> return True
+    'r' -> redo >> return True
+    't' -> toggleTable >> return True
+    'z' -> undo >> return True
     '\t' -> forward >> return True
     _ -> return False
 handleCommonKeys (VtyEvent (EvKey k [MCtrl])) = case k of

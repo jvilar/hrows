@@ -19,6 +19,8 @@ module TUI.State (
     , currentField
     , currentFieldType
     , currentFieldFormula
+    , undo
+    , redo
     , isFormulaCurrentField
     , updateCurrentField
     , changeCurrentFieldFormula
@@ -43,13 +45,14 @@ module TUI.State (
 
 
 import Brick hiding (getName, zoom)
-import Brick qualified as B
 import Brick.Widgets.List hiding (splitAt, reverse)
 import Control.Exception (try, SomeException)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Control.Monad (when, void, unless)
 import Control.Monad.IO.Class (liftIO)
 import Data.Text (Text)
+import System.Directory (removeFile)
+
 import HRowsException (HRowsException(..))
 import Model.DefaultFileNames (defaultBackupFileName, defaultConfFileName)
 import Model.Expression.RecursionSchemas
@@ -57,45 +60,42 @@ import Model.Field
 import Model.Row (Row)
 import Model.RowStore
 import Model.SourceInfo
-import System.Directory (removeFile)
-
+import Model.UndoZipper qualified as U
 import TUI.Base
 import TUI.Level
 
-data State = State { _sRowStore :: RowStore
+type UZipper = U.UndoZipper (RowStore, RowPos)
+
+data State = State { _sRowStoreZipper :: UZipper
                    , _sSourceInfo :: Maybe (SourceInfo, [SourceInfo])
-                   , _sIndex :: Int
+                   , _sIndex :: RowPos
                    , _sCurrentField :: Int
                    , _sInterface :: Interface
                    , _sLog :: [Text]
                    }
 
-makeLensesFor [
-  ("_sSourceInfo", "sSourceInfo")
-  , ("_sIndex", "sIndex")
-  , ("_sCurrentField", "sCurrentField")
-  , ("_sInterface", "sInterface")
-  , ("_sLog", "sLog")
-  ] 'State
+makeLenses 'State
 
 sRowStore :: Getter State RowStore
-sRowStore = to _sRowStore
+sRowStore = to (fst . U.current . _sRowStoreZipper)
 
 setSRowStore :: Setter' State RowStore
-setSRowStore = sets $ \f s -> s { _sRowStore = f (_sRowStore s) }
+setSRowStore = sets $ \f s -> over sRowStoreZipper (U.push (f $ s ^. sRowStore, s ^. sIndex)) s
 
 logMessage :: Text -> EventM Name State ()
--- logMessage t = sLog %= reverse . take 10 . (t:) . reverse
-logMessage _ = return ()
+logMessage t = sLog %= reverse . take 10 . (t:) . reverse
+-- logMessage _ = return ()
 
 initialState :: RowStore -> Maybe (SourceInfo, [SourceInfo]) -> State
-initialState rst msi = State { _sRowStore = rst
+initialState rst msi = State { _sRowStoreZipper = U.mkUndoZipper (rst, index)
                              , _sSourceInfo = msi
-                             , _sIndex = if size rst > 0 then 0 else -1
+                             , _sIndex = index
                              , _sCurrentField = 0
                              , _sInterface = In . Back . AsRows $ mkRowViewer rst 0
                              , _sLog = []
                              }
+    where index = if size rst > 0 then 0 else -1
+
 
 currentFieldName :: State -> Text
 currentFieldName s = fnames (s ^. sRowStore) !! (s ^. sCurrentField)
@@ -111,6 +111,24 @@ currentFieldFormula s = fieldFormula (fromIntegral $ s ^. sCurrentField) (s ^. s
 
 isFormulaCurrentField :: State -> Bool
 isFormulaCurrentField s = isFormula (fromIntegral $ s ^. sCurrentField) (s ^. sRowStore)
+
+
+undo :: EventM Name State Bool
+undo = moveZipper U.back
+
+redo :: EventM Name State Bool
+redo = moveZipper U.forward
+
+moveZipper :: (UZipper -> Maybe UZipper) -> EventM Name State Bool
+moveZipper move = do
+         zp <- use sRowStoreZipper
+         case move zp of
+              Nothing -> return False
+              Just zp' -> do
+                            sRowStoreZipper .= zp'
+                            modify . moveTo . snd $ U.current zp'
+                            return True
+
 
 changeCurrentFieldFormula :: Maybe Formula -> EventM Name State ()
 changeCurrentFieldFormula mf = do

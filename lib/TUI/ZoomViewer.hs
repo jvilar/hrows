@@ -50,7 +50,7 @@ renderZoomViewer zv = centerLayer $ joinBorders $
                          <=>
                          hBorder
                          <=>
-                         hCenter (txt "C-r: field pRoperties, C-z: close zoom")
+                         hCenter (txt "A-r: field pRoperties, A-z: close zoom")
 
 mkZoomViewer :: Text -> Bool -> Field -> ZoomViewer
 mkZoomViewer fname isFormula field = ZoomViewer fname $ if isFormula
