@@ -18,7 +18,7 @@ import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Control.Monad (when, unless)
 import Data.Either.Combinators (leftToMaybe)
 import Data.Text qualified as T
-import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Modifier(MCtrl, MAlt), Button (..))
+import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Button (..))
 import Model.Expression.RecursionSchemas
 import Model.RowStore
 
@@ -54,7 +54,7 @@ handleGlobalEvent :: BrickEvent Name EventType -> EventM Name State Bool
 handleGlobalEvent (VtyEvent (EvKey (KChar 'q') [MCtrl])) = do
     rst <- use sRowStore
     if changed rst
-    then sInterface . quitDialog .= Just (mkYesNoDialog "Are you sure you want to quit?" "Quit")
+    then sInterface . quitDialog .= Just (mkMessageDialog "Are you sure you want to quit?" "Quit" True)
     else doQuit
     return True
 handleGlobalEvent (VtyEvent (EvKey (KChar 'w') [MCtrl])) = doSave >> return True
@@ -68,7 +68,7 @@ handleEventDialogLevel (Searching dl) ev = do
         DialogCancel -> deactivateSearch
         DialogResult t -> searchSelection t
 handleEventDialogLevel (Quitting dl) ev = do
-    res <- B.zoom (sInterface . quitDialog . anon dl (const False)) $ handleEventYesNoDialog ev
+    res <- B.zoom (sInterface . quitDialog . anon dl (const False)) $ handleEventMessageDialog ev
     case res of
         DoNothing -> return ()
         DialogCancel -> abortQuit

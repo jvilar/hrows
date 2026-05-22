@@ -30,10 +30,10 @@ module TUI.Level (
   , activeEditor
 
   , module TUI.FieldPropertiesDialog
+  , module TUI.MessageDialog
   , module TUI.RowViewer
   , module TUI.SearchDialog
   , module TUI.TableViewer
-  , module TUI.YesNoDialog
   , module TUI.ZoomViewer
   ) where
 
@@ -47,10 +47,10 @@ import Model.Expression.RecursionSchemas ( Fix(..), bottomUp, cata, para, applyT
 
 import TUI.Base
 import TUI.FieldPropertiesDialog
+import TUI.MessageDialog
 import TUI.RowViewer
 import TUI.SearchDialog
 import TUI.TableViewer
-import TUI.YesNoDialog
 import TUI.ZoomViewer
 
 
@@ -59,7 +59,7 @@ data Level i = WithDialog DialogLevel i
              | Back BackLevel deriving Functor
 
 data DialogLevel = Searching SearchDialog
-                 | Quitting YesNoDialog
+                 | Quitting MessageDialog
                  | FieldProperties FieldPropertiesDialog
 
 newtype ZoomLevel = NormalZoom ZoomViewer
@@ -187,11 +187,11 @@ searchDialog = lens getter setter
                         return sd
           setter i v = set levelDialog (fmap Searching v) i
 
-quitDialog :: Lens' Interface (Maybe YesNoDialog)
+quitDialog :: Lens' Interface (Maybe MessageDialog)
 quitDialog = lens getter setter
     where getter i = do
-                        Quitting ynd <- i ^. levelDialog
-                        return ynd
+                        Quitting msgd <- i ^. levelDialog
+                        return msgd
           setter i v = set levelDialog (fmap Quitting v) i
 
 fieldProperties :: Lens' Interface (Maybe FieldPropertiesDialog)
@@ -221,7 +221,7 @@ activeEditor = editorLens
 
 renderDialogLevel :: DialogLevel -> Widget Name
 renderDialogLevel (Searching sd) = renderSearchDialog sd
-renderDialogLevel (Quitting ynd) = renderYesNoDialog ynd
+renderDialogLevel (Quitting msgd) = renderMessageDialog msgd
 renderDialogLevel (FieldProperties fp) = renderFieldPropertiesDialog fp
 
 renderZoomLevel :: ZoomLevel -> Widget Name
