@@ -31,5 +31,4 @@ data UpdateCommand = UpdateField FieldPos Field
                    | DeleteSources [SourceName]
                    | Undo
                    | Redo
-                   | BlockUndo
                      deriving Show
