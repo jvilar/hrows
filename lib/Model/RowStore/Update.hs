@@ -31,10 +31,10 @@ module Model.RowStore.Update (
 import qualified Data.IntSet as IS
 import qualified Data.IntMap.Strict as IM
 
-import Data.List(sort, foldl')
+import Data.List(sort)
 import Data.Map(Map)
 import qualified Data.Map as M
-import Data.Maybe(catMaybes, fromJust, isNothing, mapMaybe)
+import Data.Maybe(catMaybes, fromJust, isNothing, mapMaybe, fromMaybe)
 import qualified Data.Text as T
 import TextShow(TextShow(showt))
 
@@ -48,7 +48,7 @@ import Model.Row
 import Model.RowStore.Base
 import Model.RowStore.RowStoreConf
 import Model.RowStore.UpdatePlan
-import Model.SourceInfo (FormatInfo(NoFormatInfo))
+import Model.Expression.RecursionSchemas (Fix(In))
 
 updateAll :: UpdatePlan -> [DataSource] -> Row -> Row
 updateAll up dss r = foldr (changeRow $ mkError "Fórmula con dependencias circulares")
@@ -135,14 +135,23 @@ mkRSFromExpressions :: [(Expression, FieldName)] -> RowStore -> RowStore
 mkRSFromExpressions expNames rst = let
     exps = map (addPositions rst . fst) expNames
     values = [ map (evaluate r $ _dataSources rst) exps | r <- rows rst ]
-    types = case values of
+    initialTypes = do
+        e <- exps
+        return $ do
+                    p <- case e of
+                           In (NamedPosition _ (Just i)) -> Just i
+                           In (Position i) -> Just i
+                           _ -> Nothing
+                    Just $ fieldType (fromIntegral p) rst
+    inferredTypes = case values of
               [] -> replicate (length exps) TypeString
               (v:vs) -> foldr (zipWith consolidateType . map typeOf) (map typeOf v) vs
-    formulas = translateExpressions rst exps
-    names = map (Just . snd) expNames
+    newTypes = zipWith fromMaybe inferredTypes initialTypes
+    newFormulas = translateExpressions rst exps
+    newNames = map (Just . snd) expNames
     rst' = flip (foldl' addRow) values
-         $ flip (foldr (uncurry changeFieldFormula)) (zip formulas [0..])
-         $ newFields (zip names types)
+         $ flip (foldr (uncurry changeFieldFormula)) (zip newFormulas [0..])
+         $ newFields (zip newNames newTypes)
          $ deleteFields [0 .. fromIntegral (_nFields rst - 1)] rst { _rows = IM.empty, _size = 0 }
   in rst'
 
@@ -164,9 +173,9 @@ translateExpressions rst exps = let
 
 consolidateType :: FieldType -> FieldType -> FieldType
 consolidateType t1 t2 | t1 == t2 = t1
-                      | t1 == TypeEmpty = t2
                       | t2 == TypeEmpty = t1
                       | otherwise = case t1 of
+                         TypeEmpty -> t2
                          TypeInt -> case t2 of
                                       TypeInt0 -> TypeInt0
                                       TypeDouble -> TypeDouble
@@ -190,10 +199,10 @@ consolidateType t1 t2 | t1 == t2 = t1
 -- |Changes one field. Returns the new store and the fields changed.
 changeField :: RowPos -> FieldPos -> Field -> RowStore -> (RowStore, [FieldPos])
 changeField r c field rst = let
-      row = _rows rst IM.! r
+      newRow = _rows rst IM.! r
       field' = convertKeepText (_type $ _fieldInfo rst !!! c) field
-      (row', poss) = updateField (_updatePlan rst) field' c (_dataSources rst) row
-    in if row !!! c /= field'
+      (row', poss) = updateField (_updatePlan rst) field' c (_dataSources rst) newRow
+    in if newRow !!! c /= field'
        then (rst { _rows = IM.insert r row' (_rows rst), _changed = True }, poss)
        else (rst, [])
 
@@ -225,15 +234,15 @@ addPlan rst = let
 -- |Adds new fields to the store.
 newFields :: [(Maybe FieldName, FieldType)] -> RowStore -> RowStore
 newFields l rst = let
-    names = adjustNames rst (map fst l)
-    oldInfo = [ i { _name = n } | (i, n) <- zip (_fieldInfo rst) names ]
+    newNames = adjustNames rst (map fst l)
+    oldInfo = [ i { _name = n } | (i, n) <- zip (_fieldInfo rst) newNames ]
     newInfo = [ FieldInfo { _name = n
                           , _type = t
                           , _defaultValue = defaultValue t
                           , _expression = Nothing
                           , _formula = Nothing
                           , _visible = True
-                          } | (n, t) <- zip (drop (_nFields rst) names) (map snd l) ]
+                          } | (n, t) <- zip (drop (_nFields rst) newNames) (map snd l) ]
     rinfo = oldInfo ++ newInfo
     in addPlan rst { _rows = IM.map (++ map (defaultValue . snd) l) (_rows rst)
                  , _fieldInfo = rinfo
@@ -264,14 +273,14 @@ del = go 0 . sort . map fromIntegral
 
 -- |Changes the names of the fields to those given.
 renameFields :: [FieldName] -> RowStore -> RowStore
-renameFields names rst = addPlan rst { _fieldInfo = zipWith updateFInfo (_fieldInfo rst) names }
+renameFields newNames rst = addPlan rst { _fieldInfo = zipWith updateFInfo (_fieldInfo rst) newNames }
     where translations = catMaybes $ zipWith (\n1 n2 -> (,) <$> n1 <*> Just n2)
                                              (map _name $ _fieldInfo rst)
-                                             names
+                                             newNames
           updateFInfo fi n = let
                                e = _expression fi
-                               (e', changed) = translateNames translations $ fromJust e
-                             in if isNothing e || not changed
+                               (e', isChanged) = translateNames translations $ fromJust e
+                             in if isNothing e || not isChanged
                                 then fi { _name = Just n }
                                 else fi { _name = Just n
                                         , _expression = Just e'
@@ -310,9 +319,9 @@ importFields other keys values rst = addPlan rst { _rows = IM.map importRow (_ro
     where importRow r = case findRow r of
                             Nothing -> r
                             Just vals' -> replace r vals'
-              where findRow r = M.lookup (key r) keyTable
-                    key r = map ((r !!!) . fst) keys
-                    keyTable = prepareKeyTable keys values (IM.elems $ _rows other)
+          findRow r = M.lookup (key r) keyTable
+          key r = map ((r !!!) . fst) keys
+          keyTable = prepareKeyTable keys values (IM.elems $ _rows other)
 
 -- |Imports rows from another store.
 importRows :: RowStore -> [(FieldPos, FieldPos)] -> RowStore -> RowStore
@@ -349,8 +358,8 @@ moveField from to rst = let
     newPos = iperm [0 .. _nFields rst - 1]
     updateFInfo fi = let
                        e = _expression fi
-                       (e', changed) = translatePositions newPos $ fromJust e
-                     in if isNothing e || not changed
+                       (e', hasChanged) = translatePositions newPos $ fromJust e
+                     in if isNothing e || not hasChanged
                         then fi
                         else fi { _expression = Just e'
                                 , _formula = Just $ toFormula e'
@@ -363,15 +372,15 @@ moveField from to rst = let
                       }
     where
       -- move forward, ie from < to
-      mvf from to l = let
-          (left, f:right) = splitAt from l
-          (before, after) = splitAt (to - from) right
-        in left ++ before ++ f:after
+      mvf fr t l = let
+           (left, f:right) = splitAt fr l
+           (before, after) = splitAt (t - fr) right
+         in left ++ before ++ f:after
       -- move backward, ie from > to
-      mvb from to l = let
-          (left, right) = splitAt to l
-          (before, f: after) = splitAt (from - to) right
-        in left ++ f:before ++ after
+      mvb fr t l = let
+           (left, right) = splitAt t l
+           (before, f: after) = splitAt (fr - t) right
+         in left ++ f:before ++ after
 
 -- |Changes the type of the field.
 changeFieldType :: FieldType -> FieldPos -> RowStore -> RowStore
