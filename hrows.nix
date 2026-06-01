@@ -1,5 +1,5 @@
 { pkgs, mkDerivation, aeson, aeson-pretty, auto, base, brick, bv
-, bytestring, containers, data-default, directory, filepath, gi-gdk3
+, bytestring, containers, data-default, directory, either, filepath, gi-gdk3
 , gi-gtk3, gi-gtk-hs, haskeline, haskell-gi-base, hspec, jmvOptions
 , lens, lib, megaparsec, mtl, text, text-show, transformers, vector
 , vty
@@ -13,7 +13,7 @@ mkDerivation {
   enableSeparateDataOutput = true;
   libraryHaskellDepends = [
     aeson aeson-pretty auto base brick bv bytestring containers
-    data-default directory filepath gi-gdk3 gi-gtk3 haskell-gi-base
+    data-default directory either filepath gi-gdk3 gi-gtk3 haskell-gi-base
     jmvOptions lens megaparsec mtl text text-show transformers vector
     vty
   ];

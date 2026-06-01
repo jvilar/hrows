@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 
-import Control.Applicative(ZipList(..), Alternative ((<|>)))
+import Control.Applicative(Alternative ((<|>)))
 import Control.Arrow((&&&))
 import Control.Monad(unless, when, forM_)
 import Control.Lens
@@ -26,7 +26,6 @@ import Model.Row
 import Model.RowStore
 import Model.SourceInfo
 import Numeric (showFFloat)
-import Model.RowStore.RowStoreConf (fromNamesTypes)
 
 data Format = HTML | LaTeX | Listatab deriving (Show, Read, Enum, Eq)
 
@@ -200,7 +199,7 @@ keys col rst = rst ^..  colF col . element 0 . to toString
 anonymizeDic :: Int -> [Text] -> Map Text Text
 anonymizeDic ml ts = let
     s = sortOn T.reverse ts
-    d = zipWith3 combine s ("":s) (tail s ++ [""])
+    d = zipWith3 combine s ("":s) (drop 1 s ++ [""])
     combine r p n = maxBy T.length (discriminate r p) (discriminate r n)
     dots t = T.pack (replicate (ml - T.length t) '.') `T.append` t
   in M.fromList $ zip s (map dots d)
@@ -263,7 +262,13 @@ fToText d f
                   TypeInt -> case d of
                                 0 -> toString f
                                 _ -> toString f <> "." <> T.replicate d "0"
-                  TypeDouble -> T.pack $ showFFloat (Just d) (toDouble f) ""
+                  TypeDouble -> let
+                                   v = toDouble f
+                                   ts = toString f
+                                   fc = T.head ts
+                                in if v < 0.01 && fc /= '0' && fc /= '-'
+                                   then ts
+                                   else T.pack $ showFFloat (Just d) (toDouble f) ""
                   _ -> toString f
 
 colorGlobal :: Options -> Field -> Text
@@ -272,7 +277,7 @@ colorGlobal opts f = let
   v = case typeOf f of
          TypeInt -> fromIntegral $ toInt f
          TypeDouble -> toDouble f
-         _ -> opts ^. minPass
+         _ -> 0
   in if v < opts ^. canCompensate
      then "red"
      else if v < opts ^. minPass
