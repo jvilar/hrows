@@ -41,6 +41,7 @@ import qualified Data.Text as T
 import GHC.Int(Int32)
 import GI.Gtk hiding (MessageDialog)
 import GI.Gdk hiding (Window)
+import System.Directory(getCurrentDirectory)
 
 
 import GUI.Command
@@ -90,6 +91,11 @@ createDialogButtonsLabel parent btns lbl = do
 
 configureDialog :: Window -> Dialog -> IO ()
 configureDialog parent dlg = do
+  dir <- getCurrentDirectory
+  fc <- castTo FileChooser dlg
+  _ <- case fc of
+            Nothing -> return True
+            Just f -> fileChooserSetCurrentFolder f dir
   set dlg [ #transientFor := parent
           , #modal := True
           , #typeHint := WindowTypeHintDialog
