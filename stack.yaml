@@ -22,6 +22,7 @@ nix:
     - pcre2
     - pkg-config
     - util-linux
+    - xclip
     - xorg.libXdmcp
     - xorg.libXtst
     - xz

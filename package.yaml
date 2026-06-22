@@ -37,6 +37,7 @@ library:
   - lens
   - megaparsec
   - mtl
+  - process
   - text
   - text-show
   - text-zipper

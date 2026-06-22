@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module TUI.Events (
     EventType
@@ -14,13 +15,17 @@ module TUI.Events (
 import Brick hiding (getName, zoom)
 import Brick qualified as B
 import Brick.Widgets.Edit qualified as Ed
+import Control.Exception (catch)
 import Control.Lens hiding (index, Zoom, zoom, Level, para)
 import Control.Monad (when, unless)
+import Control.Monad.IO.Class (MonadIO(liftIO))
 import Data.Either.Combinators (leftToMaybe)
 import Data.Text qualified as T
+import Data.Text.Zipper (insertMany)
 import Graphics.Vty.Input.Events(Event(EvKey), Key(..), Button (..))
 import Model.Expression.RecursionSchemas
 import Model.RowStore
+import System.Process (readProcess)
 
 import TUI.Base
 import TUI.Level
@@ -177,6 +182,7 @@ handleEventRows e = case e of
     MouseDown FieldNames BLeft [] (Location (_, r)) -> modify $ moveFieldTo r
     MouseDown ValueList BLeft [] (Location (_, r)) -> modify $ moveFieldTo r
     MouseDown (ValueViewer r) BLeft [] _ -> modify (moveFieldTo r) >> handleEdition e
+    MouseDown (ValueViewer r) BMiddle [] _ -> modify (moveFieldTo r) >> handleEdition e
     _ -> handleEdition e
 
 handleEdition :: BrickEvent Name EventType -> EventM Name State ()
@@ -192,8 +198,16 @@ handleEdition e = do
 
 handleEventValueEditor :: BrickEvent Name EventType -> EventM Name ValueEditor ()
 handleEventValueEditor ev = do
-    B.zoom veEditor $ Ed.handleEditorEvent ev
+    case ev of
+         MouseDown (ValueViewer _) BMiddle [] _ -> copyClipboard True
+         VtyEvent (EvKey (KChar 'v') [MCtrl]) -> copyClipboard False
+         _ -> B.zoom veEditor $ Ed.handleEditorEvent ev
     ve <- get
     let f = convertKeepText (ve ^. veType) (toField $ ve ^. veContent)
     modify $ updateEditor f
 
+copyClipboard :: Bool -> EventM Name ValueEditor ()
+copyClipboard isPrimary = do
+    let options = if isPrimary then ["-o"] else ["-selection", "clipboard", "-o"]
+    cl <- liftIO $ readProcess "xclip" options "" `catch` \(_ :: IOError) -> return ""
+    veEditor %= Ed.applyEdit (insertMany $ T.pack cl)

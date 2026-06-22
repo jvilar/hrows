@@ -83,8 +83,8 @@ setSRowStore :: Setter' State RowStore
 setSRowStore = sets $ \f s -> over sRowStoreZipper (U.push (f $ s ^. sRowStore, s ^. sIndex)) s
 
 logMessage :: Text -> EventM Name State ()
-logMessage t = sLog %= reverse . take 10 . (t:) . reverse
--- logMessage _ = return ()
+-- logMessage t = sLog %= reverse . take 10 . (t:) . reverse
+logMessage _ = return ()
 
 initialState :: RowStore -> Maybe (SourceInfo, [SourceInfo]) -> State
 initialState rst msi = State { _sRowStoreZipper = U.mkUndoZipper (rst, index)
